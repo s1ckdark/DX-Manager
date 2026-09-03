@@ -77,4 +77,22 @@ public class ApplicationHostTests : IDisposable
         host.Dispose();
         host.Dispose();
     }
+
+    [Fact]
+    public void Constructor_InitializesRuntimeFactory()
+    {
+        using var host = CreateHost();
+
+        Assert.NotNull(host.RuntimeFactory);
+    }
+
+    [Fact]
+    public void EnsureDefaultPaths_DisablesHidInputOnMac()
+    {
+        using var host = CreateHost();
+
+        // macOS는 HID 키보드/마우스를 지원하지 않으므로 조립 시 꺼져야 한다.
+        Assert.False(host.Settings.Scrcpy.UseHidKeyboard);
+        Assert.False(host.Settings.Scrcpy.UseHidMouse);
+    }
 }

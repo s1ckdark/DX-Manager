@@ -126,12 +126,89 @@ public sealed class ApplicationHost : IDisposable
 
     private void EnsureDefaultPaths()
     {
-        // Task 6에서 InteractiveHost로부터 이관한다.
+        var modified = false;
+        var currentAdb = Settings.Paths.AdbPath ?? string.Empty;
+        var forcePortableAdb = _pathProvider.IsPortablePackage &&
+            Settings.Paths.AdbSelectionMode != AdbSelectionMode.Manual;
+        if (forcePortableAdb ||
+            string.IsNullOrWhiteSpace(currentAdb) ||
+            !File.Exists(currentAdb) ||
+            currentAdb.EndsWith(".exe", StringComparison.OrdinalIgnoreCase))
+        {
+            var adb = _pathProvider.ResolveDefaultAdbPath();
+            if (File.Exists(adb))
+            {
+                Settings.Paths.AdbPath = adb;
+                modified = true;
+            }
+        }
+
+        var currentScrcpy = Settings.Paths.ScrcpyPath ?? string.Empty;
+        if (_pathProvider.IsPortablePackage ||
+            string.IsNullOrWhiteSpace(currentScrcpy) ||
+            !File.Exists(currentScrcpy) ||
+            currentScrcpy.EndsWith(".exe", StringComparison.OrdinalIgnoreCase))
+        {
+            var scrcpy = _pathProvider.ResolveDefaultScrcpyPath();
+            if (File.Exists(scrcpy))
+            {
+                Settings.Paths.ScrcpyPath = scrcpy;
+                modified = true;
+            }
+        }
+
+        if (Settings.Scrcpy != null &&
+            (Settings.Scrcpy.UseHidKeyboard || Settings.Scrcpy.UseHidMouse))
+        {
+            Settings.Scrcpy.UseHidKeyboard = false;
+            Settings.Scrcpy.UseHidMouse = false;
+            modified = true;
+        }
+
+        if (Settings.SingleWindowSlots != null)
+        {
+            foreach (var slot in Settings.SingleWindowSlots)
+            {
+                if (slot != null && (slot.UseHidKeyboard || slot.UseHidMouse))
+                {
+                    slot.UseHidKeyboard = false;
+                    slot.UseHidMouse = false;
+                    modified = true;
+                }
+            }
+        }
+
+        if (modified)
+        {
+            SettingsService.Save(Settings);
+        }
     }
 
     private void InitializeRuntimeFactory()
     {
-        // Task 6에서 InteractiveHost로부터 이관한다.
+        var scrcpyPath = Settings.Paths.ScrcpyPath;
+        if (string.IsNullOrWhiteSpace(scrcpyPath) ||
+            !File.Exists(scrcpyPath) ||
+            scrcpyPath.EndsWith(".exe", StringComparison.OrdinalIgnoreCase))
+        {
+            scrcpyPath = _pathProvider.ResolveDefaultScrcpyPath();
+        }
+
+        var adbPath = Adb.AdbPath;
+        var coordinator = new ScrcpyLaunchCoordinator();
+
+        RuntimeFactory = new DeviceRuntimeServiceFactory(
+            scrcpyPath,
+            adbPath,
+            Settings.Timing.ProcessTimeoutMs,
+            ProcessRunner,
+            Adb,
+            coordinator,
+            SettingsService,
+            Settings,
+            Log,
+            RuntimeSessions,
+            _platformService);
     }
 
     public void Dispose()
