@@ -655,7 +655,9 @@ public class ApplicationHostTests : IDisposable
         Assert.NotNull(host.PermissionService);
         Assert.NotNull(host.EnvironmentCheck);
         Assert.NotNull(host.DiagnosticReport);
-        Assert.NotNull(host.RuntimeFactory);
+
+        // RuntimeFactory는 Task 6에서 초기화되므로 여기서 단정하지 않는다.
+        // Task 6의 Constructor_InitializesRuntimeFactory가 검증한다.
     }
 
     [Fact]
@@ -853,7 +855,7 @@ dotnet test DexManager.Mac.sln -c Release
 ```
 Expected: 경고 0, `Failed: 0, Passed: 99` (96 + 신규 3)
 
-`RuntimeFactory`가 null이라 `Constructor_ComposesAllServices`가 실패한다면 정상이다. Task 6까지 진행한 뒤 통과한다. 이 경우 해당 assert를 Task 6 완료 시까지 잠시 주석 처리하지 말고, **Task 6을 이어서 수행한다.**
+세 테스트 모두 이 시점에 통과해야 한다. `RuntimeFactory`는 Task 6에서 초기화되므로 여기서 단정하지 않는다.
 
 - [ ] **Step 5: 커밋**
 
@@ -1102,13 +1104,16 @@ cat /tmp/interactive-host-before.txt
     private DiagnosticReportService _diagnosticReportService => _host.DiagnosticReport;
     private AppSettings _settings => _host.Settings;
     private DeviceRuntimeServiceFactory _runtimeFactory => _host.RuntimeFactory;
-
-    private IPlatformService _platformService => _host.PlatformService;
-    private IPathProvider _pathProvider => _host.PathProvider;
-    private ICaptureService _captureService => _host.CaptureService;
     private IKeyboardService _keyboardService => _host.KeyboardService;
-    private IAutoStartService _autoStartService => _host.AutoStartService;
 ```
+
+**`_platformService`, `_pathProvider`, `_captureService`, `_autoStartService`의 위임 프로퍼티는 만들지 않는다.** 코드 조사 결과 이 넷은 생성자·`EnsureDefaultPaths`·`InitializeRuntimeFactory` 안에서만 쓰이며, 그 코드는 전부 `ApplicationHost`로 이관되어 `InteractiveHost`에서 사용처가 사라진다. 만들면 미사용 멤버가 된다.
+
+남기는 둘의 근거:
+- `_keyboardService` — 996행 `_keyboardService?.Dispose()`
+- `_runtimeFactory` — 368행 `_runtimeFactory.Create()`
+
+빌드가 위 넷 중 하나에 대해 "존재하지 않는 이름" 오류를 내면, 그 사용처는 이관되지 않은 코드다. 해당 프로퍼티 한 줄을 추가하고 왜 남았는지 보고한다.
 
 `DeviceRuntimeServiceSet _activeRuntime`, `_selectedDeviceSerial`, `_selectedDeviceIdentity`, `_isRunning`, `_disposed`, `_shutdownStarted`, `_runtimeServicesDisposed` 필드는 TUI 상태이므로 **그대로 둔다.**
 
