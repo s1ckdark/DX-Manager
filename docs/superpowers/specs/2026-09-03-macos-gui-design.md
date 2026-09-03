@@ -333,3 +333,32 @@ Phase 2 종료 시점부터 GUI 실사용이 가능하다.
 - `MacCaptureService.CaptureWindow`의 PID/CGWindowID 불일치 실행 검증 (Phase 6 착수 시. 현재는 미검증 잠재 결함.)
 - `ApplicationHost`가 `IKeyboardService`를 비롯한 플랫폼 서비스를 소유하지만 `Dispose()`는 아무것도 하지 않고, 실제 정리는 `InteractiveHost`의 종료 경로가 수행한다. 현재 `MacKeyboardService.Dispose()`가 멱등이라 런타임 차이는 없다. GUI가 두 번째 소비자가 되는 Phase 1에서는 소유권과 정리 책임을 `ApplicationHost`로 일원화해야 한다. (Phase 0에서 이관하지 않은 이유: 서비스 teardown 이동은 동작 변경이라 범위 밖이다.)
 - `InteractiveHost._selectedDeviceSerial`과 `ApplicationHost.SelectedSerial`이 같은 개념을 이중으로 추적한다. 현재는 대입 4곳(`InteractiveHost.cs` 64, 308, 326, 346행)이 모두 짝지어 동기화되어 어긋날 수 없지만, 향후 다섯 번째 대입이 동기화를 빠뜨리면 `EnvironmentCheckService`의 진단이 잘못된 기기를 대상으로 실행되며 어떤 자동 테스트도 이를 잡지 못한다. Phase 1 착수 시 `InteractiveHost`가 자체 필드를 버리고 `ApplicationHost.SelectedSerial`만 사용하도록 일원화한다.
+
+  ⚠️ **이 수정은 동작 중립이 아니다.** 필드를 전달로 바꾸면 초기값이 `null`에서 `""`로 바뀌고, `InteractiveHost.cs:166`의 `string.Equals(...)` 결과가 기기가 serial을 보고하지 않는 경우에 뒤집힌다. 회귀 테스트를 먼저 추가한 뒤 의도적으로 변경한다.
+
+  영향 범위는 진단에 한정된다(Phase 0 최종 리뷰에서 확인). `ApplicationHost.SelectedSerial`의 저장소 전체 reader는 테스트와 `ApplicationHost.cs:93`의 클로저 둘뿐이며, 그 클로저의 호출 지점은 `EnvironmentCheckService.cs:112`(`AddDeviceScreenshotFolderCheck`) 하나다. DeX·scrcpy 실행, `DeviceRuntimeSessionRegistry` 변경, 세션 상태 접근 경로는 없다.
+
+### 8.1 Phase 1 착수 전 해결할 `ApplicationHost` 수명주기 공백
+
+Phase 0 최종 리뷰가 지적한 사항이다. 공통 원인은 하나다 — 계획은 `ApplicationHost`에 **"조립·수명주기"** 를 배정했으나 Phase 0에서는 전반부만 구현했다. GUI가 두 번째 소비자가 되는 순간 아래가 순서대로 문제가 된다.
+
+1. **`Dispose()`가 실질적으로 비어 있다.** GUI가 `using var host = new ApplicationHost(...)`를 써도 아무것도 정리되지 않는다. `DeviceMonitor` 타이머가 계속 ADB를 폴링하고 키보드 서비스가 핸들을 붙잡는다. Phase 1 최우선 과제다. (Phase 0에서 `InteractiveHost.Dispose()`가 `_host?.Dispose()`를 호출하도록 배선만 해 두었다.)
+2. **`Start()`/`Stop()`이 없다.** `DeviceMonitor.Start()` 호출은 현재 소비자 몫이다(`InteractiveHost.cs:72`). 소비자가 둘이면 시작·중지 책임이 미정의다. `Start()`는 우연히 멱등이지만(`if (_timer != null) return;`) `Stop()`은 소비자별이 아니어서 한 호스트가 멈추면 양쪽 감시가 함께 죽는다.
+3. **인스턴스가 단일 사용인데 계약에 없다.** `InteractiveHost.cs:854`가 `DeviceMonitor`를 dispose한 뒤 재시작하면 `DeviceMonitorService`가 `ObjectDisposedException`을 던진다(`DeviceMonitorService.cs:73-84`). `IsDisposed` 노출이든 문서화된 단일 사용 계약이든, 명시가 필요하다.
+4. **`SelectedSerial`에 변경 알림이 없다.** MVVM 바인딩에는 `INotifyPropertyChanged`나 이벤트가 필요하다. **GUI가 첫 ViewModel을 작성하기 전에 결정해야 한다** — 나중에 넣으면 모든 소비자를 수정해야 한다.
+5. **`Settings`가 공유 가변 `AppSettings`를 저장 조율 없이 노출한다.** 소비자 둘이 편집하면 `SettingsService.Save`에서 경쟁하며, TUI의 설정 메뉴도 같은 객체를 통해 쓴다.
+6. **Core 서비스 13개가 전부 구체 타입으로 노출된다.** 소비자 둘까지는 방어 가능하나 표면은 늘어나기만 한다. 누적이 아니라 의식적 결정이 필요하다.
+
+### 8.2 Phase 0에서 지연 처리한 기타 항목
+
+- `ApplicationHost.cs`의 `EnsureDefaultPaths`가 macOS 정책(HID 강제 비활성화, `.exe` 경로 거부)을 플랫폼 중립 Core에 담고 있다. 제약의 문언은 지키나 취지에는 어긋난다. Windows 통합 시 재검토 대상이다.
+- 죽은 참조 둘: `DexManager.Mac.csproj`의 `InternalsVisibleTo`와 `DexManager.Tests.csproj`가 참조하는 Mac 실행 파일(현재 어떤 테스트도 그 어셈블리의 타입을 쓰지 않는다).
+- `InteractiveHost.cs:60-66`이 두 serial을 모니터 스레드에서 비휘발성 저장 두 번으로 쓴다. 변수 하나일 때는 불가능하던 불일치가 가능해졌다. 영향은 위의 진단 한정 범위와 같다.
+- 브랜치의 커밋 co-author 트레일러가 일관되지 않다(모델 3종, 트레일러 없는 커밋 2개, 서로 다른 세션 URL 4개). 메타데이터 문제이며 12개 커밋을 다시 쓰는 것이 더 나쁜 거래라고 판단해 그대로 두었다.
+
+### 8.3 Phase 0에서 정적으로 검증할 수 없었던 것
+
+- 실기 Galaxy 기기의 DeX 시작·중지·overlay 정리·재연결. 작업 전 기간 동안 기기를 연결한 적이 없다. **유일한 진짜 미지수다.**
+- 배포된 single-file 패키지가 클린 머신에서 `DexManager.Platform.Mac`을 실제로 로드하는지. 패키징 스크립트는 0으로 종료하고 ZIP과 체크섬을 생성했으나, 패키징된 바이너리를 실행해 보지는 않았다.
+- `SelectedSerial` 쓰기의 메모리 가시성. 참조 저장은 원자적이라 torn read는 없으나 가시성은 소스만으로 증명할 수 없다.
+- `ApplicationHostTests`의 병렬 실행 상호작용. GUID 임시 루트로 격리되어 현재 통과하나, `LogService`/`SettingsService`/`AdbService` 내부의 정적 상태는 부하 상황에서 flake로만 드러난다.
