@@ -937,6 +937,7 @@ public sealed class InteractiveHost : IDisposable
             if (_disposed) return;
             _disposed = true;
             Shutdown();
+            _host?.Dispose();
         }
 
         private void DisposeRuntimeServices(ICollection<Exception> errors)

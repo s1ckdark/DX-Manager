@@ -1,4 +1,5 @@
 using DexManager.Hosting;
+using DexManager.Models;
 using DexManager.Services;
 using DexManager.Tests.FakePlatform;
 
@@ -63,7 +64,7 @@ public class ApplicationHostTests : IDisposable
     {
         using var host = CreateHost();
 
-        Assert.Equal(string.Empty, host.SelectedSerial ?? string.Empty);
+        Assert.Equal(string.Empty, host.SelectedSerial);
 
         host.SelectedSerial = "R5CT1234567";
 
@@ -76,7 +77,9 @@ public class ApplicationHostTests : IDisposable
         var host = CreateHost();
 
         host.Dispose();
-        host.Dispose();
+        var ex = Record.Exception(() => host.Dispose());
+
+        Assert.Null(ex);
     }
 
     [Fact]
@@ -115,5 +118,35 @@ public class ApplicationHostTests : IDisposable
             Assert.False(slot.UseHidKeyboard);
             Assert.False(slot.UseHidMouse);
         }
+    }
+
+    [Fact]
+    public void EnsureDefaultPaths_PortablePackage_ForcesConfiguredAdbPathToDefault()
+    {
+        // 이미 유효하고 존재하는 ADB 경로가 설정되어 있어도, 포터블 패키지에서는
+        // AdbSelectionMode가 Manual이 아닌 한 기본(번들) ADB 경로로 강제 교체되어야 한다.
+        // 실제 SettingsService/직렬화 경로로 사전 상태를 저장해 둔다.
+        var seedLog = new LogService();
+        var seedSettingsService = new SettingsService(seedLog, _root);
+        var seededSettings = seedSettingsService.Load();
+        const string preConfiguredAdbPath = "/bin/ls";
+        Assert.True(File.Exists(preConfiguredAdbPath));
+        seededSettings.Paths.AdbPath = preConfiguredAdbPath;
+        seededSettings.Paths.AdbSelectionMode = AdbSelectionMode.Auto;
+        seedSettingsService.Save(seededSettings);
+
+        var portablePathProvider = new FakePathProvider(_root, isPortablePackage: true);
+        using var host = new ApplicationHost(
+            new FakePlatformService(),
+            portablePathProvider,
+            new FakeCaptureService(),
+            new FakeKeyboardService(),
+            new FakeAutoStartService());
+
+        // 포터블 패키지에서는 이미 유효했던 ADB 경로였더라도 기본 경로로 교체된다.
+        Assert.NotEqual(preConfiguredAdbPath, host.Settings.Paths.AdbPath);
+        Assert.Equal(
+            portablePathProvider.ResolveDefaultAdbPath(),
+            host.Settings.Paths.AdbPath);
     }
 }

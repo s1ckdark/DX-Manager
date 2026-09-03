@@ -6,11 +6,12 @@ public sealed class FakePathProvider : IPathProvider
 {
     private readonly string _root;
 
-    public FakePathProvider(string root)
+    public FakePathProvider(string root, bool isPortablePackage = false)
     {
         _root = root;
         Directory.CreateDirectory(_root);
         Directory.CreateDirectory(Path.Combine(_root, "config"));
+        IsPortablePackage = isPortablePackage;
     }
 
     public string BaseDirectory => _root;
@@ -24,7 +25,7 @@ public sealed class FakePathProvider : IPathProvider
 
     public string DefaultProxyExecutablePath => Path.Combine(_root, "DXMAdbProxy");
 
-    public bool IsPortablePackage => false;
+    public bool IsPortablePackage { get; set; }
 
     // 실존하는 실행 파일을 반환해 경로 탐색 타임아웃을 피한다.
     public string ResolveDefaultAdbPath() => "/bin/echo";
