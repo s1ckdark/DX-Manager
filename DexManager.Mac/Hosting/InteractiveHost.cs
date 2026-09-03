@@ -1,3 +1,4 @@
+using DexManager.Hosting;
 using DexManager.Mac.Platform;
 using DexManager.Models;
 using DexManager.Platform;
@@ -8,27 +9,25 @@ namespace DexManager.Mac.Hosting;
 
 public sealed class InteractiveHost : IDisposable
 {
-    private readonly MacPlatformService _platformService;
-    private readonly MacPathProvider _pathProvider;
-    private readonly MacCaptureService _captureService;
-    private readonly MacKeyboardService _keyboardService;
-    private readonly MacAutoStartService _autoStartService;
+    private readonly ApplicationHost _host;
 
-    private readonly SettingsService _settingsService;
-    private readonly LogService _logService;
-    private readonly ProcessRunner _processRunner;
-    private readonly PathService _pathService;
-    private readonly AdbService _adbService;
-    private readonly WirelessAdbService _wirelessAdb;
-    private readonly PhysicalDeviceRegistry _deviceRegistry;
-    private readonly DeviceRuntimeSessionRegistry _runtimeSessions;
-    private readonly DeviceMonitorService _deviceMonitor;
-    private readonly DisplayCleanupPermissionService _permissionService;
-    private readonly EnvironmentCheckService _envCheckService;
-    private readonly DiagnosticReportService _diagnosticReportService;
+    // 기존 필드명을 유지해 나머지 1,000여 줄의 코드를 수정하지 않는다.
+    private SettingsService _settingsService => _host.SettingsService;
+    private LogService _logService => _host.Log;
+    private ProcessRunner _processRunner => _host.ProcessRunner;
+    private PathService _pathService => _host.PathService;
+    private AdbService _adbService => _host.Adb;
+    private WirelessAdbService _wirelessAdb => _host.WirelessAdb;
+    private PhysicalDeviceRegistry _deviceRegistry => _host.DeviceRegistry;
+    private DeviceRuntimeSessionRegistry _runtimeSessions => _host.RuntimeSessions;
+    private DeviceMonitorService _deviceMonitor => _host.DeviceMonitor;
+    private DisplayCleanupPermissionService _permissionService => _host.PermissionService;
+    private EnvironmentCheckService _envCheckService => _host.EnvironmentCheck;
+    private DiagnosticReportService _diagnosticReportService => _host.DiagnosticReport;
+    private AppSettings _settings => _host.Settings;
+    private DeviceRuntimeServiceFactory _runtimeFactory => _host.RuntimeFactory;
+    private IKeyboardService _keyboardService => _host.KeyboardService;
 
-    private readonly AppSettings _settings;
-    private DeviceRuntimeServiceFactory _runtimeFactory;
     private DeviceRuntimeServiceSet _activeRuntime;
     private string _selectedDeviceSerial;
     private string _selectedDeviceIdentity;
@@ -39,169 +38,34 @@ public sealed class InteractiveHost : IDisposable
 
     public InteractiveHost()
     {
-        _platformService = new MacPlatformService();
-        _pathProvider = new MacPathProvider();
-        _captureService = new MacCaptureService(_pathProvider.DefaultScreenshotFolder);
-        _keyboardService = new MacKeyboardService();
-        _autoStartService = new MacAutoStartService();
+        var pathProvider = new MacPathProvider();
 
-        _logService = new LogService();
-        _logService.SetLogDirectory(_pathProvider.DefaultLogDirectory);
+        _host = new ApplicationHost(
+            new MacPlatformService(),
+            pathProvider,
+            new MacCaptureService(pathProvider.DefaultScreenshotFolder),
+            new MacKeyboardService(),
+            new MacAutoStartService());
 
-        _settingsService = new SettingsService(_logService, _pathProvider.BaseDirectory);
-        _settings = _settingsService.Load();
-
-        _processRunner = new ProcessRunner(_logService);
-        _pathService = new PathService(
-            _settingsService,
-            _logService,
-            _processRunner,
-            _pathProvider,
-            _platformService);
-
-        // Auto-detect and populate macOS default paths if not set
-        EnsureDefaultPaths();
-
-        var adbPath = _pathService.SelectAdbPath(_settings, 5000);
-        _adbService = new AdbService(
-            adbPath,
-            _settings.Timing.ProcessTimeoutMs,
-            _processRunner,
-            _logService);
-
-        _wirelessAdb = new WirelessAdbService(
-            _adbService,
-            _settingsService,
-            _settings,
-            _logService);
-
-        _deviceRegistry = new PhysicalDeviceRegistry();
-        _runtimeSessions = new DeviceRuntimeSessionRegistry();
-
-        _deviceMonitor = new DeviceMonitorService(
-            _adbService,
-            _wirelessAdb,
-            _deviceRegistry,
-            _logService,
-            _settings.Timing.DeviceMonitorIntervalMs,
-            _settings.Timing.DisconnectMonitorIntervalMs);
-
-        _deviceMonitor.DeviceConnected += (_, e) =>
+        _host.DeviceMonitor.DeviceConnected += (_, e) =>
         {
             var d = e.Current;
             AnsiConsole.Success($"Device connected: {d.DisplayName} [{d.Serial}]");
         };
-        _deviceMonitor.DeviceDisconnected += (_, e) =>
+        _host.DeviceMonitor.DeviceDisconnected += (_, e) =>
         {
             var d = e.Current;
             AnsiConsole.Warning($"Device disconnected: {d.DisplayName} [{d.Serial}]");
         };
-        _deviceMonitor.StateChanged += (_, e) =>
+        _host.DeviceMonitor.StateChanged += (_, e) =>
         {
             if (string.IsNullOrWhiteSpace(_selectedDeviceSerial) && e.Current.IsConnected)
             {
                 _selectedDeviceSerial = e.Current.Serial;
+                _host.SelectedSerial = e.Current.Serial;
             }
         };
-
-        _permissionService = new DisplayCleanupPermissionService(_adbService);
-        _envCheckService = new EnvironmentCheckService(
-            _adbService,
-            null,
-            _pathService,
-            _logService,
-            _settingsService,
-            _settings,
-            () => _selectedDeviceSerial ?? string.Empty);
-
-        _diagnosticReportService = new DiagnosticReportService();
-
-        InitializeRuntimeFactory();
     }
-
-        private void EnsureDefaultPaths()
-        {
-            var modified = false;
-            var currentAdb = _settings.Paths.AdbPath ?? string.Empty;
-            var forcePortableAdb = _pathProvider.IsPortablePackage &&
-                _settings.Paths.AdbSelectionMode != AdbSelectionMode.Manual;
-            if (forcePortableAdb ||
-                string.IsNullOrWhiteSpace(currentAdb) ||
-                !File.Exists(currentAdb) ||
-                currentAdb.EndsWith(".exe", StringComparison.OrdinalIgnoreCase))
-            {
-                var adb = _pathProvider.ResolveDefaultAdbPath();
-                if (File.Exists(adb))
-                {
-                    _settings.Paths.AdbPath = adb;
-                    modified = true;
-                }
-            }
-
-            var currentScrcpy = _settings.Paths.ScrcpyPath ?? string.Empty;
-            if (_pathProvider.IsPortablePackage ||
-                string.IsNullOrWhiteSpace(currentScrcpy) ||
-                !File.Exists(currentScrcpy) ||
-                currentScrcpy.EndsWith(".exe", StringComparison.OrdinalIgnoreCase))
-            {
-                var scrcpy = _pathProvider.ResolveDefaultScrcpyPath();
-                if (File.Exists(scrcpy))
-                {
-                    _settings.Paths.ScrcpyPath = scrcpy;
-                    modified = true;
-                }
-            }
-
-            if (_settings.Scrcpy != null && (_settings.Scrcpy.UseHidKeyboard || _settings.Scrcpy.UseHidMouse))
-            {
-                _settings.Scrcpy.UseHidKeyboard = false;
-                _settings.Scrcpy.UseHidMouse = false;
-                modified = true;
-            }
-
-            if (_settings.SingleWindowSlots != null)
-            {
-                foreach (var slot in _settings.SingleWindowSlots)
-                {
-                    if (slot != null && (slot.UseHidKeyboard || slot.UseHidMouse))
-                    {
-                        slot.UseHidKeyboard = false;
-                        slot.UseHidMouse = false;
-                        modified = true;
-                    }
-                }
-            }
-
-            if (modified)
-            {
-                _settingsService.Save(_settings);
-            }
-        }
-
-        private void InitializeRuntimeFactory()
-        {
-            var scrcpyPath = _settings.Paths.ScrcpyPath;
-            if (string.IsNullOrWhiteSpace(scrcpyPath) || !File.Exists(scrcpyPath) || scrcpyPath.EndsWith(".exe", StringComparison.OrdinalIgnoreCase))
-            {
-                scrcpyPath = _pathProvider.ResolveDefaultScrcpyPath();
-            }
-
-            var adbPath = _adbService.AdbPath;
-            var coordinator = new ScrcpyLaunchCoordinator();
-
-            _runtimeFactory = new DeviceRuntimeServiceFactory(
-                scrcpyPath,
-                adbPath,
-                _settings.Timing.ProcessTimeoutMs,
-                _processRunner,
-                _adbService,
-                coordinator,
-                _settingsService,
-                _settings,
-                _logService,
-                _runtimeSessions,
-                _platformService);
-        }
 
         public async Task RunAsync(CancellationToken cancellationToken = default)
         {
@@ -442,6 +306,7 @@ public sealed class InteractiveHost : IDisposable
             {
                 var target = snapshot.Devices[idx - 1];
                 _selectedDeviceSerial = GetPrimarySerial(target);
+                _host.SelectedSerial = _selectedDeviceSerial;
                 _selectedDeviceIdentity = target.Identity;
                 AnsiConsole.Success($"Selected device: {target.DisplayName}");
             }
@@ -459,6 +324,7 @@ public sealed class InteractiveHost : IDisposable
                 return false;
             }
             _selectedDeviceSerial = serial;
+            _host.SelectedSerial = _selectedDeviceSerial;
             _selectedDeviceIdentity = device.Identity;
             AnsiConsole.Header($"STARTING DeX ON {device.DisplayName}");
             var runtime = GetOrCreateRuntime();
@@ -479,6 +345,7 @@ public sealed class InteractiveHost : IDisposable
                 }
                 _selectedDeviceSerial =
                     runtime.Dex.CurrentSession?.Serial ?? serial;
+                _host.SelectedSerial = _selectedDeviceSerial;
                 _selectedDeviceIdentity =
                     runtime.Dex.CurrentSession?.DeviceIdentity ??
                     device.Identity;
