@@ -23,6 +23,8 @@ macOS 사용자는 터미널 대시보드만 사용할 수 있다. 이 설계의
 - 기존 macOS TUI(`DexManager.Mac`)의 제거 — 유지한다
 - Apple Developer ID 서명·notarization 도입 (별도 과제, `docs/KNOWN_ISSUES.md` 참조)
 - 신규 기능 추가 — 기존 기능의 GUI 제공에 한정한다
+- **전송 상태창을 scrcpy 창 옆에 배치하는 UX** — 근거는 2.3절, 결정은 4.5절
+- **`IPlatformService`의 창 제어 API 구현** — 근거는 2.3절
 
 ## 2. 현황 분석
 
@@ -49,7 +51,36 @@ macOS 사용자는 터미널 대시보드만 사용할 수 있다. 이 설계의
 - `InteractiveHost` 생성자가 18개 서비스를 조립하는 사실상의 컴포지션 루트 역할을 한다
 - xUnit 95개 + 다중기기 회귀 39개 테스트가 통과 중이다
 
-### 2.3 프레임워크 선택 근거
+### 2.3 창 제어 API 구현 실태 조사 (2026-09-03)
+
+`MacPlatformService`의 창 제어 8개는 모두 스텁이다.
+
+| 메서드 | Mac 구현 | 결과 |
+| :--- | :--- | :--- |
+| `IsWindow` | `handle != IntPtr.Zero` | 항상 true |
+| `IsWindowVisible` | `handle != IntPtr.Zero` | 항상 true |
+| `IsIconic` | `false` 고정 | 최소화 감지 불가 |
+| `ShowWindow` | no-op | 주석만 존재 |
+| `SetForegroundWindow` | no-op | 주석만 존재 |
+| `GetForegroundWindow` | `IntPtr.Zero` | 포그라운드 창 판별 불가 |
+| `GetClientRect` | 1920×1080 하드코딩 + `return false` | 명시적 실패 신호 |
+| `GetWindowRect` | 1920×1080 하드코딩 + `return false` | 명시적 실패 신호 |
+
+`ShowWindow`/`SetForegroundWindow`의 주석은 "Handled via macOS process / AppleScript activation when needed"라고 기술하나, 코드베이스에 `osascript`/AppleScript 호출은 존재하지 않는다.
+
+**실사용 범위**: 창 제어 API 중 실제로 호출되는 것은 `IsWindow` 하나뿐이며, 호출 지점은 `ScrcpyService.cs:1070`과 `SingleWindowService.cs:1123` 두 곳(모두 `QueueWindowMonitor` 내부)이다. TUI는 창 제어 API를 전혀 호출하지 않는다. WinForms는 `IPlatformService`를 사용하지 않고 `NativeMethods`로 직접 P/Invoke한다. 나머지 7개는 인터페이스를 경유해 호출되는 지점이 없다.
+
+**`QueueWindowMonitor`의 macOS 동작**: macOS에서 `Process.MainWindowHandle`은 항상 0이므로 Core는 `handle = (IntPtr)process.Id`(PID)로 대체한다(`ScrcpyService.cs:872-878`). 따라서 `IsWindow(handle)`는 항상 true가 되어 창 닫힘을 감지하지 못한다.
+
+그러나 주 정리 경로는 별도로 존재한다. 두 서비스 모두 `process.EnableRaisingEvents = true; process.Exited += Process_Exited`를 등록하며(`ScrcpyService.cs:604`, `SingleWindowService.cs:412`), `Process_Exited`(`ScrcpyService.cs:821`)가 세션 정리·전송 세션 종료·상태 리셋·`RunningChanged` 발화를 수행한다. 이 경로는 크로스플랫폼으로 동작한다. scrcpy 창을 닫으면 프로세스가 종료되므로 정리가 이루어진다.
+
+스레드 누수도 없다. `Process_Exited`가 `_process = null`로 설정하면 감시 루프가 다음 순회(100ms)에 스스로 반환한다.
+
+**결론**: `QueueWindowMonitor`는 Windows 전용 보조 안전망이며, macOS는 `Process.Exited` 주 경로만으로 충분하다. 창 제어 미구현은 현재 기능 결함을 일으키지 않는다.
+
+**WinForms의 창 제어 실사용처**: `MainForm.TransferWindows.cs` 한 곳뿐이며, 기능은 전송 상태창을 scrcpy 창 옆에 배치하고 소유 창으로 결속하는 것이다(`ResolveTransferTarget` 106행, `TryPositionBesideTarget` 136행). 모든 경로가 실패 시 `window.Show()` 기본 배치로 폴백하므로 부가 UX에 해당한다.
+
+### 2.4 프레임워크 선택 근거
 
 **선택: Avalonia 11**
 
@@ -59,7 +90,7 @@ macOS 사용자는 터미널 대시보드만 사용할 수 있다. 이 설계의
 | .NET MAUI | 기각. macOS 지원이 Mac Catalyst 기반이라 데스크톱 다중 창 지원이 빈약하다. DX Manager는 미니 컨트롤바·설정창·전송 상태창 등 다중 창이 필수다. |
 | SwiftUI + C# 브리지 | 기각. Mac UX는 우수하나 브리지 계층이 새로 필요하고 Windows 통합 목표와 상충한다. |
 
-### 2.4 알려진 제약: Windows 7 지원
+### 2.5 알려진 제약: Windows 7 지원
 
 Avalonia를 포함한 크로스플랫폼 .NET UI는 데스크톱에서 **.NET 8.0 이상**을 요구한다. .NET 7부터 Windows 7/8.1 지원이 중단되었고, Windows 7을 지원한 마지막 릴리스는 .NET 6(2024-11-12 지원 종료)이다.
 
@@ -215,7 +246,35 @@ public interface IUiDispatcher
 - **화면 기록 권한**: `MacCaptureService`가 `screencapture` CLI를 호출하므로 macOS 화면 기록 권한이 필요하다. 영역 선택 오버레이도 동일하다. 첫 실행 시 권한 안내 UI가 필요하다.
 - **권한 주체 변경**: 권한은 `.app` 번들 식별자에 귀속된다. 기존 CLI 바이너리와 주체가 달라지므로 GUI 첫 실행 시 권한 재승인이 필요하다. 사용자 문서에 명시한다.
 - **미니 컨트롤바**: Avalonia `Window.Topmost` + `ShowInTaskbar = false`로 구현한다.
-- **`IPlatformService`의 창 제어 API**: `SetForegroundWindow`, `GetWindowRect`, `IsIconic` 등이 인터페이스에 정의되어 있다. `MacPlatformService`의 실제 구현 수준은 구현 계획 단계에서 확인해야 하며, scrcpy 창 제어에 직접 영향을 준다. 미구현 항목이 있으면 해당 GUI 기능의 범위를 명시적으로 조정한다.
+
+### 4.5 창 제어 의존 기능의 범위 결정
+
+2.3절 조사 결과에 따라 다음을 확정한다.
+
+**결정 1 — `IPlatformService` 창 제어 8개는 구현하지 않는다.**
+
+실사용이 `IsWindow` 하나뿐이고, 그마저 `Process.Exited` 주 경로가 정리를 담당하므로 구현 이득이 없다. macOS에서 타 앱 창을 제어하려면 접근성 권한(`AXUIElement`)이 필요한데, 얻는 것에 비해 사용자 부담이 크다. 기존 스텁을 그대로 유지한다.
+
+`GetClientRect`/`GetWindowRect`가 하드코딩 값을 채우면서도 `false`를 반환하는 현재 방식은 호출자가 스텁임을 감지할 수 있게 하므로 유지한다.
+
+**결정 2 — 전송 상태창은 화면 기준 기본 배치로 구현한다.**
+
+WinForms의 "scrcpy 창 옆 배치 + 소유 창 결속"은 비목표로 둔다(1절). macOS에서 scrcpy 창 좌표를 얻으려면 `CGWindowListCopyWindowInfo` 또는 접근성 권한이 필요한데, 부가 UX를 위해 화면 기록 권한에 더해 접근성 권한까지 요구하는 것은 과하다. WinForms도 창 좌표 획득 실패 시 기본 배치로 폴백하므로, macOS는 항상 폴백 경로를 사용하는 것과 동등하다.
+
+Phase 4에서 전송 상태창은 주 창 기준 또는 화면 중앙 기준으로 배치한다.
+
+**결정 3 — Phase 6 착수 전 `MacCaptureService.CaptureWindow`를 선행 수정한다.**
+
+미검증 잠재 결함이 존재한다. `CaptureWindow`는 `screencapture -x -l <handle>`을 호출하는데, `man screencapture` 기준 `-l`은 CoreGraphics window ID를 받는다. 그러나 Core가 전달하는 handle은 macOS에서 PID이므로(2.3절) 창 캡처가 실패할 것으로 판단된다.
+
+추가로 `RunScreencapture`는 예외를 삼키고 `CaptureWindow`는 성공 여부와 무관하게 파일 경로를 반환하므로, 실패가 성공으로 보고된다.
+
+현재 `MacCaptureService`는 `InteractiveHost`에서 생성만 되고 호출 지점이 없어 도달 불가 상태이며, 실행 검증은 수행하지 않았다. 따라서 확인된 버그가 아닌 **미검증 잠재 결함**으로 분류한다. Phase 6에서 캡처를 GUI에 노출하는 시점에 다음 중 하나를 선택해 해소한다.
+
+- (a) 창 캡처를 제공하지 않고 전체화면·영역 캡처만 노출한다
+- (b) `CGWindowListCopyWindowInfo`로 PID → CGWindowID 변환을 구현한다
+
+어느 쪽이든 `CaptureResult`가 실패를 반영하도록 함께 수정한다.
 
 ## 5. 검증 전략
 
@@ -256,9 +315,9 @@ DX Manager.app/Contents/
 | 1 | `Desktop` 골격 + `MainWindow` (기기 목록·선택·상태) | 앱 기동, 연결 기기 표시 |
 | 2 | DeX 시작/중지 + 단일창 슬롯 | 실사용 가능 |
 | 3 | `SettingsWindow` (연결·값·상호작용·테마) | 설정 변경·영구 저장 |
-| 4 | 무선 ADB + 파일 전송 + 전송 상태창 | |
+| 4 | 무선 ADB + 파일 전송 + 전송 상태창 (화면 기준 배치, 4.5절 결정 2) | |
 | 5 | 진단 + 로그 + 기기 폴더 탐색 | |
-| 6 | 미니 컨트롤바 + 캡처 영역 선택 오버레이 | |
+| 6 | `MacCaptureService` 선행 수정(4.5절 결정 3) → 미니 컨트롤바 + 캡처 영역 선택 오버레이 | 캡처 실패가 `CaptureResult`에 반영됨 |
 | 7 | `.app` 번들 패키징 + CI 통합 | ZIP 검증 통과 |
 
 **Phase 0만 기존 동작을 건드린다.** 여기에는 기능 추가 금지 제약을 건다.
@@ -269,5 +328,6 @@ Phase 2 종료 시점부터 GUI 실사용이 가능하다.
 
 ## 8. 열린 항목
 
-- `MacPlatformService`의 창 제어 API 실제 구현 수준 확인 (Phase 1 착수 전에 조사한다. 결과에 따라 scrcpy 창 제어 관련 GUI 기능의 범위를 조정한다.)
+- ~~`MacPlatformService`의 창 제어 API 실제 구현 수준 확인~~ — **해결됨(2026-09-03).** 조사 결과는 2.3절, 범위 결정은 4.5절 참조.
 - Windows UI 통합 착수 여부 및 Windows 7/8.1 지원 정책 (본 설계 범위 밖. 통합을 착수하는 시점에 별도 결정한다.)
+- `MacCaptureService.CaptureWindow`의 PID/CGWindowID 불일치 실행 검증 (Phase 6 착수 시. 현재는 미검증 잠재 결함.)
