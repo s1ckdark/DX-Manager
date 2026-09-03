@@ -198,5 +198,17 @@ namespace DexManager.Tests
 
             Assert.Throws<FileNotFoundException>(() => pathService.SelectAdbPath(settings, 3000));
         }
+
+        [Fact]
+        public void IsPortablePackage_IsReachableThroughInterface()
+        {
+            IPathProvider provider = new MacPathProvider();
+
+            // 인터페이스 경유 접근만 검증한다. 값 자체는 번들 도구 존재 여부에
+            // 따라 달라지므로 단정하지 않는다.
+            var value = provider.IsPortablePackage;
+
+            Assert.IsType<bool>(value);
+        }
     }
 }
