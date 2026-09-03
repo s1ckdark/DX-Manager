@@ -20,12 +20,52 @@
   </ItemGroup>
 
   <ItemGroup>
-    <None Include="..\tools\**\*.*" Condition="'$(CopyBundledMacTools)' == 'true'">
+    <!--
+      adb-proxy는 이 글롭에서 제외한다. 저장소의 tools/adb-proxy에 미리 빌드된
+      바이너리를 두면 그 아키텍처가 고정되어 다른 아키텍처의 Mac에서 실행되지
+      않는다. 대신 아래 CopyAdbProxyToToolsFolder가 호스트 아키텍처로 빌드된
+      산출물을 복사한다.
+    -->
+    <None Include="..\tools\**\*.*"
+          Exclude="..\tools\adb-proxy\**\*.*"
+          Condition="'$(CopyBundledMacTools)' == 'true'">
       <Link>tools\%(RecursiveDir)%(Filename)%(Extension)</Link>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
       <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
     </None>
   </ItemGroup>
+
+  <!--
+    ADB proxy를 호스트 아키텍처로 빌드해 tools/adb-proxy에 넣는다.
+    scrcpy가 이 프록시를 자기 adb로 실행하므로 아키텍처가 맞지 않으면
+    "Could not start adb server"로 DeX 시작이 실패한다.
+    배포 패키지는 scripts/Package-Mac-Release.sh가 대상 RID로 별도 publish하므로
+    Build에서만 복사하고 Publish에는 관여하지 않는다.
+  -->
+  <ItemGroup>
+    <ProjectReference Include="..\DexManager.AdbProxy\DexManager.AdbProxy.csproj">
+      <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
+    </ProjectReference>
+  </ItemGroup>
+
+  <Target Name="CopyAdbProxyToToolsFolder"
+          AfterTargets="Build"
+          Condition="'$(CopyBundledMacTools)' == 'true'">
+    <PropertyGroup>
+      <_AdbProxyOutDir>$(MSBuildThisFileDirectory)..\DexManager.AdbProxy\bin\$(Configuration)\net8.0\</_AdbProxyOutDir>
+    </PropertyGroup>
+    <ItemGroup>
+      <_AdbProxyFiles Include="$(_AdbProxyOutDir)DXMAdbProxy" />
+      <_AdbProxyFiles Include="$(_AdbProxyOutDir)DXMAdbProxy.dll" />
+      <_AdbProxyFiles Include="$(_AdbProxyOutDir)DXMAdbProxy.deps.json" />
+      <_AdbProxyFiles Include="$(_AdbProxyOutDir)DXMAdbProxy.runtimeconfig.json" />
+    </ItemGroup>
+    <Copy SourceFiles="@(_AdbProxyFiles)"
+          DestinationFolder="$(OutDir)tools\adb-proxy"
+          SkipUnchangedFiles="true" />
+    <Exec Command="chmod +x &quot;$(OutDir)tools/adb-proxy/DXMAdbProxy&quot;"
+          Condition="'$(OS)' != 'Windows_NT' And Exists('$(OutDir)tools/adb-proxy/DXMAdbProxy')" />
+  </Target>
 
   <ItemGroup>
     <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleTo">
