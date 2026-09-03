@@ -2,6 +2,14 @@
 
 ## 다음 작업
 
+- [x] macOS GUI Phase 0 — 플랫폼 분리와 ApplicationHost 추출
+  - [x] `IPathProvider.IsPortablePackage` 승격
+  - [x] `DexManager.Platform.Mac` 라이브러리 분리
+  - [x] `ApplicationHost` 조립 루트 추출
+  - [x] `InteractiveHost`를 `ApplicationHost` 소비로 전환
+  - [ ] 실제 기기에서 TUI DeX 시작·중지 회귀 확인
+- [ ] macOS GUI Phase 1 — Avalonia Desktop 골격과 MainWindow
+
 - [x] v2.0.1 DeX 기기별 설정 표시 회귀 수정
   - [x] 첫 물리 identity 결속 뒤 기기별 DeX 설정 UI 재동기화
   - [x] 최초 다중 기기 선택에서 공통 기본값의 기기별 설정 덮어쓰기 차단

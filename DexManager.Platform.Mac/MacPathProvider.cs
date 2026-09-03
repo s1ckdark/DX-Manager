@@ -17,7 +17,7 @@ public sealed class MacPathProvider : IPathProvider
             Path.Combine(BaseDirectory, "PORTABLE_PACKAGE.txt"));
     }
 
-    internal bool IsPortablePackage => _preferBundledTools;
+    public bool IsPortablePackage => _preferBundledTools;
 
     public string BaseDirectory => AppDomain.CurrentDomain.BaseDirectory;
 

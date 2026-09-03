@@ -21,6 +21,7 @@
   <ItemGroup>
     <ProjectReference Include="..\DexManager.Core\DexManager.Core.csproj" />
     <ProjectReference Include="..\DexManager.Mac\DexManager.Mac.csproj" />
+    <ProjectReference Include="..\DexManager.Platform.Mac\DexManager.Platform.Mac.csproj" />
   </ItemGroup>
 
   <ItemGroup>

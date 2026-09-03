@@ -198,5 +198,15 @@ namespace DexManager.Tests
 
             Assert.Throws<FileNotFoundException>(() => pathService.SelectAdbPath(settings, 3000));
         }
+
+        [Fact]
+        public void IsPortablePackage_ReflectsPreferBundledToolsThroughInterface()
+        {
+            IPathProvider portable = new MacPathProvider(preferBundledTools: true);
+            IPathProvider nonPortable = new MacPathProvider(preferBundledTools: false);
+
+            Assert.True(portable.IsPortablePackage);
+            Assert.False(nonPortable.IsPortablePackage);
+        }
     }
 }
