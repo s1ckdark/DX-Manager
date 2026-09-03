@@ -1,4 +1,5 @@
 using DexManager.Hosting;
+using DexManager.Services;
 using DexManager.Tests.FakePlatform;
 
 namespace DexManager.Tests;
@@ -89,10 +90,30 @@ public class ApplicationHostTests : IDisposable
     [Fact]
     public void EnsureDefaultPaths_DisablesHidInputOnMac()
     {
+        // 실제 SettingsService/직렬화 경로로 "HID가 켜져 있던" 상태를 미리 저장해 둔다.
+        // ApplicationHost가 읽는 것과 동일한 <_root>/config/settings.json 파일을 생성한다.
+        var seedLog = new LogService();
+        var seedSettingsService = new SettingsService(seedLog, _root);
+        var seededSettings = seedSettingsService.Load();
+        seededSettings.Scrcpy.UseHidKeyboard = true;
+        seededSettings.Scrcpy.UseHidMouse = true;
+        Assert.NotEmpty(seededSettings.SingleWindowSlots);
+        foreach (var slot in seededSettings.SingleWindowSlots)
+        {
+            slot.UseHidKeyboard = true;
+            slot.UseHidMouse = true;
+        }
+        seedSettingsService.Save(seededSettings);
+
         using var host = CreateHost();
 
         // macOS는 HID 키보드/마우스를 지원하지 않으므로 조립 시 꺼져야 한다.
         Assert.False(host.Settings.Scrcpy.UseHidKeyboard);
         Assert.False(host.Settings.Scrcpy.UseHidMouse);
+        foreach (var slot in host.Settings.SingleWindowSlots)
+        {
+            Assert.False(slot.UseHidKeyboard);
+            Assert.False(slot.UseHidMouse);
+        }
     }
 }
