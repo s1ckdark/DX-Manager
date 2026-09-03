@@ -12,6 +12,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DexManager.MultiDeviceTests
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DexManager.Tests", "DexManager.Tests\DexManager.Tests.csproj", "{37209A68-0A80-4BA6-81FD-05A2C2D7C0FF}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DexManager.Platform.Mac", "DexManager.Platform.Mac\DexManager.Platform.Mac.csproj", "{B8C84693-5B86-4DF7-ABDA-CEFBA65A2861}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -38,6 +40,10 @@ Global
 		{37209A68-0A80-4BA6-81FD-05A2C2D7C0FF}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{37209A68-0A80-4BA6-81FD-05A2C2D7C0FF}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{37209A68-0A80-4BA6-81FD-05A2C2D7C0FF}.Release|Any CPU.Build.0 = Release|Any CPU
+		{B8C84693-5B86-4DF7-ABDA-CEFBA65A2861}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{B8C84693-5B86-4DF7-ABDA-CEFBA65A2861}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{B8C84693-5B86-4DF7-ABDA-CEFBA65A2861}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{B8C84693-5B86-4DF7-ABDA-CEFBA65A2861}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

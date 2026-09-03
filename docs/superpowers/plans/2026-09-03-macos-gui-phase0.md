@@ -253,6 +253,20 @@ macOS 플랫폼 구현이 실행 파일 프로젝트 안에 있어 GUI가 참조
     <ProjectReference Include="..\DexManager.Core\DexManager.Core.csproj" />
   </ItemGroup>
 
+  <!--
+    MacPathProvider에는 테스트 전용 internal 생성자
+    MacPathProvider(bool? preferBundledTools)가 있고 MacPathProviderTests가
+    이를 직접 호출한다. 타입이 이 어셈블리로 옮겨오므로, 그 호출을 합법으로
+    만들던 접근 허가도 함께 옮긴다. DexManager.Mac.csproj와 DexManager.Core.csproj가
+    이미 같은 패턴을 선언한다. 노출 대상은 테스트 어셈블리 하나로 이동 전과 같다.
+    DexManager.MultiDeviceTests에는 부여하지 않는다.
+  -->
+  <ItemGroup>
+    <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleTo">
+      <_Parameter1>DexManager.Tests</_Parameter1>
+    </AssemblyAttribute>
+  </ItemGroup>
+
 </Project>
 ```
 
