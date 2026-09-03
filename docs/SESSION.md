@@ -1,6 +1,18 @@
 # Session Handoff
 
-마지막 갱신: 2026-08-31
+마지막 갱신: 2026-09-03
+
+## macOS GUI Phase 0 완료
+
+- `DexManager.Platform.Mac` 라이브러리를 분리해 macOS 플랫폼 서비스 5종을
+  실행 파일 밖으로 옮겼다. 네임스페이스는 `DexManager.Mac.Platform`을 유지한다.
+- `IPathProvider`에 `IsPortablePackage`를 추가했다. 구현체는 `MacPathProvider`
+  하나뿐이다.
+- `DexManager.Core/Hosting/ApplicationHost.cs`가 서비스 조립, 경로 기본값 보정,
+  런타임 팩토리 초기화를 담당한다. 플랫폼 구현은 생성자 주입으로 받는다.
+- `InteractiveHost`는 `ApplicationHost`를 소비하며 TUI 전용 로직만 보유한다.
+- xUnit 101개(기존 95 + 신규 6), 다중기기 회귀 39개 통과. Release 빌드 경고 0.
+- 실제 Galaxy 기기의 DeX 실기 검증은 수행하지 않았다. 미확인 항목이다.
 
 ## macOS 포터블 배포 작업
 

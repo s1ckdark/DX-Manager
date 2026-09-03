@@ -112,7 +112,7 @@ DexManager.Core          (net8.0, lib)  기존 엔진
   └ Platform/I*.cs                      기존 추상화 5종 — 재사용
   └ Hosting/ApplicationHost.cs          신규: 서비스 조립
 
-DexManager.Platform.Mac  (net8.0, lib)  신규: DexManager.Mac/Platform/ 이동
+DexManager.Platform.Mac  (net8.0, lib)  완료(Phase 0): DexManager.Mac/Platform/에서 이동
 
 DexManager.ViewModels    (net8.0, lib)  신규: UI 로직·상태, Avalonia 비의존
 
@@ -311,7 +311,7 @@ DX Manager.app/Contents/
 
 | Phase | 내용 | 완료 조건 |
 | :--- | :--- | :--- |
-| 0 | `Platform.Mac` 분리 + `ApplicationHost` 추출 | 기존 134개 테스트 통과, 기능 변경 없음 |
+| 0 | `Platform.Mac` 분리 + `ApplicationHost` 추출 | ✅ 완료 — 101개 xUnit + 39개 다중기기 통과, 기능 변경 없음 |
 | 1 | `Desktop` 골격 + `MainWindow` (기기 목록·선택·상태) | 앱 기동, 연결 기기 표시 |
 | 2 | DeX 시작/중지 + 단일창 슬롯 | 실사용 가능 |
 | 3 | `SettingsWindow` (연결·값·상호작용·테마) | 설정 변경·영구 저장 |
@@ -331,3 +331,5 @@ Phase 2 종료 시점부터 GUI 실사용이 가능하다.
 - ~~`MacPlatformService`의 창 제어 API 실제 구현 수준 확인~~ — **해결됨(2026-09-03).** 조사 결과는 2.3절, 범위 결정은 4.5절 참조.
 - Windows UI 통합 착수 여부 및 Windows 7/8.1 지원 정책 (본 설계 범위 밖. 통합을 착수하는 시점에 별도 결정한다.)
 - `MacCaptureService.CaptureWindow`의 PID/CGWindowID 불일치 실행 검증 (Phase 6 착수 시. 현재는 미검증 잠재 결함.)
+- `ApplicationHost`가 `IKeyboardService`를 비롯한 플랫폼 서비스를 소유하지만 `Dispose()`는 아무것도 하지 않고, 실제 정리는 `InteractiveHost`의 종료 경로가 수행한다. 현재 `MacKeyboardService.Dispose()`가 멱등이라 런타임 차이는 없다. GUI가 두 번째 소비자가 되는 Phase 1에서는 소유권과 정리 책임을 `ApplicationHost`로 일원화해야 한다. (Phase 0에서 이관하지 않은 이유: 서비스 teardown 이동은 동작 변경이라 범위 밖이다.)
+- `InteractiveHost._selectedDeviceSerial`과 `ApplicationHost.SelectedSerial`이 같은 개념을 이중으로 추적한다. 현재는 대입 4곳(`InteractiveHost.cs` 64, 308, 326, 346행)이 모두 짝지어 동기화되어 어긋날 수 없지만, 향후 다섯 번째 대입이 동기화를 빠뜨리면 `EnvironmentCheckService`의 진단이 잘못된 기기를 대상으로 실행되며 어떤 자동 테스트도 이를 잡지 못한다. Phase 1 착수 시 `InteractiveHost`가 자체 필드를 버리고 `ApplicationHost.SelectedSerial`만 사용하도록 일원화한다.
