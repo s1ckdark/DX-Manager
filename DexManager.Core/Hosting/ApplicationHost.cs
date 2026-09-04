@@ -124,6 +124,27 @@ public sealed class ApplicationHost : IDisposable
     /// </summary>
     public string SelectedSerial { get; set; }
 
+    /// <summary>
+    /// 기기 감시를 시작한다. 호스트 인스턴스 하나는 소비자 하나가 소유한다 —
+    /// 여러 소비자가 한 호스트를 공유하지 않는다.
+    /// </summary>
+    public void Start()
+    {
+        if (_disposed)
+            throw new ObjectDisposedException(nameof(ApplicationHost));
+        DeviceMonitor.Start();
+    }
+
+    /// <summary>
+    /// 기기 감시를 중지한다. 해제된 호스트에서는 아무 일도 하지 않는다 —
+    /// 정리 경로가 순서를 어겨 호출해도 앱이 죽지 않게 한다.
+    /// </summary>
+    public void Stop()
+    {
+        if (_disposed) return;
+        DeviceMonitor.Stop();
+    }
+
     private void EnsureDefaultPaths()
     {
         var modified = false;

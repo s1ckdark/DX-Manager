@@ -166,4 +166,35 @@ public class ApplicationHostTests : IDisposable
             portablePathProvider.ResolveDefaultAdbPath(),
             host.Settings.Paths.AdbPath);
     }
+
+    [Fact]
+    public void Start_ThenStop_LeavesHostRestartable()
+    {
+        using var host = CreateHost();
+
+        host.Start();
+        host.Stop();
+        host.Start();
+        host.Stop();
+
+        Assert.False(host.IsDisposed);
+    }
+
+    [Fact]
+    public void Start_AfterDispose_Throws()
+    {
+        var host = CreateHost();
+        host.Dispose();
+
+        Assert.Throws<ObjectDisposedException>(() => host.Start());
+    }
+
+    [Fact]
+    public void Stop_AfterDispose_DoesNotThrow()
+    {
+        var host = CreateHost();
+        host.Dispose();
+
+        host.Stop();
+    }
 }

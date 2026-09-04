@@ -70,7 +70,7 @@ public sealed class InteractiveHost : IDisposable
         public async Task RunAsync(CancellationToken cancellationToken = default)
         {
             _isRunning = true;
-            _deviceMonitor.Start();
+            _host.Start();
 
             AnsiConsole.Clear();
             PrintBanner();
@@ -806,7 +806,7 @@ public sealed class InteractiveHost : IDisposable
         private async Task WaitForDeviceSnapshotAsync(
             CancellationToken cancellationToken = default)
         {
-            _deviceMonitor.Start();
+            _host.Start();
             var pollTimeoutMs = (int)Math.Min(
                 60000L,
                 Math.Max(
