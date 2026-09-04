@@ -32,3 +32,6 @@ dist/
 **/config/settings.json
 **/config/settings.json.*
 **/*.dSYM/
+
+# Agent tooling operational state
+.omc/
