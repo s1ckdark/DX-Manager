@@ -6,6 +6,7 @@ namespace DexManager.Tests.FakePlatform;
 public sealed class FakeKeyboardService : IKeyboardService
 {
     public bool Started { get; private set; }
+    public int DisposeCallCount { get; private set; }
 
     public event EventHandler CaptureHotkeyPressed;
     public event EventHandler ExitHotkeyPressed;
@@ -24,5 +25,9 @@ public sealed class FakeKeyboardService : IKeyboardService
     public void TriggerExit() =>
         ExitHotkeyPressed?.Invoke(this, EventArgs.Empty);
 
-    public void Dispose() => Stop();
+    public void Dispose()
+    {
+        Stop();
+        DisposeCallCount++;
+    }
 }

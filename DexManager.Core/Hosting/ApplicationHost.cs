@@ -211,9 +211,48 @@ public sealed class ApplicationHost : IDisposable
             _platformService);
     }
 
+    /// <summary>
+    /// 이 호스트가 이미 해제되었는지 여부. 해제된 호스트는 재사용할 수 없다 —
+    /// <see cref="DeviceMonitor"/>가 <see cref="ObjectDisposedException"/>을 던진다.
+    /// 인스턴스 하나는 한 번만 사용한다.
+    /// </summary>
+    public bool IsDisposed => _disposed;
+
+    /// <summary>
+    /// 호스트가 소유한 서비스를 정리한다. 멱등하다.
+    /// 정리 중 발생한 예외는 모두 수집한 뒤 <see cref="AggregateException"/>으로
+    /// 던진다 — 앞선 실패가 뒤의 정리를 막지 않게 하기 위함이다.
+    /// </summary>
     public void Dispose()
     {
         if (_disposed) return;
         _disposed = true;
+
+        var errors = new List<Exception>();
+
+        try
+        {
+            DeviceMonitor?.Dispose();
+        }
+        catch (Exception ex)
+        {
+            errors.Add(ex);
+        }
+
+        try
+        {
+            _keyboardService?.Dispose();
+        }
+        catch (Exception ex)
+        {
+            errors.Add(ex);
+        }
+
+        if (errors.Count > 0)
+        {
+            throw new AggregateException(
+                "ApplicationHost disposal did not complete cleanly.",
+                errors);
+        }
     }
 }

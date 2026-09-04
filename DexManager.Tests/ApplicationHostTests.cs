@@ -29,11 +29,11 @@ public class ApplicationHostTests : IDisposable
         }
     }
 
-    private ApplicationHost CreateHost() => new ApplicationHost(
+    private ApplicationHost CreateHost(FakeKeyboardService keyboard = null) => new ApplicationHost(
         new FakePlatformService(),
         new FakePathProvider(_root),
         new FakeCaptureService(),
-        new FakeKeyboardService(),
+        keyboard ?? new FakeKeyboardService(),
         new FakeAutoStartService());
 
     [Fact]
@@ -72,14 +72,31 @@ public class ApplicationHostTests : IDisposable
     }
 
     [Fact]
+    public void Dispose_DisposesKeyboardServiceAndStopsDeviceMonitor()
+    {
+        var keyboard = new FakeKeyboardService();
+        var host = CreateHost(keyboard: keyboard);
+
+        host.DeviceMonitor.Start();
+        host.Dispose();
+
+        Assert.True(host.IsDisposed);
+        Assert.Equal(1, keyboard.DisposeCallCount);
+        Assert.Throws<ObjectDisposedException>(() => host.DeviceMonitor.Start());
+    }
+
+    [Fact]
     public void Dispose_IsIdempotent()
     {
-        var host = CreateHost();
+        var keyboard = new FakeKeyboardService();
+        var host = CreateHost(keyboard: keyboard);
 
         host.Dispose();
         var ex = Record.Exception(() => host.Dispose());
+        host.Dispose();
 
         Assert.Null(ex);
+        Assert.Equal(1, keyboard.DisposeCallCount);
     }
 
     [Fact]
