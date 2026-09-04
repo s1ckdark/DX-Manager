@@ -72,6 +72,36 @@ public class ApplicationHostTests : IDisposable
     }
 
     [Fact]
+    public void SelectedSerial_NormalizesNullToEmpty()
+    {
+        using var host = CreateHost();
+
+        host.SelectedSerial = null;
+
+        Assert.NotNull(host.SelectedSerial);
+        Assert.Equal(string.Empty, host.SelectedSerial);
+    }
+
+    [Fact]
+    public void SelectedSerial_RaisesChangedOnlyWhenValueDiffers()
+    {
+        using var host = CreateHost();
+
+        var events = new List<(string Previous, string Current)>();
+        host.SelectedSerialChanged += (_, e) => events.Add((e.Previous, e.Current));
+
+        host.SelectedSerial = "R5KLTEST";
+        host.SelectedSerial = "R5KLTEST";   // 같은 값 — 발생하지 않아야 한다
+        host.SelectedSerial = "OTHER";
+        host.SelectedSerial = null;         // "" 로 정규화되며 변경으로 간주
+
+        Assert.Equal(3, events.Count);
+        Assert.Equal((string.Empty, "R5KLTEST"), events[0]);
+        Assert.Equal(("R5KLTEST", "OTHER"), events[1]);
+        Assert.Equal(("OTHER", string.Empty), events[2]);
+    }
+
+    [Fact]
     public void Dispose_DisposesKeyboardServiceAndStopsDeviceMonitor()
     {
         var keyboard = new FakeKeyboardService();

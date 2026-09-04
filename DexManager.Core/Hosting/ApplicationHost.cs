@@ -20,6 +20,7 @@ public sealed class ApplicationHost : IDisposable
     private readonly IAutoStartService _autoStartService;
 
     private bool _disposed;
+    private string _selectedSerial = string.Empty;
 
     public ApplicationHost(
         IPlatformService platformService,
@@ -121,8 +122,29 @@ public sealed class ApplicationHost : IDisposable
     /// <summary>
     /// 현재 선택된 기기의 transport serial. 진단 서비스가 이 값을 읽는다.
     /// 소비 호스트(TUI/GUI)가 갱신한다.
+    /// <c>null</c>을 대입하면 <see cref="string.Empty"/>로 정규화되므로
+    /// 이 속성은 절대 <c>null</c>을 반환하지 않는다.
     /// </summary>
-    public string SelectedSerial { get; set; }
+    public string SelectedSerial
+    {
+        get => _selectedSerial;
+        set
+        {
+            var next = value ?? string.Empty;
+            var previous = _selectedSerial;
+            if (string.Equals(previous, next, StringComparison.Ordinal)) return;
+            _selectedSerial = next;
+            SelectedSerialChanged?.Invoke(
+                this,
+                new SelectedSerialChangedEventArgs(previous, next));
+        }
+    }
+
+    /// <summary>
+    /// <see cref="SelectedSerial"/>이 실제로 바뀔 때 발생한다.
+    /// 같은 값을 다시 대입하면 발생하지 않는다.
+    /// </summary>
+    public event EventHandler<SelectedSerialChangedEventArgs> SelectedSerialChanged;
 
     /// <summary>
     /// 기기 감시를 시작한다. 호스트 인스턴스 하나는 소비자 하나가 소유한다 —
@@ -276,4 +298,20 @@ public sealed class ApplicationHost : IDisposable
                 errors);
         }
     }
+}
+
+/// <summary>
+/// <see cref="ApplicationHost.SelectedSerialChanged"/>가 전달하는 값.
+/// 두 속성 모두 <c>null</c>이 아니다.
+/// </summary>
+public sealed class SelectedSerialChangedEventArgs : EventArgs
+{
+    public SelectedSerialChangedEventArgs(string previous, string current)
+    {
+        Previous = previous ?? string.Empty;
+        Current = current ?? string.Empty;
+    }
+
+    public string Previous { get; }
+    public string Current { get; }
 }
