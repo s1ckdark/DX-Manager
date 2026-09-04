@@ -2,13 +2,25 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** 온디바이스 DeX 창 설계의 미검증 위험 3건에 답을 내고, 접근안 A(직접 Surface 연결)를 계속 갈지 접근안 C(scrcpy-server 내장)로 선회할지 판정한다.
+**Goal:** 온디바이스 DeX 창 설계의 미검증 위험에 답을 내고, 접근안(scrcpy 자체 기동)을 유지할지 Shizuku 의존으로 되돌릴지 판정한다.
 
-**Architecture:** 이것은 **버리는 코드를 쓰는 스파이크**다. 산출물은 앱이 아니라 답이다. 가장 싸고 정보량이 큰 실험부터 배치한다 — 위험 2건은 코드 없이 `scrcpy`와 `adb`만으로 답하고, 나머지 1건(Shizuku 경유 Surface 전달)에만 스파이크 앱을 만든다.
+**Architecture:** 이것은 **버리는 코드를 쓰는 스파이크**다. 산출물은 앱이 아니라 답이다. 가장 싸고 정보량이 큰 실험부터 배치한다 — Task 2·3은 코드 없이 `scrcpy`와 `adb`만으로 답하고, Task 4~6에서만 스파이크 앱을 만들어 앱이 자기 기기의 adb 데몬을 통해 셸을 얻고 `scrcpy-server`를 띄울 수 있는지 확인한다.
 
-**Tech Stack:** Android (Java, minSdk 30, compileSdk 36), Gradle 8.14.5, Shizuku API, adb, scrcpy 4.1
+**Tech Stack:** Android (Java, minSdk 30, compileSdk 36), Gradle wrapper 8.14.5, AGP 8.13.2, libadb-android, adb, scrcpy 4.1
 
 **Spec:** `docs/superpowers/specs/2026-09-04-ondevice-dex-window-design.md`
+
+## 진행 상태 (2026-09-04)
+
+**Task 1~3은 이미 완료되었다.** 접근안 선회 이전에 실행되었으나 그 결과는 접근안과 무관하게 유효하며, 실제로 이번 선회의 근거가 되었다.
+
+| Task | 결과 |
+| :--- | :--- |
+| 1 | 툴체인 검증 완료. 기준선: `overlay=null`, `stay_on=0`, 디스플레이 `0 1` |
+| 2 | **Q2 통과** — 삼성 `SecondaryLauncher`가 shell 생성 TRUSTED 디스플레이에 자동 부착 |
+| 3 | **Q3 아니오** — 보조 디스플레이에 IME가 뜨지 않고 display 0에 결합 |
+
+Task 4~6은 접근안 선회로 **전면 재작성되었다.** 기존의 Shizuku 경유 Surface 전달 검증은 무효가 되었으며, 그 질문 자체가 새 접근안에서는 존재하지 않는다.
 
 ## Global Constraints
 
@@ -37,16 +49,22 @@ export PATH="$JAVA_HOME/bin:$PATH"
 
 ## 기기 연결
 
-기기는 무선 ADB로 붙는다. USB 케이블은 앞서 인식되지 않았다.
+Task 1 실행 시점에 adb 대상이 셋 붙어 있었다 — USB(`R5***TP`), 무선(`IP:PORT`), 에뮬레이터(`emulator-5554`). **모든 adb 명령에 `-s <serial>`을 명시한다.** 생략하면 엉뚱한 대상에 명령이 간다.
+
+**USB serial `R5***TP`를 우선한다** — 포트가 바뀌지 않기 때문이다. USB가 인식되지 않으면 무선으로 붙는다.
 
 ```bash
 cd /Users/dave/iWorks/DX-Manager
-./tools/adb/adb mdns services          # _adb-tls-connect._tcp 항목의 IP:PORT 확인
+./tools/adb/adb devices -l                      # USB serial 이 보이면 그것을 쓴다
+./tools/adb/adb mdns services                   # 없으면 _adb-tls-connect._tcp 의 IP:PORT
 ./tools/adb/adb connect <IP>:<PORT>
-./tools/adb/adb devices
 ```
 
-이 Mac은 해당 기기와 이미 페어링되어 있어 페어링 코드가 필요 없다. 포트는 재부팅·재활성화 시 바뀌므로 매번 `mdns services`로 다시 확인한다.
+이 Mac은 해당 기기와 이미 페어링되어 있어 **Mac에서 붙을 때는** 페어링 코드가 필요 없다. 무선 포트는 재부팅·재활성화 시 바뀌므로 매번 `mdns services`로 다시 확인한다.
+
+Task 5의 **앱 내부 페어링은 별개다.** 앱은 자기만의 ADB 키를 갖고 처음 붙으므로 사용자가 페어링 코드를 새로 발급해야 한다.
+
+`gradlew`는 저장소에 실행 비트 없이(100644) 추적되어 있다. **`bash ./gradlew ...` 형태로 실행한다** — `chmod +x`는 추적 파일을 변경하므로 금지한다.
 
 **중요**: 2.4절에 따라 화면이 잠겨 있으면 보조 디스플레이가 동작하지 않는다. 모든 실험 전에 깨우고 잠금 해제 상태를 확인한다.
 
@@ -63,13 +81,15 @@ cd /Users/dave/iWorks/DX-Manager
 | 경로 | 책임 | 상태 |
 | :--- | :--- | :--- |
 | `<스크래치>/dexwindow-spike/` | 스파이크 Gradle 프로젝트 | 생성, 최종 삭제 |
-| `.../app/src/main/java/.../SpikeActivity.java` | 전체화면 SurfaceView, Shizuku 상태 표시 | 생성 |
-| `.../app/src/main/java/.../DisplayManagerProbe.java` | `IDisplayManager` 시그니처 덤프와 호출 | 생성 |
-| `docs/superpowers/specs/2026-09-04-ondevice-dex-window-design.md` | 판정 반영 | 수정 |
+| `.../app/src/main/java/.../SpikeActivity.java` | 결과 표시, 프로브 호출 진입점 | 생성 (Task 4) |
+| `.../app/src/main/java/.../AdbProbe.java` | ADB 페어링·셸 획득·scrcpy-server 기동 | 생성 (Task 5·6) |
+| `docs/superpowers/specs/2026-09-04-ondevice-dex-window-design.md` | 판정 반영 | 수정 (Task 7) |
 
 ---
 
 ## Task 1: 환경 준비와 기준선
+
+> **✅ 완료 (2026-09-04).** 툴체인 검증 성공, 기준선 `overlay=null` / `stay_on=0` / 디스플레이 `0 1`. 아래 본문은 실행 당시 기준이며 참고용으로 보존한다.
 
 스파이크 앱을 만들기 전에 툴체인이 실제로 안드로이드 앱을 빌드할 수 있는지 확인한다. 여기서 막히면 이후 모든 Task가 툴체인 문제인지 코드 문제인지 구분되지 않는다.
 
@@ -149,6 +169,8 @@ echo "displays: $(./tools/adb/adb -s $S shell dumpsys display | grep -oE 'mDispl
 
 ## Task 2: Q2 검증 — 삼성 런처가 shell 생성 디스플레이에 붙는가
 
+> **✅ 완료 (2026-09-04) — Q2 통과.** 삼성 `SecondaryLauncher`가 shell 생성 TRUSTED 디스플레이(id=44)에 자동 부착됨을 확인했다. 본문의 "우리 앱이 Shizuku로 만들려는 것과 같은 조건"이라는 서술은 선회 이전 표현이며, 결과 자체는 새 접근안에도 그대로 적용된다 — scrcpy가 만드는 디스플레이가 바로 그것이기 때문이다.
+
 **코드를 쓰지 않는다.** `scrcpy --new-display`가 이미 shell 권한으로 TRUSTED 디스플레이를 만든다. 앞서 수집한 logcat에서 그 디스플레이가 `FLAG_TRUSTED`와 `FLAG_SHOULD_SHOW_SYSTEM_DECORATIONS`를 가진 것이 확인되었으므로, 우리 앱이 Shizuku로 만들려는 것과 같은 조건이다.
 
 이 Task가 실패하면 앱이 자체 데스크톱 셸을 만들어야 하고, 그것은 스펙 1절의 "지원 대상" 근거를 무너뜨린다. **가장 먼저 확인해야 할 항목이다.**
@@ -226,6 +248,8 @@ Q2의 답을 보고서에 한 줄로 명시한다: "삼성 보조 런처가 shel
 ---
 
 ## Task 3: Q3 검증 — 보조 디스플레이에 IME가 표시되는가
+
+> **✅ 완료 (2026-09-04) — Q3 아니오.** IME가 보조 디스플레이(id 46)가 아니라 display 0에 결합되었다. 본문이 말하는 "스펙 4.4절의 폴백"은 선회로 사라졌다. 새 접근안에서는 scrcpy control 프로토콜의 `INJECT_TEXT`가 IME를 아예 경유하지 않으므로 이 제약이 문제되지 않는다(스펙 4.3절).
 
 Task 2와 마찬가지로 **코드를 쓰지 않는다.** 같은 방식으로 디스플레이를 만들고, 텍스트 입력란이 있는 앱을 그 위에 띄운 뒤 IME가 뜨는지 관찰한다.
 
@@ -322,11 +346,11 @@ Q3의 답을 보고서에 한 줄로 명시한다. 커밋하지 않는다.
 
 ---
 
-## Task 4: 스파이크 앱 뼈대와 Shizuku 연결
+## Task 4: 스파이크 앱 뼈대와 앱 uid에서의 adbd 접속
 
-여기서부터 코드를 쓴다. Q1(Surface 전달)만이 코드로 답할 수 있는 질문이다.
+여기서부터 코드를 쓴다. 이 Task는 **ADB 프로토콜을 전혀 다루지 않는다.** 오직 하나만 확인한다 — 일반 앱 uid의 프로세스가 자기 기기의 adb 데몬 포트에 TCP로 붙을 수 있는가.
 
-이 Task는 **디스플레이를 아직 만들지 않는다.** Shizuku에 연결해 shell 권한을 실제로 얻는 데까지만 간다. 여기서 막히면 이후가 무의미하므로 단계를 나눈다.
+스펙 2.6절에서 같은 확인을 했으나 그것은 `adb shell`을 통해 **shell uid**로 실행되었다. 앱 uid는 다른 SELinux 도메인이며 네트워크 정책도 다를 수 있다. 여기서 막히면 접근안 전체가 무너지므로 ADB 라이브러리를 붙이기 전에 먼저 확인한다.
 
 **Files:**
 - Create: `<스크래치>/dexwindow-spike/settings.gradle`
@@ -338,23 +362,15 @@ Q3의 답을 보고서에 한 줄로 명시한다. 커밋하지 않는다.
 
 **Interfaces:**
 - Consumes: Task 1의 빌드 환경과 기기 serial
-- Produces: 설치된 스파이크 앱, `SpikeActivity`가 Shizuku 권한 보유 상태를 화면과 logcat에 보고
+- Produces: 설치된 스파이크 앱. `SpikeActivity`가 `--es port <N>` 인텐트 엑스트라로 받은 포트에 TCP 접속을 시도하고 결과를 화면과 logcat(`DexSpike` 태그)에 출력한다.
 
 - [ ] **Step 1: Gradle 프로젝트 뼈대 생성**
-
-스크래치 디렉터리를 만든다.
 
 ```bash
 SPIKE=/private/tmp/claude-501/-Users-dave-iWorks-DX-Manager/ac296bd2-8484-4146-a937-10d857effd0b/scratchpad/dexwindow-spike
 mkdir -p "$SPIKE/app/src/main/java/io/github/mazemei/dexspike"
-cd "$SPIKE"
-```
-
-Gradle wrapper는 기존 Companion의 것을 복사해 버전을 맞춘다.
-
-```bash
-cp -R /Users/dave/iWorks/DX-Manager/DXDisplayCleanup/gradle "$SPIKE/gradle"
-cp /Users/dave/iWorks/DX-Manager/DXDisplayCleanup/gradlew "$SPIKE/gradlew"
+/bin/cp -Rf /Users/dave/iWorks/DX-Manager/DXDisplayCleanup/gradle "$SPIKE/gradle"
+/bin/cp -f /Users/dave/iWorks/DX-Manager/DXDisplayCleanup/gradlew "$SPIKE/gradlew"
 chmod +x "$SPIKE/gradlew"
 ```
 
@@ -373,11 +389,14 @@ dependencyResolutionManagement {
     repositories {
         google()
         mavenCentral()
+        maven { url "https://jitpack.io" }
     }
 }
 rootProject.name = "DexWindowSpike"
 include ':app'
 ```
+
+JitPack 저장소는 Task 5에서 필요하다. 지금 넣어두면 Task 5에서 다시 건드리지 않는다.
 
 `build.gradle` (루트):
 
@@ -387,7 +406,7 @@ plugins {
 }
 ```
 
-버전 `8.13.2`는 추측이 아니라 같은 저장소의 `DXDisplayCleanup/build.gradle`이 실제로 쓰는 값이다. 그 프로젝트가 같은 Gradle wrapper(8.14.5)와 같은 JDK 17로 빌드되므로 조합이 검증되어 있다.
+버전 `8.13.2`는 추측이 아니라 같은 저장소의 `DXDisplayCleanup/build.gradle`이 쓰는 값이며, 같은 Gradle wrapper(8.14.5)와 JDK 17로 빌드되는 것이 Task 1에서 확인되었다.
 
 `gradle.properties`:
 
@@ -424,12 +443,8 @@ android {
 }
 
 dependencies {
-    implementation 'dev.rikka.shizuku:api:13.1.5'
-    implementation 'dev.rikka.shizuku:provider:13.1.5'
 }
 ```
-
-AGP 8.13.2는 `DXDisplayCleanup`에서 검증된 조합이므로 여기서 실패할 가능성은 낮다. 그래도 실패하면 오류 메시지가 요구하는 버전으로 바꾸고 **무엇으로 바꿨는지 보고서에 기록한다.**
 
 - [ ] **Step 3: 매니페스트 작성**
 
@@ -439,11 +454,12 @@ AGP 8.13.2는 `DXDisplayCleanup`에서 검증된 조합이므로 여기서 실�
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
-    <uses-permission android:name="moe.shizuku.manager.permission.API_V23" />
+    <uses-permission android:name="android.permission.INTERNET" />
 
     <application
         android:label="DeX Spike"
-        android:allowBackup="false">
+        android:allowBackup="false"
+        android:usesCleartextTraffic="true">
 
         <activity
             android:name=".SpikeActivity"
@@ -453,19 +469,11 @@ AGP 8.13.2는 `DXDisplayCleanup`에서 검증된 조합이므로 여기서 실�
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
-
-        <provider
-            android:name="rikka.shizuku.ShizukuProvider"
-            android:authorities="${applicationId}.shizuku"
-            android:multiprocess="false"
-            android:enabled="true"
-            android:exported="true"
-            android:permission="android.permission.INTERACT_ACROSS_USERS_FULL" />
     </application>
 </manifest>
 ```
 
-- [ ] **Step 4: Shizuku 상태를 보고하는 액티비티 작성**
+- [ ] **Step 4: 소켓 접속을 시도하는 액티비티 작성**
 
 `app/src/main/java/io/github/mazemei/dexspike/SpikeActivity.java`:
 
@@ -474,15 +482,19 @@ package io.github.mazemei.dexspike;
 
 import android.app.Activity;
 import android.os.Bundle;
+import android.os.Process;
 import android.util.Log;
+import android.widget.ScrollView;
 import android.widget.TextView;
 
-import rikka.shizuku.Shizuku;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.net.InetSocketAddress;
+import java.net.Socket;
 
 public class SpikeActivity extends Activity {
 
-    static final String TAG = "DexSpike";
-    private static final int REQ = 1000;
+    public static final String TAG = "DexSpike";
 
     private TextView status;
 
@@ -490,188 +502,278 @@ public class SpikeActivity extends Activity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         status = new TextView(this);
-        status.setTextSize(16f);
-        setContentView(status);
+        status.setTextSize(13f);
+        ScrollView sv = new ScrollView(this);
+        sv.addView(status);
+        setContentView(sv);
 
-        Shizuku.addRequestPermissionResultListener(
-                (requestCode, grantResult) -> report());
-        report();
+        int port = getIntent().getIntExtra("port", -1);
+        new Thread(() -> {
+            String result = probe(port);
+            runOnUiThread(() -> status.setText(result));
+            Log.i(TAG, result);
+        }).start();
     }
 
-    private void report() {
+    private String probe(int port) {
         StringBuilder sb = new StringBuilder();
-        boolean ping = false;
-        try {
-            ping = Shizuku.pingBinder();
-        } catch (Throwable t) {
-            sb.append("pingBinder threw: ").append(t).append('\n');
-        }
-        sb.append("binder alive: ").append(ping).append('\n');
+        sb.append("app uid: ").append(Process.myUid()).append('\n');
+        sb.append("target port: ").append(port).append('\n');
 
-        if (ping) {
-            int uid = -1;
-            int version = -1;
-            try {
-                uid = Shizuku.getUid();
-                version = Shizuku.getVersion();
-            } catch (Throwable t) {
-                sb.append("uid/version threw: ").append(t).append('\n');
-            }
-            sb.append("shizuku uid: ").append(uid)
-              .append(" (2000 = shell)\n");
-            sb.append("shizuku version: ").append(version).append('\n');
-
-            boolean granted = false;
-            try {
-                granted = Shizuku.checkSelfPermission()
-                        == android.content.pm.PackageManager.PERMISSION_GRANTED;
-            } catch (Throwable t) {
-                sb.append("checkSelfPermission threw: ").append(t).append('\n');
-            }
-            sb.append("permission granted: ").append(granted).append('\n');
-
-            if (!granted) {
-                try {
-                    Shizuku.requestPermission(REQ);
-                } catch (Throwable t) {
-                    sb.append("requestPermission threw: ").append(t).append('\n');
-                }
-            }
+        if (port <= 0) {
+            sb.append("FAILED: no port supplied. "
+                    + "Launch with --ei port <N>\n");
+            return sb.toString();
         }
 
-        String text = sb.toString();
-        status.setText(text);
-        Log.i(TAG, text);
-    }
-}
-```
-
-- [ ] **Step 5: 빌드**
-
-Run:
-```bash
-cd "$SPIKE"
-export JAVA_HOME=/Users/dave/.asdf/installs/java/temurin-17.0.8+7
-export ANDROID_HOME=/Users/dave/Library/Android/sdk
-./gradlew --no-daemon assembleDebug
-```
-Expected: `BUILD SUCCESSFUL`, `app/build/outputs/apk/debug/app-debug.apk` 생성
-
-- [ ] **Step 6: Shizuku 설치 여부 확인**
-
-Run:
-```bash
-cd /Users/dave/iWorks/DX-Manager
-./tools/adb/adb -s $S shell pm list packages | grep -i shizuku
-```
-
-`moe.shizuku.privileged.api`가 없으면 **사용자에게 Shizuku 설치와 실행을 요청하고 BLOCKED로 보고한다.** 임의로 설치하지 않는다 — 사용자의 개인 기기다.
-
-설치되어 있으면 실행 중인지 확인한다.
-
-```bash
-./tools/adb/adb -s $S shell ps -A | grep -i shizuku
-```
-
-- [ ] **Step 7: 스파이크 앱 설치와 실행**
-
-Run:
-```bash
-./tools/adb/adb -s $S install -r "$SPIKE/app/build/outputs/apk/debug/app-debug.apk"
-./tools/adb/adb -s $S shell am start -n io.github.mazemei.dexspike/.SpikeActivity
-sleep 3
-./tools/adb/adb -s $S logcat -d -s DexSpike | tail -20
-```
-
-Expected: `binder alive: true`, `shizuku uid: 2000 (2000 = shell)`, `permission granted: true`
-
-권한 요청 대화상자가 뜨면 사용자에게 승인을 요청한다.
-
-`binder alive: false`면 Shizuku가 실행 중이 아니다. 사용자에게 무선 디버깅으로 Shizuku를 시작해 달라고 요청한다(스펙 2.5절).
-
-- [ ] **Step 8: 결과 기록**
-
-`shizuku uid`가 **2000**인지가 핵심이다. 이것이 shell 권한 확보의 증거다. logcat 출력 전체를 보고서에 붙여넣는다. 커밋하지 않는다.
-
----
-
-## Task 5: `IDisplayManager` 시그니처 런타임 덤프
-
-`createVirtualDisplay`는 hidden API이며 Android 버전마다 시그니처가 다르다. **추측해서 호출하지 않는다.** 이 기기의 실제 시그니처를 런타임에 열거해 확인한 뒤 Task 6에서 호출한다.
-
-**Files:**
-- Create: `<스크래치>/dexwindow-spike/app/src/main/java/io/github/mazemei/dexspike/DisplayManagerProbe.java`
-- Modify: `<스크래치>/dexwindow-spike/app/src/main/java/io/github/mazemei/dexspike/SpikeActivity.java`
-
-**Interfaces:**
-- Consumes: Task 4의 Shizuku 연결 (`Shizuku.checkSelfPermission()`이 GRANTED)
-- Produces: `DisplayManagerProbe.dumpSignatures()` — `IDisplayManager`의 `*VirtualDisplay*` 메서드 시그니처를 logcat에 출력
-
-- [ ] **Step 1: 프로브 클래스 작성**
-
-`DisplayManagerProbe.java`:
-
-```java
-package io.github.mazemei.dexspike;
-
-import android.os.IBinder;
-import android.util.Log;
-
-import java.lang.reflect.Method;
-
-import rikka.shizuku.ShizukuBinderWrapper;
-import rikka.shizuku.SystemServiceHelper;
-
-public final class DisplayManagerProbe {
-
-    static final String TAG = SpikeActivity.TAG;
-
-    private DisplayManagerProbe() {
-    }
-
-    /** IDisplayManager 인터페이스의 VirtualDisplay 관련 메서드를 전부 출력한다. */
-    public static String dumpSignatures() {
-        StringBuilder sb = new StringBuilder();
+        Socket socket = null;
         try {
-            IBinder raw = SystemServiceHelper.getSystemService("display");
-            sb.append("raw binder: ").append(raw).append('\n');
+            socket = new Socket();
+            socket.connect(new InetSocketAddress("127.0.0.1", port), 3000);
+            sb.append("connect: OK\n");
+            sb.append("localPort: ").append(socket.getLocalPort()).append('\n');
 
-            IBinder wrapped = new ShizukuBinderWrapper(raw);
-            sb.append("wrapped: ").append(wrapped).append('\n');
-
-            Class<?> stub =
-                    Class.forName("android.hardware.display.IDisplayManager$Stub");
-            Method asInterface = stub.getMethod("asInterface", IBinder.class);
-            Object dm = asInterface.invoke(null, wrapped);
-            sb.append("IDisplayManager: ").append(dm).append('\n');
-
-            Class<?> iface =
-                    Class.forName("android.hardware.display.IDisplayManager");
-            for (Method m : iface.getMethods()) {
-                if (m.getName().toLowerCase().contains("virtualdisplay")) {
-                    sb.append("METHOD ").append(m.toGenericString()).append('\n');
-                }
-            }
-
-            // VirtualDisplayConfig 의 존재와 Builder 메서드도 확인한다.
+            // adbd 는 접속 직후 아무것도 보내지 않는다. 여기서는 소켓이
+            // 열렸다는 사실만 확인하고, 프로토콜은 Task 5에서 다룬다.
+            socket.setSoTimeout(1500);
+            OutputStream out = socket.getOutputStream();
+            out.flush();
+            InputStream in = socket.getInputStream();
             try {
-                Class<?> cfg = Class.forName(
-                        "android.hardware.display.VirtualDisplayConfig$Builder");
-                for (Method m : cfg.getMethods()) {
-                    if (m.getDeclaringClass() == cfg) {
-                        sb.append("CFG ").append(m.toGenericString()).append('\n');
-                    }
-                }
-            } catch (Throwable t) {
-                sb.append("VirtualDisplayConfig$Builder absent: ")
-                  .append(t).append('\n');
+                int b = in.read();
+                sb.append("first byte: ").append(b).append('\n');
+            } catch (Exception readEx) {
+                sb.append("read timed out or closed: ")
+                  .append(readEx.getClass().getSimpleName())
+                  .append(" (expected — adbd waits for a client message)\n");
             }
         } catch (Throwable t) {
             sb.append("FAILED: ").append(t).append('\n');
             for (StackTraceElement e : t.getStackTrace()) {
                 sb.append("  at ").append(e).append('\n');
             }
+        } finally {
+            if (socket != null) {
+                try {
+                    socket.close();
+                } catch (Exception ignored) {
+                    // 진단에 영향 없음
+                }
+            }
         }
+        return sb.toString();
+    }
+}
+```
+
+- [ ] **Step 5: 빌드**
+
+```bash
+cd "$SPIKE"
+export JAVA_HOME=/Users/dave/.asdf/installs/java/temurin-17.0.8+7
+export ANDROID_HOME=/Users/dave/Library/Android/sdk
+bash ./gradlew --no-daemon assembleDebug
+```
+Expected: `BUILD SUCCESSFUL`, `app/build/outputs/apk/debug/app-debug.apk` 생성
+
+Task 1에서 확인했듯 `gradlew`는 실행 비트가 없으므로 `bash ./gradlew`로 실행한다. 스크래치의 사본에 `chmod +x`를 했더라도 이 형태가 항상 안전하다.
+
+- [ ] **Step 6: 현재 무선 디버깅 포트 확인**
+
+```bash
+cd /Users/dave/iWorks/DX-Manager
+./tools/adb/adb mdns services
+```
+
+`_adb-tls-connect._tcp` 행의 포트를 기록한다. 이 값은 무선 디버깅을 껐다 켜거나 재부팅하면 바뀐다.
+
+- [ ] **Step 7: 설치와 실행**
+
+```bash
+S=R5***TP
+PORT=<Step 6에서 확인한 포트>
+./tools/adb/adb -s $S install -r "$SPIKE/app/build/outputs/apk/debug/app-debug.apk"
+./tools/adb/adb -s $S logcat -c
+./tools/adb/adb -s $S shell am start -n io.github.mazemei.dexspike/.SpikeActivity --ei port $PORT
+sleep 4
+./tools/adb/adb -s $S logcat -d -s DexSpike
+```
+
+Expected (통과): `app uid:` 가 10000 이상(일반 앱 범위)이고 `connect: OK`
+
+Expected (실패): `FAILED:` 와 예외. `ECONNREFUSED`면 포트가 틀렸거나 데몬이 그 포트를 안 열고 있는 것이고, `EACCES`나 SELinux 거부면 앱 uid에서 막힌 것이다. **둘을 구분해서 기록한다.**
+
+`app uid`가 2000(shell)으로 나오면 무언가 잘못된 것이다 — 앱은 일반 uid로 실행되어야 한다.
+
+- [ ] **Step 8: 결과 기록**
+
+`app uid`와 `connect` 결과를 보고서에 원문으로 붙여넣는다. 커밋하지 않는다.
+
+---
+
+## Task 5: ADB 페어링과 셸 획득 (최대 위험)
+
+앱이 자기 기기의 adb 데몬과 **ADB 프로토콜로** 대화해 셸을 얻을 수 있는지 확인한다. Android 11+ 무선 디버깅은 TLS와 SPAKE2 페어링을 요구하므로, 직접 구현하지 않고 검증된 라이브러리를 쓴다.
+
+여기서 막히면 접근안을 Shizuku 의존으로 되돌려야 한다. **이 Task가 Phase 0의 핵심이다.**
+
+**Files:**
+- Modify: `<스크래치>/dexwindow-spike/app/build.gradle`
+- Modify: `<스크래치>/dexwindow-spike/app/src/main/java/io/github/mazemei/dexspike/SpikeActivity.java`
+- Create: `<스크래치>/dexwindow-spike/app/src/main/java/io/github/mazemei/dexspike/AdbProbe.java`
+
+**Interfaces:**
+- Consumes: Task 4의 앱 뼈대와 `SpikeActivity.TAG`
+- Produces: `AdbProbe.pairAndShell(Context, String host, int pairPort, String pairCode, int connectPort, String command)` — 페어링·연결·명령 실행 결과를 문자열로 반환
+
+- [ ] **Step 1: ADB 라이브러리 좌표 확인**
+
+**추측하지 않는다.** libadb-android의 현재 배포 좌표를 저장소에서 확인한다.
+
+```bash
+curl -sL https://raw.githubusercontent.com/MuntashirAkon/libadb-android/master/README.md | grep -iA6 "implementation\|dependencies\|jitpack" | head -30
+```
+
+README가 제시하는 `implementation` 좌표와 필요한 추가 의존성(예: `spake2-java`, Conscrypt)을 **그대로** 기록한다. 최신 태그가 필요하면 다음으로 확인한다.
+
+```bash
+curl -sL "https://api.github.com/repos/MuntashirAkon/libadb-android/releases/latest" | grep '"tag_name"'
+```
+
+라이브러리를 가져올 수 없거나 좌표를 확정할 수 없으면 **BLOCKED로 보고한다.** 다른 라이브러리(예: `flyfishxu/Kadb`)로 임의 교체하지 않는다 — 그것은 계획 변경이며 컨트롤러가 판정할 사항이다.
+
+- [ ] **Step 2: 의존성 추가**
+
+`app/build.gradle`의 `dependencies` 블록을 Step 1에서 확인한 좌표로 채운다. 예시 형태는 다음과 같으나 **실제 좌표는 Step 1의 결과를 쓴다.**
+
+```groovy
+dependencies {
+    implementation 'com.github.MuntashirAkon:libadb-android:<확인한 버전>'
+    implementation 'com.github.MuntashirAkon:spake2-java:<확인한 버전>'
+    implementation 'org.conscrypt:conscrypt-android:<확인한 버전>'
+}
+```
+
+빌드가 의존성 해석에 실패하면 오류 전문을 기록하고, JitPack 저장소가 `settings.gradle`에 있는지 확인한다(Task 4 Step 1에서 이미 추가했다).
+
+- [ ] **Step 3: 페어링·셸 프로브 작성**
+
+`AdbProbe.java`:
+
+```java
+package io.github.mazemei.dexspike;
+
+import android.content.Context;
+import android.util.Log;
+
+import java.io.ByteArrayOutputStream;
+import java.io.InputStream;
+
+public final class AdbProbe {
+
+    static final String TAG = SpikeActivity.TAG;
+
+    private AdbProbe() {
+    }
+
+    /**
+     * 무선 디버깅으로 페어링한 뒤 연결해 셸 명령을 실행한다.
+     * pairCode 가 비어 있으면 페어링을 건너뛰고 기존 키로 연결만 시도한다.
+     */
+    public static String pairAndShell(Context context,
+                                      String host,
+                                      int pairPort,
+                                      String pairCode,
+                                      int connectPort,
+                                      String command) {
+        StringBuilder sb = new StringBuilder();
+        sb.append("host=").append(host)
+          .append(" pairPort=").append(pairPort)
+          .append(" connectPort=").append(connectPort)
+          .append(" pairCode=").append(pairCode == null || pairCode.isEmpty()
+                  ? "<none>" : "<supplied>")
+          .append('\n');
+
+        Object manager = null;
+        try {
+            // 라이브러리 API 는 버전마다 다를 수 있으므로 먼저 표면을 덤프한다.
+            Class<?> cls = Class.forName(
+                    "io.github.muntashirakon.adb.AdbConnectionManager");
+            sb.append("AdbConnectionManager methods:\n");
+            for (java.lang.reflect.Method m : cls.getMethods()) {
+                if (m.getDeclaringClass() == cls) {
+                    sb.append("  ").append(m.toGenericString()).append('\n');
+                }
+            }
+        } catch (Throwable t) {
+            sb.append("class lookup FAILED: ").append(t).append('\n');
+            Log.i(TAG, sb.toString());
+            return sb.toString();
+        }
+
+        try {
+            manager = Class
+                    .forName("io.github.muntashirakon.adb.AdbConnectionManager")
+                    .getMethod("getInstance", Context.class)
+                    .invoke(null, context);
+            sb.append("manager: ").append(manager).append('\n');
+        } catch (Throwable t) {
+            sb.append("getInstance FAILED: ").append(t).append('\n');
+            Throwable c = t.getCause();
+            if (c != null) sb.append("cause: ").append(c).append('\n');
+            Log.i(TAG, sb.toString());
+            return sb.toString();
+        }
+
+        if (pairCode != null && !pairCode.isEmpty()) {
+            try {
+                Object r = manager.getClass()
+                        .getMethod("pair", String.class, int.class, String.class)
+                        .invoke(manager, host, pairPort, pairCode);
+                sb.append("pair result: ").append(r).append('\n');
+            } catch (Throwable t) {
+                sb.append("pair FAILED: ").append(t).append('\n');
+                Throwable c = t.getCause();
+                if (c != null) sb.append("cause: ").append(c).append('\n');
+            }
+        }
+
+        try {
+            Object connected = manager.getClass()
+                    .getMethod("connect", String.class, int.class)
+                    .invoke(manager, host, connectPort);
+            sb.append("connect result: ").append(connected).append('\n');
+        } catch (Throwable t) {
+            sb.append("connect FAILED: ").append(t).append('\n');
+            Throwable c = t.getCause();
+            if (c != null) sb.append("cause: ").append(c).append('\n');
+            Log.i(TAG, sb.toString());
+            return sb.toString();
+        }
+
+        try {
+            Object stream = manager.getClass()
+                    .getMethod("openStream", String.class)
+                    .invoke(manager, "shell:" + command);
+            InputStream in = (InputStream) stream.getClass()
+                    .getMethod("openInputStream").invoke(stream);
+            ByteArrayOutputStream bos = new ByteArrayOutputStream();
+            byte[] buf = new byte[4096];
+            int n;
+            long deadline = System.currentTimeMillis() + 5000;
+            while (System.currentTimeMillis() < deadline
+                    && (n = in.read(buf)) > 0) {
+                bos.write(buf, 0, n);
+                if (bos.size() > 8192) break;
+            }
+            sb.append("shell output: ")
+              .append(bos.toString("UTF-8")).append('\n');
+        } catch (Throwable t) {
+            sb.append("shell FAILED: ").append(t).append('\n');
+            Throwable c = t.getCause();
+            if (c != null) sb.append("cause: ").append(c).append('\n');
+        }
+
         String out = sb.toString();
         Log.i(TAG, out);
         return out;
@@ -679,176 +781,198 @@ public final class DisplayManagerProbe {
 }
 ```
 
-- [ ] **Step 2: 액티비티에서 호출**
+리플렉션을 쓰는 이유는 라이브러리 API 시그니처를 추측하지 않기 위해서다. 첫 블록이 `AdbConnectionManager`의 실제 메서드 목록을 덤프하므로, 시그니처가 예상과 다르면 그 출력이 정답을 알려준다. **덤프 결과가 아래 호출들과 맞지 않으면 덤프에 맞춰 호출부를 고치고, 무엇을 고쳤는지 보고서에 기록한다.**
 
-`SpikeActivity.report()`의 마지막, `status.setText(text)` 앞에 다음을 추가한다.
+- [ ] **Step 4: 액티비티에서 호출**
+
+`SpikeActivity.onCreate`의 `new Thread(...)` 블록을 다음으로 교체한다.
 
 ```java
-            if (granted) {
-                sb.append("--- display manager probe ---\n");
-                sb.append(DisplayManagerProbe.dumpSignatures());
-            }
+        int port = getIntent().getIntExtra("port", -1);
+        int pairPort = getIntent().getIntExtra("pair_port", -1);
+        String pairCode = getIntent().getStringExtra("pair_code");
+
+        new Thread(() -> {
+            StringBuilder all = new StringBuilder();
+            all.append(probe(port)).append("\n--- adb probe ---\n");
+            all.append(AdbProbe.pairAndShell(
+                    getApplicationContext(),
+                    "127.0.0.1", pairPort, pairCode, port, "id; echo READY"));
+            String result = all.toString();
+            runOnUiThread(() -> status.setText(result));
+            Log.i(TAG, result);
+        }).start();
 ```
 
-`granted` 변수는 `if (ping) { ... }` 블록 안에서 선언되어 있으므로, 이 코드도 같은 블록 안 마지막에 넣는다.
+- [ ] **Step 5: 빌드**
 
-- [ ] **Step 3: 빌드와 설치**
-
-Run:
 ```bash
 cd "$SPIKE"
 export JAVA_HOME=/Users/dave/.asdf/installs/java/temurin-17.0.8+7
 export ANDROID_HOME=/Users/dave/Library/Android/sdk
-./gradlew --no-daemon assembleDebug
+bash ./gradlew --no-daemon assembleDebug
+```
+Expected: `BUILD SUCCESSFUL`
+
+- [ ] **Step 6: 사용자에게 페어링 코드를 요청한다**
+
+페어링에는 사용자만 얻을 수 있는 값이 필요하다. **임의로 진행하지 말고 요청한다.**
+
+사용자에게 다음을 부탁한다.
+
+> 폰에서 **설정 → 개발자 옵션 → 무선 디버깅 → "페어링 코드로 기기 페어링"** 을 여시고, 화면에 표시되는 **IP:포트**와 **6자리 코드**를 알려주세요. 이 대화상자는 열어둔 채로 두셔야 합니다 — 닫으면 페어링 포트가 사라집니다.
+
+**주의**: 페어링 포트는 연결 포트(Task 4 Step 6의 `_adb-tls-connect._tcp`)와 **다른 값**이다. 둘을 혼동하면 페어링이 실패한다.
+
+값을 받기 전까지 다음 Step으로 넘어가지 않는다.
+
+- [ ] **Step 7: 설치와 실행**
+
+```bash
+S=R5***TP
+PORT=<연결 포트>
+PAIR_PORT=<페어링 대화상자의 포트>
+PAIR_CODE=<6자리 코드>
 cd /Users/dave/iWorks/DX-Manager
 ./tools/adb/adb -s $S install -r "$SPIKE/app/build/outputs/apk/debug/app-debug.apk"
 ./tools/adb/adb -s $S logcat -c
-./tools/adb/adb -s $S shell am start -n io.github.mazemei.dexspike/.SpikeActivity
-sleep 4
+./tools/adb/adb -s $S shell am start -n io.github.mazemei.dexspike/.SpikeActivity \
+    --ei port $PORT --ei pair_port $PAIR_PORT --es pair_code $PAIR_CODE
+sleep 15
 ./tools/adb/adb -s $S logcat -d -s DexSpike
 ```
 
-- [ ] **Step 4: 시그니처 판독**
+Expected (통과): `pair result:` 성공, `connect result:` 성공, `shell output:` 에 `uid=2000(shell)` 과 `READY`
 
-logcat에서 `METHOD` 로 시작하는 줄을 전부 보고서에 붙여넣는다. 여기에 `createVirtualDisplay`의 정확한 파라미터 목록이 나온다.
+Expected (실패): 어느 단계에서 무엇이 던져졌는지. 예외와 cause를 모두 기록한다.
 
-`FAILED:` 가 출력되면 그 예외와 스택트레이스 전체를 기록한다. `ClassNotFoundException`이면 hidden API 차단(non-SDK interface restriction)일 수 있으며, 그 경우 **이것이 Q1에 대한 부정적 답**이다. 임의로 우회를 시도하지 말고 보고한다.
+**`shell output` 의 uid가 2000(shell)인지 확인한다.** 이것이 shell 권한 획득의 증거다.
 
-- [ ] **Step 5: 결과 기록**
+- [ ] **Step 8: 결과 기록**
 
-커밋하지 않는다.
+`AdbConnectionManager` 메서드 덤프, 페어링·연결·셸 각 단계의 결과를 원문으로 붙여넣는다. 페어링 코드는 일회성이지만 **보고서에 기록하지 않는다.** 커밋하지 않는다.
 
 ---
 
-## Task 6: Surface로 VirtualDisplay 생성 시도 (Q1 본편)
+## Task 6: scrcpy-server 기동과 프레임 수신
 
-Task 5에서 확인한 실제 시그니처로 호출한다. 이것이 접근안 A의 성립 여부를 가른다.
+Task 5에서 셸을 얻었다면, 그 셸로 `scrcpy-server`를 띄우고 앱이 소켓으로 H.264 프레임을 받을 수 있는지 확인한다. 이것이 접근안 C의 마지막 조각이다.
+
+전체 디코딩과 렌더링은 Phase 1의 몫이다. 여기서는 **바이트가 실제로 도착하는지**만 확인한다.
 
 **Files:**
+- Modify: `<스크래치>/dexwindow-spike/app/src/main/java/io/github/mazemei/dexspike/AdbProbe.java`
 - Modify: `<스크래치>/dexwindow-spike/app/src/main/java/io/github/mazemei/dexspike/SpikeActivity.java`
-- Modify: `<스크래치>/dexwindow-spike/app/src/main/java/io/github/mazemei/dexspike/DisplayManagerProbe.java`
 
 **Interfaces:**
-- Consumes: Task 5의 `dumpSignatures()` 출력에서 확인한 `createVirtualDisplay` 시그니처
-- Produces: Q1 판정 (Surface 전달로 디스플레이 생성 성공 여부)
+- Consumes: Task 5의 `AdbProbe.pairAndShell(...)` 이 확립한 연결과 API 시그니처
+- Produces: `AdbProbe.runScrcpyServer(Context, int connectPort, String serverPath)` — 서버 기동과 소켓 수신 결과를 문자열로 반환
 
-- [ ] **Step 1: SurfaceView를 화면에 올린다**
+- [ ] **Step 1: scrcpy-server.jar 를 기기에 올린다**
 
-`SpikeActivity`의 `onCreate`에서 `setContentView(status)`를 다음으로 교체한다.
+저장소가 이미 번들한 scrcpy의 서버 파일을 쓴다. 새로 내려받지 않는다.
 
-```java
-        android.widget.FrameLayout root = new android.widget.FrameLayout(this);
-
-        surfaceView = new android.view.SurfaceView(this);
-        root.addView(surfaceView, new android.widget.FrameLayout.LayoutParams(
-                android.widget.FrameLayout.LayoutParams.MATCH_PARENT,
-                android.widget.FrameLayout.LayoutParams.MATCH_PARENT));
-
-        root.addView(status, new android.widget.FrameLayout.LayoutParams(
-                android.widget.FrameLayout.LayoutParams.MATCH_PARENT,
-                android.widget.FrameLayout.LayoutParams.WRAP_CONTENT));
-
-        setContentView(root);
-
-        surfaceView.getHolder().addCallback(new android.view.SurfaceHolder.Callback() {
-            @Override
-            public void surfaceCreated(android.view.SurfaceHolder holder) {
-                Log.i(TAG, "surfaceCreated");
-            }
-
-            @Override
-            public void surfaceChanged(android.view.SurfaceHolder holder,
-                                       int format, int width, int height) {
-                Log.i(TAG, "surfaceChanged " + width + "x" + height);
-            }
-
-            @Override
-            public void surfaceDestroyed(android.view.SurfaceHolder holder) {
-                Log.i(TAG, "surfaceDestroyed");
-                DisplayManagerProbe.release();
-            }
-        });
+```bash
+cd /Users/dave/iWorks/DX-Manager
+ls -l tools/scrcpy/scrcpy-server 2>/dev/null || find /opt/homebrew -name "scrcpy-server" 2>/dev/null | head -2
 ```
 
-필드를 클래스 상단에 추가한다.
+찾은 경로를 기기의 `/data/local/tmp/`에 올린다.
 
-```java
-    private android.view.SurfaceView surfaceView;
+```bash
+S=R5***TP
+./tools/adb/adb -s $S push <찾은 경로> /data/local/tmp/scrcpy-server-spike.jar
+./tools/adb/adb -s $S shell ls -l /data/local/tmp/scrcpy-server-spike.jar
 ```
 
-- [ ] **Step 2: 생성 메서드 작성**
+**버전을 기록한다.** scrcpy 클라이언트와 서버 버전이 다르면 서버가 거부한다. Task 2·3에서 쓴 scrcpy는 4.1이다.
 
-`DisplayManagerProbe`에 다음을 추가한다. **Task 5에서 확인한 시그니처에 맞춰 호출부를 조정한다.** 아래는 Android 14 이후의 일반적 형태이며, 실제 시그니처가 다르면 그쪽을 따른다.
+- [ ] **Step 2: 서버 기동 명령을 확인한다**
+
+앞선 실기에서 관측한 실제 명령 형태는 다음과 같다.
+
+```
+CLASSPATH=/data/local/tmp/scrcpy-server.jar app_process / com.genymobile.scrcpy.Server 4.1 \
+    scid=<8자리 hex> log_level=info audio=false new_display=1600x900/150
+```
+
+`scid`는 소켓 이름을 구분하는 임의의 8자리 16진수다. 서버는 `localabstract:scrcpy_<scid>` 이름의 abstract 소켓을 연다.
+
+- [ ] **Step 3: 서버 기동과 소켓 수신 코드 작성**
+
+`AdbProbe`에 다음을 추가한다.
 
 ```java
-    private static Object heldCallback;
-    private static int createdDisplayId = -1;
-
-    /** Surface를 백엔드로 TRUSTED 가상 디스플레이를 만든다. 성공 시 displayId 반환. */
-    public static String createDisplay(android.view.Surface surface,
-                                       int width, int height, int dpi) {
+    /** scrcpy-server 를 셸로 띄우고 video 소켓에서 바이트를 받아본다. */
+    public static String runScrcpyServer(Context context,
+                                         int connectPort,
+                                         String serverPath) {
         StringBuilder sb = new StringBuilder();
+        String scid = String.format("%08x",
+                new java.util.Random().nextInt(Integer.MAX_VALUE));
+        sb.append("scid=").append(scid).append('\n');
+
         try {
-            IBinder wrapped = new ShizukuBinderWrapper(
-                    SystemServiceHelper.getSystemService("display"));
-            Class<?> stub =
-                    Class.forName("android.hardware.display.IDisplayManager$Stub");
-            Object dm = stub.getMethod("asInterface", IBinder.class)
-                    .invoke(null, wrapped);
+            Object manager = Class
+                    .forName("io.github.muntashirakon.adb.AdbConnectionManager")
+                    .getMethod("getInstance", Context.class)
+                    .invoke(null, context);
 
-            // IVirtualDisplayCallback 은 콜백만 받는 인터페이스이므로
-            // 동적 프록시로 최소 구현을 만든다.
-            Class<?> cbIface = Class.forName(
-                    "android.hardware.display.IVirtualDisplayCallback");
-            heldCallback = java.lang.reflect.Proxy.newProxyInstance(
-                    cbIface.getClassLoader(),
-                    new Class<?>[]{cbIface},
-                    (proxy, method, args) -> {
-                        Log.i(TAG, "callback: " + method.getName());
-                        if (method.getName().equals("asBinder")) {
-                            return new android.os.Binder();
+            String cmd = "CLASSPATH=" + serverPath
+                    + " app_process / com.genymobile.scrcpy.Server 4.1"
+                    + " scid=" + scid
+                    + " log_level=debug audio=false"
+                    + " new_display=1600x900/150";
+            sb.append("cmd: ").append(cmd).append('\n');
+
+            Object stream = manager.getClass()
+                    .getMethod("openStream", String.class)
+                    .invoke(manager, "shell:" + cmd);
+            InputStream serverLog = (InputStream) stream.getClass()
+                    .getMethod("openInputStream").invoke(stream);
+
+            // 서버 로그를 별도 스레드에서 계속 읽는다. 읽지 않으면 서버가 막힌다.
+            final StringBuilder logBuf = new StringBuilder();
+            Thread logReader = new Thread(() -> {
+                byte[] b = new byte[2048];
+                try {
+                    int n;
+                    while ((n = serverLog.read(b)) > 0) {
+                        synchronized (logBuf) {
+                            logBuf.append(new String(b, 0, n, "UTF-8"));
                         }
-                        return null;
-                    });
-
-            // VirtualDisplayConfig 구성
-            Class<?> builderCls = Class.forName(
-                    "android.hardware.display.VirtualDisplayConfig$Builder");
-            Object builder = builderCls
-                    .getConstructor(String.class, int.class, int.class, int.class)
-                    .newInstance("dexspike", width, height, dpi);
-
-            int flags = flag("VIRTUAL_DISPLAY_FLAG_PUBLIC")
-                    | flag("VIRTUAL_DISPLAY_FLAG_PRESENTATION")
-                    | flag("VIRTUAL_DISPLAY_FLAG_TRUSTED")
-                    | flag("VIRTUAL_DISPLAY_FLAG_OWN_DISPLAY_GROUP")
-                    | flag("VIRTUAL_DISPLAY_FLAG_SHOULD_SHOW_SYSTEM_DECORATIONS");
-            sb.append("flags: 0x").append(Integer.toHexString(flags)).append('\n');
-
-            builderCls.getMethod("setFlags", int.class).invoke(builder, flags);
-            builderCls.getMethod("setSurface", android.view.Surface.class)
-                    .invoke(builder, surface);
-            Object config = builderCls.getMethod("build").invoke(builder);
-
-            // createVirtualDisplay 호출 — Task 5에서 확인한 시그니처를 사용한다.
-            Method create = null;
-            for (Method m : dm.getClass().getInterfaces()[0].getMethods()) {
-                if (m.getName().equals("createVirtualDisplay")) {
-                    create = m;
-                    sb.append("using: ").append(m.toGenericString()).append('\n');
-                    break;
+                    }
+                } catch (Throwable ignored) {
+                    // 서버 종료 시 정상적으로 끊긴다
                 }
-            }
-            if (create == null) {
-                sb.append("FAILED: createVirtualDisplay not found\n");
-                Log.i(TAG, sb.toString());
-                return sb.toString();
+            });
+            logReader.setDaemon(true);
+            logReader.start();
+
+            Thread.sleep(4000);
+            synchronized (logBuf) {
+                sb.append("--- server log ---\n")
+                  .append(logBuf).append("\n--- end ---\n");
             }
 
-            Object[] callArgs = buildArgs(create, config, heldCallback);
-            Object result = create.invoke(dm, callArgs);
-            createdDisplayId = ((Integer) result);
-            sb.append("createdDisplayId: ").append(createdDisplayId).append('\n');
+            // abstract 소켓에 붙는다. 이름은 서버가 여는 규약을 따른다.
+            Object sockStream = manager.getClass()
+                    .getMethod("openStream", String.class)
+                    .invoke(manager, "localabstract:scrcpy_" + scid);
+            InputStream video = (InputStream) sockStream.getClass()
+                    .getMethod("openInputStream").invoke(sockStream);
+
+            byte[] head = new byte[64];
+            int got = video.read(head);
+            sb.append("video socket first read: ").append(got)
+              .append(" bytes\n");
+            if (got > 0) {
+                StringBuilder hex = new StringBuilder();
+                for (int i = 0; i < Math.min(got, 32); i++) {
+                    hex.append(String.format("%02x ", head[i]));
+                }
+                sb.append("head bytes: ").append(hex).append('\n');
+            }
         } catch (Throwable t) {
             sb.append("FAILED: ").append(t).append('\n');
             Throwable c = t.getCause();
@@ -857,186 +981,152 @@ Task 5에서 확인한 실제 시그니처로 호출한다. 이것이 접근안 
                 sb.append("  at ").append(e).append('\n');
             }
         }
+
         String out = sb.toString();
         Log.i(TAG, out);
         return out;
     }
-
-    /** 파라미터 순서에 맞춰 인자를 채운다. 모르는 타입은 null 로 둔다. */
-    private static Object[] buildArgs(Method m, Object config, Object callback) {
-        Class<?>[] types = m.getParameterTypes();
-        Object[] args = new Object[types.length];
-        for (int i = 0; i < types.length; i++) {
-            String n = types[i].getName();
-            if (n.endsWith("VirtualDisplayConfig")) {
-                args[i] = config;
-            } else if (n.endsWith("IVirtualDisplayCallback")) {
-                args[i] = callback;
-            } else if (n.equals("java.lang.String")) {
-                args[i] = "io.github.mazemei.dexspike";
-            } else if (types[i] == int.class) {
-                args[i] = 0;
-            } else {
-                args[i] = null;
-            }
-        }
-        return args;
-    }
-
-    private static int flag(String name) throws Exception {
-        return android.hardware.display.DisplayManager.class
-                .getField(name).getInt(null);
-    }
-
-    public static void release() {
-        heldCallback = null;
-        createdDisplayId = -1;
-    }
 ```
 
-`flag(...)`가 `NoSuchFieldException`을 던지면 그 상수가 이 SDK에 공개되어 있지 않다는 뜻이다. 값을 하드코딩하지 말고 **어떤 상수가 없었는지 기록하고 그 플래그를 제외한 채 다시 시도한다.** 어떤 조합으로 성공했는지가 중요한 결과다.
+`localabstract:` 스트림 열기가 이 라이브러리에서 지원되지 않으면 Step 3의 메서드 덤프(Task 5)에서 대안을 찾는다. 지원되지 않는다는 사실 자체가 유효한 결과이며, **그 경우 보고하고 임의로 우회하지 않는다.**
 
-- [ ] **Step 3: 액티비티에서 호출**
+- [ ] **Step 4: 액티비티에서 호출**
 
-`surfaceChanged` 콜백 안에서 호출한다. Surface가 유효해진 시점이다.
+Task 5에서 만든 스레드 블록 끝에 다음을 추가한다.
 
 ```java
-            @Override
-            public void surfaceChanged(android.view.SurfaceHolder holder,
-                                       int format, int width, int height) {
-                Log.i(TAG, "surfaceChanged " + width + "x" + height);
-                String r = DisplayManagerProbe.createDisplay(
-                        holder.getSurface(), 1600, 900, 150);
-                status.setText(r);
-            }
+            all.append("\n--- scrcpy server ---\n");
+            all.append(AdbProbe.runScrcpyServer(
+                    getApplicationContext(), port,
+                    "/data/local/tmp/scrcpy-server-spike.jar"));
 ```
 
-- [ ] **Step 4: 빌드·설치·실행**
+- [ ] **Step 5: 잠금 해제 확인 후 실행**
 
-Run:
+2.4절에 따라 잠긴 상태에서는 가상 디스플레이가 철거된다.
+
+```bash
+cd /Users/dave/iWorks/DX-Manager
+S=R5***TP
+./tools/adb/adb -s $S shell input keyevent KEYCODE_WAKEUP
+sleep 2
+./tools/adb/adb -s $S shell dumpsys window | grep -oE 'isKeyguardShowing=[a-z]+' | head -1
+```
+Expected: `isKeyguardShowing=false`
+
+`true`면 사용자에게 잠금 해제를 요청하고 **BLOCKED로 보고한다.**
+
 ```bash
 cd "$SPIKE"
 export JAVA_HOME=/Users/dave/.asdf/installs/java/temurin-17.0.8+7
 export ANDROID_HOME=/Users/dave/Library/Android/sdk
-./gradlew --no-daemon assembleDebug
+bash ./gradlew --no-daemon assembleDebug
 cd /Users/dave/iWorks/DX-Manager
-./tools/adb/adb -s $S shell input keyevent KEYCODE_WAKEUP
 ./tools/adb/adb -s $S install -r "$SPIKE/app/build/outputs/apk/debug/app-debug.apk"
 ./tools/adb/adb -s $S logcat -c
-./tools/adb/adb -s $S shell am start -n io.github.mazemei.dexspike/.SpikeActivity
-sleep 5
+./tools/adb/adb -s $S shell am start -n io.github.mazemei.dexspike/.SpikeActivity \
+    --ei port $PORT --ei pair_port $PAIR_PORT --es pair_code "$PAIR_CODE"
+sleep 25
 ./tools/adb/adb -s $S logcat -d -s DexSpike
 ```
 
-Expected (Q1 = 통과): `createdDisplayId:` 뒤에 0보다 큰 숫자
+Task 5에서 이미 페어링했다면 `pair_code`를 비워도 기존 키로 연결될 수 있다. 그 경우 `--es pair_code ""`로 실행하고, 페어링 없이 연결되는지도 함께 기록한다 — **재부팅 후 자동 재연결 가능성**과 직결되는 정보다.
 
-Expected (Q1 = 실패): `FAILED:` 와 예외
+- [ ] **Step 6: 디스플레이가 실제로 생겼는지 독립 확인**
 
-- [ ] **Step 5: 디스플레이가 실제로 생겼는지 독립 확인**
-
-앱의 보고를 믿지 않고 시스템에서 직접 확인한다.
+앱의 보고를 믿지 않고 시스템에서 확인한다.
 
 ```bash
-./tools/adb/adb -s $S shell dumpsys display | grep -B2 -A2 "dexspike" | head -20
-./tools/adb/adb -s $S shell dumpsys activity activities | grep -E "^Display #|topResumedActivity=" | head -12
+./tools/adb/adb -s $S shell dumpsys display | grep -oE 'mDisplayId=[0-9]+' | sort -u | tr '\n' ' '
+./tools/adb/adb -s $S shell dumpsys activity activities | grep -E "^Display #|topResumedActivity=" | head -10
 ```
 
-디스플레이가 목록에 있으면 **플래그를 기록한다.** `FLAG_TRUSTED`가 실제로 붙었는지가 Q3(IME)와 직결된다.
-
-그 디스플레이에 `SecondaryLauncher`가 붙었는지도 확인한다. 붙었다면 Task 2의 정황 증거가 확정된다.
-
-- [ ] **Step 6: 화면에 실제로 렌더링되는지 확인**
-
-기기 화면을 캡처해 SurfaceView 영역에 디스플레이 내용이 보이는지 확인한다.
-
-```bash
-./tools/adb/adb -s $S exec-out screencap -p > /tmp/spike-render.png
-```
-
-캡처 파일을 열어 확인하고 결과를 보고서에 기록한다. 검은 화면이면 디스플레이는 만들어졌으나 합성이 되지 않는 것이며, 이는 별개의 문제로 기록한다.
+새 디스플레이가 있으면 그 위에 `SecondaryLauncher`가 붙었는지도 확인한다. 붙었다면 2.3절이 앱 기동 경로에서도 재현된 것이다.
 
 - [ ] **Step 7: 정리**
 
-Run:
 ```bash
 ./tools/adb/adb -s $S shell am force-stop io.github.mazemei.dexspike
-sleep 2
-./tools/adb/adb -s $S shell dumpsys display | grep -oE 'mDisplayId=[0-9]+' | sort -u | tr '\n' ' '
-```
-Expected: Task 1의 기준 디스플레이 목록으로 복귀
-
-남아 있으면 **누수가 재현된 것이다.** 스펙 3.5절의 우려가 실증된 것이므로 반드시 기록하고, 다음으로 정리한다.
-
-```bash
+./tools/adb/adb -s $S shell "pkill -f com.genymobile.scrcpy.Server" 2>/dev/null
+sleep 3
+./tools/adb/adb -s $S shell rm -f /data/local/tmp/scrcpy-server-spike.jar
 ./tools/adb/adb -s $S shell pm uninstall io.github.mazemei.dexspike
 sleep 2
-./tools/adb/adb -s $S shell dumpsys display | grep -oE 'mDisplayId=[0-9]+' | sort -u | tr '\n' ' '
+echo "overlay : $(./tools/adb/adb -s $S shell settings get global overlay_display_devices | tr -d '\r')"
+echo "displays: $(./tools/adb/adb -s $S shell dumpsys display | grep -oE 'mDisplayId=[0-9]+' | sort -u | tr '\n' ' ')"
 ```
+Expected: 앱 제거됨, 임시 jar 제거됨, 디스플레이가 Task 1 기준선(`0 1`)으로 복귀
+
+디스플레이가 남아 있으면 **누수가 재현된 것이다.** 스펙 3.5절의 우려가 실증된 것이므로 반드시 기록한다.
 
 - [ ] **Step 8: 결과 기록**
 
-커밋하지 않는다.
+서버 로그, 소켓 수신 바이트 수와 앞부분 hex, 디스플레이 확인 결과를 원문으로 붙여넣는다. 커밋하지 않는다.
 
 ---
 
 ## Task 7: 판정과 스펙 반영
 
-세 질문의 답을 스펙에 기록하고 접근안 유지 여부를 판정한다. **이것이 Phase 0의 실제 산출물이다.**
+세 검증의 답을 스펙에 기록하고 접근안 유지 여부를 판정한다. **이것이 Phase 0의 실제 산출물이다.**
 
 **Files:**
 - Modify: `docs/superpowers/specs/2026-09-04-ondevice-dex-window-design.md`
 
 **Interfaces:**
-- Consumes: Task 2·3·6의 판정
+- Consumes: Task 4·5·6의 결과
 - Produces: 갱신된 스펙, Phase 1 착수 가능 여부
 
-- [ ] **Step 1: 스파이크 앱 제거 확인**
+- [ ] **Step 1: 스파이크 잔여물 제거 확인**
 
-Run:
 ```bash
 cd /Users/dave/iWorks/DX-Manager
-./tools/adb/adb -s $S shell pm list packages | grep dexspike || echo "제거됨"
+S=R5***TP
+./tools/adb/adb -s $S shell pm list packages | grep dexspike || echo "앱 제거됨"
+./tools/adb/adb -s $S shell ls /data/local/tmp/ | grep -i scrcpy-server-spike || echo "임시 jar 제거됨"
 echo "overlay : $(./tools/adb/adb -s $S shell settings get global overlay_display_devices | tr -d '\r')"
 echo "stay_on : $(./tools/adb/adb -s $S shell settings get global stay_on_while_plugged_in | tr -d '\r')"
 echo "displays: $(./tools/adb/adb -s $S shell dumpsys display | grep -oE 'mDisplayId=[0-9]+' | sort -u | tr '\n' ' ')"
 ```
-Expected: 앱 제거됨, Task 1 Step 4의 기준값과 동일
+Expected: 앱과 jar 제거됨, `overlay: null`, `stay_on: 0`, 디스플레이 `0 1`
+
+**페어링으로 추가된 ADB 키는 남는다.** 이것은 정상이며 제거하지 않는다 — 사용자가 원하면 개발자 옵션에서 "무선 디버깅 승인 취소"로 지울 수 있다는 점을 보고서에 안내한다.
 
 - [ ] **Step 2: 스펙 5.1절 표 갱신**
 
-`docs/superpowers/specs/2026-09-04-ondevice-dex-window-design.md`의 5.1절 표에서 세 행의 상태를 실제 결과로 바꾼다.
+`docs/superpowers/specs/2026-09-04-ondevice-dex-window-design.md`의 5.1절 표에서 미검증 4행의 상태를 실제 결과로 바꾼다.
 
 변경 전:
 ```
-| **Surface를 shell 프로세스에 전달해 디스플레이 생성** | ❌ 미검증 — 최대 위험 |
-| **앱이 만든 디스플레이에도 런처가 붙는가** | ⚠️ 정황 증거만 (2.3절) |
-| **보조 디스플레이 IME 표시** | ❌ 미검증 |
+| **일반 앱 uid에서 adb 데몬 접속** | ❌ 미검증 |
+| **앱 안에서 ADB 페어링·RSA 인증 구현** | ❌ 미검증 — 최대 위험 |
+| **앱이 scrcpy-server를 기동하고 소켓으로 프레임 수신** | ❌ 미검증 |
+| **재부팅 후 ADB 키 보존과 자동 재연결** | ❌ 미검증 |
 ```
 
-변경 후에는 각 행을 `✅ 검증 (Phase 0)` 또는 `❌ 불가 — <이유>`로 바꾸고, 근거가 되는 명령과 출력 요지를 한 줄로 덧붙인다.
+각 행을 `✅ 검증 (Phase 0)` 또는 `❌ 불가 — <이유>`로 바꾸고 근거를 한 줄 덧붙인다. 재부팅 항목은 이번 Phase에서 재부팅을 하지 않았다면 **미검증으로 남긴다.** 하지 않은 것을 했다고 적지 않는다.
 
 - [ ] **Step 3: 스펙 8절 열린 항목 갱신**
 
-해소된 항목은 취소선과 함께 `— **해결됨(날짜).** <결론>` 형식으로 바꾼다. 스펙의 기존 항목들이 이미 이 형식을 쓰고 있다.
+해소된 항목은 취소선과 `— **해결됨(날짜).** <결론>` 형식으로 바꾼다. 기존 항목들이 이미 이 형식을 쓴다.
 
-새로 발견된 위험이 있으면 항목을 추가한다. 특히 Task 6 Step 7에서 디스플레이 누수가 재현되었다면 반드시 기록한다.
+새로 발견된 위험이 있으면 추가한다. 특히 Task 6 Step 7에서 디스플레이 누수가 재현되었다면 반드시 기록한다.
 
 - [ ] **Step 4: 판정 절 추가**
 
 스펙 5절 끝에 다음 형식으로 절을 추가한다.
 
 ```markdown
-### 5.4 Phase 0 판정 (2026-09-XX)
+### 5.5 Phase 0 판정 (2026-09-XX)
 
 기기: Galaxy Z Fold (SM-F971N), Android 17 (SDK 37), One UI 9.0
 
-| 질문 | 결과 |
+| 검증 | 결과 |
 | :--- | :--- |
-| Q1 Surface 전달로 디스플레이 생성 | <결과> |
-| Q2 삼성 보조 런처 부착 | <결과> |
-| Q3 보조 디스플레이 IME | <결과> |
+| 일반 앱 uid에서 adbd 접속 | <결과> |
+| 앱 내 ADB 페어링·인증 | <결과> |
+| scrcpy-server 기동과 프레임 수신 | <결과> |
 
-**결론**: 접근안 A를 유지한다 / 접근안 C로 선회한다.
+**결론**: 접근안(scrcpy 자체 기동)을 유지한다 / Shizuku 의존으로 되돌린다.
 
 <판정 근거 2~3문장>
 ```
@@ -1050,13 +1140,13 @@ cd /Users/dave/iWorks/DX-Manager
 git add docs/superpowers/specs/2026-09-04-ondevice-dex-window-design.md
 git commit -m "docs: record Phase 0 spike results for on-device DeX window
 
-Q1/Q2/Q3 검증 결과를 스펙 5.1절과 8절에 반영하고 5.4절에 판정을 추가한다.
-스파이크 코드는 스크래치 디렉터리에서만 작업했고 저장소에 남기지 않는다."
+앱 uid adbd 접속, ADB 페어링·인증, scrcpy-server 기동 검증 결과를 스펙
+5.1절과 8절에 반영하고 5.5절에 판정을 추가한다. 스파이크 코드는 스크래치
+디렉터리에서만 작업했고 저장소에 남기지 않는다."
 ```
 
 - [ ] **Step 6: 스파이크 디렉터리 삭제**
 
-Run:
 ```bash
 rm -rf /private/tmp/claude-501/-Users-dave-iWorks-DX-Manager/ac296bd2-8484-4146-a937-10d857effd0b/scratchpad/dexwindow-spike
 ```
@@ -1071,37 +1161,40 @@ rm -rf /private/tmp/claude-501/-Users-dave-iWorks-DX-Manager/ac296bd2-8484-4146-
 
 | 스펙 요구 | 담당 Task |
 | :--- | :--- |
-| 5.1 미검증 위험 — Surface 전달 | Task 5, 6 |
-| 5.1 미검증 위험 — 런처 부착 | Task 2 (+ Task 6 Step 5에서 재확인) |
-| 5.1 미검증 위험 — IME 표시 | Task 3 |
-| 6절 Phase 0 완료 조건 | Task 7 |
-| 3.5 디스플레이 누수 우려 | Task 6 Step 7에서 실증 여부 확인 |
-| 2.4 잠금 상태 제약 | Task 2·3·6의 각 Step 1에서 확인 |
+| 5.1 — 일반 앱 uid에서 adbd 접속 | Task 4 |
+| 5.1 — 앱 내 ADB 페어링·인증 | Task 5 |
+| 5.1 — scrcpy-server 기동과 프레임 수신 | Task 6 |
+| 5.1 — 재부팅 후 재연결 | Task 6 Step 5에서 부분 관찰(페어링 없이 재연결), 재부팅 자체는 범위 밖 |
+| 2.3 삼성 런처 부착 | Task 2에서 확정, Task 6 Step 6에서 앱 기동 경로 재확인 |
+| 2.5 IME 미표시 | Task 3에서 확정 |
+| 3.5 세션 정리 우려 | Task 6 Step 7에서 누수 실증 여부 확인 |
+| 2.4 잠금 제약 | Task 2·3·6의 각 시작 Step에서 확인 |
 
-Phase 1~5는 이 계획의 범위 밖이며 별도 계획으로 작성한다.
+Phase 1~5는 이 계획의 범위 밖이다.
 
 **2. Placeholder 스캔**
 
-Task 6 Step 2의 `createVirtualDisplay` 호출부는 Task 5가 덤프한 실제 시그니처에 맞춰 조정하도록 되어 있다. 이는 미완성이 아니라 **의도된 순서**다 — hidden API 시그니처를 추측해 적는 것이 오히려 계획 실패다. 인자 채우기는 `buildArgs`가 리플렉션으로 처리하므로 코드 자체는 완결되어 있다.
+Task 5 Step 2의 라이브러리 좌표와 Step 3의 호출부는 Step 1이 확인한 실제 값에 맞추도록 되어 있다. 이는 미완성이 아니라 **의도된 순서**다 — 외부 라이브러리의 버전과 시그니처를 추측해 적는 것이 오히려 계획 실패다. 리플렉션 덤프가 그 자리에서 정답을 알려주므로 코드 자체는 완결되어 있다.
 
 그 외 "TBD", "적절히 처리", 코드 없는 코드 단계는 없다.
 
 **3. 타입 일관성**
 
-- `DisplayManagerProbe.dumpSignatures()`(Task 5) → `createDisplay(Surface, int, int, int)`(Task 6) → `release()`(Task 6 Step 1의 `surfaceDestroyed`) 모두 같은 클래스에 정의되고 같은 이름으로 호출된다.
-- `SpikeActivity.TAG`를 `DisplayManagerProbe`가 참조하므로 Task 4에서 `static final`로 선언해 둔다.
-- `status`와 `surfaceView` 필드는 Task 4와 Task 6에서 같은 이름을 쓴다.
+- `SpikeActivity.TAG`(Task 4에서 `public static final`)를 `AdbProbe`가 참조한다.
+- `AdbProbe.pairAndShell(Context, String, int, String, int, String)`(Task 5) → `runScrcpyServer(Context, int, String)`(Task 6)는 같은 클래스에 정의되고 `SpikeActivity`의 같은 스레드 블록에서 순서대로 호출된다.
+- `status` 필드와 `probe(int)` 메서드는 Task 4에서 정의되고 Task 5·6에서 같은 이름으로 쓰인다.
 
 **4. 계획 작성 중 확인 완료된 사항**
 
-- JDK 17.0.8이 `/Users/dave/.asdf/installs/java/temurin-17.0.8+7`에 설치되어 있다.
-- Android platform-36과 build-tools 36.1.0이 `~/Library/Android/sdk`에 있다.
-- AGP **8.13.2** + Gradle wrapper 8.14.5 + JDK 17 조합이 `DXDisplayCleanup`에서 실제로 사용 중이다. 추측값이 아니다.
-- 저장소가 `google()` + `mavenCentral()`을 `FAIL_ON_PROJECT_REPOS` 모드로 쓰는 패턴을 따랐다.
+- JDK 17.0.8, Android platform-36, build-tools 36.1.0이 이 Mac에 있다(Task 1에서 실증).
+- AGP 8.13.2 + Gradle wrapper 8.14.5 + JDK 17 조합이 `DXDisplayCleanup`에서 빌드된다(Task 1에서 실증).
+- `gradlew`는 실행 비트가 없어 `bash ./gradlew`로 실행해야 한다(Task 1에서 실증).
+- 기기가 자기 adb 데몬(localhost)에 접속 가능하다 — 단 shell uid 기준(스펙 2.6절).
+- ADB 라이브러리로 `MuntashirAkon/libadb-android`가 존재하며 `pair(host, port, code)`와 `openStream("shell:")` API를 제공한다. **정확한 배포 좌표와 버전은 Task 5 Step 1에서 확인한다.**
 
 **5. 남은 실행 시 위험**
 
-- `dev.rikka.shizuku:api:13.1.5` 버전이 최신인지 확인하지 않았다. 빌드 실패 시 Maven Central에서 확인해 조정하고 기록한다.
-- Shizuku가 기기에 설치되어 실행 중인지 확인하지 않았다. Task 4 Step 6에서 확인하며, 없으면 사용자에게 요청하고 BLOCKED로 보고한다. **개인 기기이므로 임의 설치는 금지한다.**
-- Android 17의 non-SDK interface restriction이 `IDisplayManager` 접근 자체를 막을 수 있다. Task 5에서 `ClassNotFoundException`이나 `NoSuchMethodException`으로 드러나며, 그것은 Q1에 대한 유효한 부정적 답이다. 우회를 시도하지 않는다.
-- Task 6의 동적 프록시로 만든 `IVirtualDisplayCallback`이 실제 Binder 전송을 견디지 못할 수 있다. `asBinder`가 반환하는 `Binder`가 올바른 인터페이스 디스크립터를 갖지 않기 때문이다. 이 경우 예외 메시지를 기록하고, 실제 `Binder` 서브클래스로 디스크립터를 맞추는 것을 다음 시도로 남긴다.
+- libadb-android의 메서드 시그니처가 리플렉션 덤프와 다를 수 있다. Task 5 Step 3이 덤프를 먼저 출력하므로 그 자리에서 교정 가능하다.
+- 이 라이브러리가 `localabstract:` 스트림을 지원하지 않으면 Task 6이 막힌다. 그 경우 대안은 TCP 포워딩이나, 지원 여부 자체가 유효한 결과이므로 보고하고 판정을 받는다.
+- 페어링 코드는 사용자만 얻을 수 있고 대화상자를 닫으면 무효가 된다. Task 5 Step 6이 이를 명시한다.
+- scrcpy 서버 버전(4.1)과 기동 인자가 scrcpy 4.1 기준이다. 다른 버전의 jar를 쓰면 서버가 거부한다.
