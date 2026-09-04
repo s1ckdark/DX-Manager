@@ -29,7 +29,11 @@ public sealed class InteractiveHost : IDisposable
     private IKeyboardService _keyboardService => _host.KeyboardService;
 
     private DeviceRuntimeServiceSet _activeRuntime;
-    private string _selectedDeviceSerial;
+    private string _selectedDeviceSerial
+    {
+        get => _host.SelectedSerial;
+        set => _host.SelectedSerial = value;
+    }
     private string _selectedDeviceIdentity;
     private bool _isRunning;
     private bool _disposed;
@@ -62,7 +66,6 @@ public sealed class InteractiveHost : IDisposable
             if (string.IsNullOrWhiteSpace(_selectedDeviceSerial) && e.Current.IsConnected)
             {
                 _selectedDeviceSerial = e.Current.Serial;
-                _host.SelectedSerial = e.Current.Serial;
             }
         };
     }
@@ -306,7 +309,6 @@ public sealed class InteractiveHost : IDisposable
             {
                 var target = snapshot.Devices[idx - 1];
                 _selectedDeviceSerial = GetPrimarySerial(target);
-                _host.SelectedSerial = _selectedDeviceSerial;
                 _selectedDeviceIdentity = target.Identity;
                 AnsiConsole.Success($"Selected device: {target.DisplayName}");
             }
@@ -324,7 +326,6 @@ public sealed class InteractiveHost : IDisposable
                 return false;
             }
             _selectedDeviceSerial = serial;
-            _host.SelectedSerial = _selectedDeviceSerial;
             _selectedDeviceIdentity = device.Identity;
             AnsiConsole.Header($"STARTING DeX ON {device.DisplayName}");
             var runtime = GetOrCreateRuntime();
@@ -345,7 +346,6 @@ public sealed class InteractiveHost : IDisposable
                 }
                 _selectedDeviceSerial =
                     runtime.Dex.CurrentSession?.Serial ?? serial;
-                _host.SelectedSerial = _selectedDeviceSerial;
                 _selectedDeviceIdentity =
                     runtime.Dex.CurrentSession?.DeviceIdentity ??
                     device.Identity;
