@@ -347,7 +347,7 @@ Phase 0 최종 리뷰가 지적한 사항이다. 공통 원인은 하나다 — 
 3. **인스턴스가 단일 사용인데 계약에 없다.** `InteractiveHost.cs:854`가 `DeviceMonitor`를 dispose한 뒤 재시작하면 `DeviceMonitorService`가 `ObjectDisposedException`을 던진다(`DeviceMonitorService.cs:73-84`). `IsDisposed` 노출이든 문서화된 단일 사용 계약이든, 명시가 필요하다.
 4. **`SelectedSerial`에 변경 알림이 없다.** MVVM 바인딩에는 `INotifyPropertyChanged`나 이벤트가 필요하다. **GUI가 첫 ViewModel을 작성하기 전에 결정해야 한다** — 나중에 넣으면 모든 소비자를 수정해야 한다.
 5. **`Settings`가 공유 가변 `AppSettings`를 저장 조율 없이 노출한다.** 소비자 둘이 편집하면 `SettingsService.Save`에서 경쟁하며, TUI의 설정 메뉴도 같은 객체를 통해 쓴다.
-6. **Core 서비스 13개가 전부 구체 타입으로 노출된다.** 소비자 둘까지는 방어 가능하나 표면은 늘어나기만 한다. 누적이 아니라 의식적 결정이 필요하다.
+6. ~~**Core 서비스 13개가 전부 구체 타입으로 노출된다.**~~ — **결정됨(2026-09-05, Phase 1).** 인터페이스를 새로 만들지 않고 소비 규칙을 둔다: `ShellViewModel`만 `ApplicationHost` 전체를 받고(앱 수명주기를 소유해야 하므로), 나머지 ViewModel은 자기가 쓰는 서비스만 생성자로 받는다. 인터페이스 13개를 미리 만드는 것은 두 번째 구현이 없는 상태의 추측이다. 좁은 생성자 의존성은 비용 없이 결합을 제한하고, 추출이 필요해지는 시점에는 각 생성자가 이미 경계를 알려준다.
 
 ### 8.2 Phase 0에서 지연 처리한 기타 항목
 
