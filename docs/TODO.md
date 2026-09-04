@@ -7,8 +7,20 @@
   - [x] `DexManager.Platform.Mac` 라이브러리 분리
   - [x] `ApplicationHost` 조립 루트 추출
   - [x] `InteractiveHost`를 `ApplicationHost` 소비로 전환
-  - [ ] 실제 기기에서 TUI DeX 시작·중지 회귀 확인
+  - [x] 실제 기기에서 TUI DeX 시작·중지 회귀 확인
+        (2026-09-04 SM-F971N: 시작 시 `SecondaryLauncher` display 47 Resumed,
+        `--stop-dex` 후 `overlay=null`·디스플레이 `0 1` 복귀 확인)
 - [ ] macOS GUI Phase 1 — Avalonia Desktop 골격과 MainWindow
+
+- [ ] 세션 중 기기 분리 시 overlay 잔여물 자동 회수
+  - 현상: DeX 실행 중 기기가 사라지면 종료 처리가
+    `Could not remove the existing virtual display`로 실패하고
+    `overlay_display_devices`가 남는다. `settings global` 값이라 재부팅해도 유지된다.
+  - 재현: 2026-09-04 SM-F971N(One UI 9.0), 세션 중 USB 분리.
+    잔여값 `1600x900/150,hdmi`. 이후 `--stop-dex`로 정상 회수됨.
+  - [ ] "기기가 없어서 못 지움"과 "지우기 자체가 실패"를 구분해 처리
+  - [ ] 전자는 보류 정리 항목으로 로컬에 기록하고 다음 실행 시 자동 회수
+  - [ ] 회수 전까지 시작 시 잔여물 경고 표시
 
 - [x] v2.0.1 DeX 기기별 설정 표시 회귀 수정
   - [x] 첫 물리 identity 결속 뒤 기기별 DeX 설정 UI 재동기화
