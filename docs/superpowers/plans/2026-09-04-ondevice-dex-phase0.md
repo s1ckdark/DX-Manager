@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** 온디바이스 DeX 창 설계의 미검증 위험에 답을 내고, 접근안(scrcpy 자체 기동)을 유지할지 Shizuku 의존으로 되돌릴지 판정한다.
+**Goal:** 온디바이스 DeX 창 설계의 미검증 위험에 답을 내고, 접근안(scrcpy 자체 기동)을 유지할지 Shizuku 의존으로 되돌릴지 판정한다. — **달성. Shizuku 경로로 판정(진행 상태 참조).**
 
 **Architecture:** 이것은 **버리는 코드를 쓰는 스파이크**다. 산출물은 앱이 아니라 답이다. 가장 싸고 정보량이 큰 실험부터 배치한다 — Task 2·3은 코드 없이 `scrcpy`와 `adb`만으로 답하고, Task 4~6에서만 스파이크 앱을 만들어 앱이 자기 기기의 adb 데몬을 통해 셸을 얻고 `scrcpy-server`를 띄울 수 있는지 확인한다.
 
@@ -10,17 +10,29 @@
 
 **Spec:** `docs/superpowers/specs/2026-09-04-ondevice-dex-window-design.md`
 
-## 진행 상태 (2026-09-04)
+## 진행 상태 — **Phase 0 종료 (2026-09-04)**
 
-**Task 1~3은 이미 완료되었다.** 접근안 선회 이전에 실행되었으나 그 결과는 접근안과 무관하게 유효하며, 실제로 이번 선회의 근거가 되었다.
+> 이 문서는 **완료된 계획의 기록**이다. 실행할 남은 Task는 없다.
+> 최종 판정과 채택된 아키텍처는 스펙 2.7·2.8·5.5절에 있다.
 
 | Task | 결과 |
 | :--- | :--- |
 | 1 | 툴체인 검증 완료. 기준선: `overlay=null`, `stay_on=0`, 디스플레이 `0 1` |
 | 2 | **Q2 통과** — 삼성 `SecondaryLauncher`가 shell 생성 TRUSTED 디스플레이에 자동 부착 |
 | 3 | **Q3 아니오** — 보조 디스플레이에 IME가 뜨지 않고 display 0에 결합 |
+| 4 | 부분 통과 — 앱 uid에서 adbd 접속 성공(`uid 10494`, `connect: OK`) |
+| 5 | **실패 — 최대 위험이 현실화.** `exportKeyingMaterial`의 hidden API 제한으로 셸 미획득 (13패스) |
+| 6~7 | **취소.** Task 5 실패로 scrcpy 자체 기동 접근안 자체가 폐기됨 |
 
-Task 4~6은 접근안 선회로 **전면 재작성되었다.** 기존의 Shizuku 경유 Surface 전달 검증은 무효가 되었으며, 그 질문 자체가 새 접근안에서는 존재하지 않는다.
+**최종 판정: Shizuku 경로 + Surface 직접 연결.**
+
+Task 5 실패 후 Shizuku로 복귀했고, 남은 최대 위험이었던 "Surface를 Shizuku Binder로 전달할 수 있는가"는 **기기 스파이크 없이 선행 사례 조사로 해소**되었다(스펙 2.8절). 프로덕션 앱이 이 경로로 동작 중임을 소스에서 확인했으므로, 같은 결론에 실기 패스를 더 쓰지 않는다.
+
+아래 Task 4~7 본문은 실행 기록으로 보존한다. **재작성하거나 재실행하지 않는다.**
+
+### 절차적 교훈
+
+13패스 중 상당수는 선행 사례를 먼저 찾았다면 불필요했다. 신규 플랫폼 API에 대해 "이것이 가능한가"를 기기에서 밑바닥부터 증명하기 전에, **같은 문제를 이미 푼 프로덕션 코드가 있는지 먼저 확인한다.**
 
 ## Global Constraints
 
