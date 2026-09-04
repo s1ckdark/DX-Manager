@@ -10,7 +10,42 @@
   - [x] 실제 기기에서 TUI DeX 시작·중지 회귀 확인
         (2026-09-04 SM-F971N: 시작 시 `SecondaryLauncher` display 47 Resumed,
         `--stop-dex` 후 `overlay=null`·디스플레이 `0 1` 복귀 확인)
-- [ ] macOS GUI Phase 1 — Avalonia Desktop 골격과 MainWindow
+- [x] macOS GUI Phase 1 — Avalonia Desktop 골격과 MainWindow
+
+- [ ] macOS GUI Phase 2 착수 전 선행 정리 (Phase 1 최종 리뷰 지적)
+  - [ ] `ApplicationHost`로 정리(teardown) 책임 이관 — **Phase 2의 첫 작업**
+    - 현상: 조립은 `ApplicationHost`가 공유하나 정리는 `InteractiveHost.ShutdownAsync`에만 있다.
+      `Dex.ShutdownAsync`, `SingleWindows.StopAll()`, `HasDeferredDisplayCleanup`,
+      `DisposeRuntimeServices` 등 `AGENTS.md`의 프로세스·overlay 불변식을 강제하는 코드 전부.
+    - Phase 1에서는 GUI가 런타임을 만들지 않아 무해하나, 스펙 3.3절이 막으려던 분기다.
+      Phase 2는 정리 코드를 GUI에 복제하거나 옮겨야 하며 **옮기는 쪽을 먼저 한다.**
+    - 부수 증상: TUI 종료 시 호스트의 `DeviceMonitor`·`KeyboardService`가 직접 해제되는데
+      `ApplicationHost._disposed`는 `false`로 남는다. 하나의 수명주기를 두 플래그가 추적한다.
+  - [ ] `UpdateSettings`에 프로덕션 호출자 연결 — 스펙 8.1절 공백 5가 아직 절반만 닫혔다
+    - TUI 설정 메뉴(`InteractiveHost.cs:760-788`)가 여전히 `_settings`를 직접 수정하고
+      잠금 밖에서 저장한다. 스펙이 지목한 바로 그 메뉴다.
+    - `_settingsLock`이 인스턴스 필드라 호스트 하나당 소비자 하나 계약과 어긋난다 —
+      겨냥한 두 소비자를 조율할 수 없다.
+    - [ ] `UpdateSettings`에 `_disposed` 가드 추가 (`Start`/`Stop`이 세운 패턴과 일치시킨다)
+    - [ ] `UpdateSettings`가 무관한 필드까지 정규화함을 문서화 —
+      `Save` → `SaveCore` → `EnsureDefaults()`가 호출자의 살아있는 객체에 작용한다.
+      Phase 3 설정 화면이 `Settings`에 폼을 바인딩하기 전에 알아야 한다.
+  - [ ] `ApplicationHost._disposed`를 `Interlocked`로 전환 — `DeviceMonitorService`와 동일하게.
+    Phase 2에서 창 닫기와 종료 경로가 함께 `Dispose`에 도달하기 전에.
+  - [ ] `DeviceListViewModel` 생성자의 구독-적용 순서 경합 — 구독 후 `Apply(_registry.Current)`
+    사이에 `Reconcile`이 끼면 큐의 오래된 스냅샷이 이긴다. `DeviceRegistrySnapshot.Generation`으로 판별 가능.
+
+- [ ] macOS GUI Phase 2 설계 시 주의 (Phase 1 최종 리뷰 지적)
+  - DeX 시작·중지 명령을 `ShellViewModel`에 두지 않는다. `host.SelectedSerial`을 읽는 것이
+    최소 저항 경로가 되어 복수 기기 불변식이 조용히 무너지며 어떤 테스트도 잡지 못한다.
+    명령은 `DeviceViewModel`에 두고 serial을 행에서 가져온다.
+    `ApplicationHost.SelectedSerial`은 문서대로 진단 전용으로 유지한다.
+  - `DeviceViewModel`에 `IDisposable`을 붙인다. 행에 세션 상태 구독을 달는 순간
+    `Apply`의 `Devices.RemoveAt(i)`가 기기를 뽑을 때마다 하나씩 샌다. 지금은 공짜다.
+  - [ ] `new ShellViewModel(...)`가 던질 때 이미 만들어진 `ApplicationHost`가 새지 않게 한다 —
+    현재는 `_shell`이 null이라 종료 훅의 `DisposeQuietly()`가 no-op이 된다.
+  - [ ] 워크플로 `paths:` 필터에 `DexManager.Platform.Mac/**` 추가 — main에 이미 있던 공백이라
+    그 프로젝트만 건드린 PR은 macOS 워크플로를 트리거하지 않는다.
 
 - [ ] 세션 중 기기 분리 시 overlay 잔여물 자동 회수
   - 현상: DeX 실행 중 기기가 사라지면 종료 처리가
