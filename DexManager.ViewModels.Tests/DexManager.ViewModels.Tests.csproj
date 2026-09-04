@@ -22,4 +22,9 @@
     <ProjectReference Include="..\DexManager.ViewModels\DexManager.ViewModels.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Compile Include="..\DexManager.Tests\FakePlatform\*.cs"
+             Link="FakePlatform\%(Filename)%(Extension)" />
+  </ItemGroup>
+
 </Project>
