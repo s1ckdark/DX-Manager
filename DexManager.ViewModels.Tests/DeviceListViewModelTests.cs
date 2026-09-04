@@ -126,6 +126,35 @@ public class DeviceListViewModelTests
     }
 
     [Fact]
+    public void ReordersDevicesToMatchTheRegistrysSortOrder()
+    {
+        var registry = new PhysicalDeviceRegistry();
+        using var list = new DeviceListViewModel(registry, new ImmediateUiDispatcher());
+
+        registry.Reconcile(new[]
+        {
+            Device("phone-b", "Galaxy B", "USB-B", DeviceTransportKind.Usb),
+            Device("phone-z", "Galaxy Z", "USB-Z", DeviceTransportKind.Usb)
+        });
+
+        var selected = list.Devices.First(d => d.Identity == "phone-z");
+        list.SelectedDevice = selected;
+
+        // 정렬 순서상 맨 앞에 와야 하는 기기가 새로 연결된다.
+        registry.Reconcile(new[]
+        {
+            Device("phone-b", "Galaxy B", "USB-B", DeviceTransportKind.Usb),
+            Device("phone-z", "Galaxy Z", "USB-Z", DeviceTransportKind.Usb),
+            Device("phone-a", "Galaxy A", "USB-A", DeviceTransportKind.Usb)
+        });
+
+        Assert.Equal(
+            new[] { "Galaxy A", "Galaxy B", "Galaxy Z" },
+            list.Devices.Select(d => d.DisplayName));
+        Assert.Same(selected, list.SelectedDevice);
+    }
+
+    [Fact]
     public void IsEmpty_TracksWhetherTheListHasDevices()
     {
         var registry = new PhysicalDeviceRegistry();

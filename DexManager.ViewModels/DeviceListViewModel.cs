@@ -66,6 +66,28 @@ public sealed partial class DeviceListViewModel : ObservableObject, IDisposable
             else Devices.Add(new DeviceViewModel(info));
         }
 
+        // 레지스트리가 이미 정렬해 둔 순서(incoming)를 그대로 따라간다.
+        // 터미널 UI도 snapshot.Devices 순서를 그대로 쓰므로, 두 UI가
+        // 같은 데이터를 다른 순서로 보여주면 안 된다. Move는 선택 상태를
+        // 건드리지 않는 이동 이벤트를 내므로 remove+insert 대신 이걸 쓴다.
+        for (var target = 0; target < incoming.Count; target++)
+        {
+            var identity = incoming[target].Identity;
+            var currentIndex = -1;
+            for (var i = 0; i < Devices.Count; i++)
+            {
+                if (string.Equals(Devices[i].Identity, identity, StringComparison.OrdinalIgnoreCase))
+                {
+                    currentIndex = i;
+                    break;
+                }
+            }
+            if (currentIndex >= 0 && currentIndex != target)
+            {
+                Devices.Move(currentIndex, target);
+            }
+        }
+
         if (SelectedDevice == null || !Devices.Contains(SelectedDevice))
         {
             SelectedDevice = Devices.FirstOrDefault();
