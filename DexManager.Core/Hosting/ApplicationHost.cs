@@ -19,6 +19,8 @@ public sealed class ApplicationHost : IDisposable
     private readonly IKeyboardService _keyboardService;
     private readonly IAutoStartService _autoStartService;
 
+    private readonly object _settingsLock = new object();
+
     private bool _disposed;
     private string _selectedSerial = string.Empty;
 
@@ -104,6 +106,10 @@ public sealed class ApplicationHost : IDisposable
     public IKeyboardService KeyboardService => _keyboardService;
     public IAutoStartService AutoStartService => _autoStartService;
 
+    /// <summary>
+    /// 현재 설정. 읽기 전용으로 취급한다 — 수정과 저장은
+    /// <see cref="UpdateSettings"/>를 거쳐야 갱신 유실이 없다.
+    /// </summary>
     public AppSettings Settings { get; }
     public SettingsService SettingsService { get; }
     public LogService Log { get; }
@@ -165,6 +171,23 @@ public sealed class ApplicationHost : IDisposable
     {
         if (_disposed) return;
         DeviceMonitor.Stop();
+    }
+
+    /// <summary>
+    /// 설정을 수정하고 저장한다. 수정과 저장이 한 잠금 안에서 일어나므로
+    /// 소비자 둘이 동시에 읽기-수정-쓰기를 해도 갱신이 유실되지 않는다.
+    /// 설정을 바꿀 때는 <see cref="Settings"/>를 직접 수정하지 말고
+    /// 이 메서드를 쓴다.
+    /// </summary>
+    public void UpdateSettings(Action<AppSettings> mutate)
+    {
+        if (mutate == null) throw new ArgumentNullException(nameof(mutate));
+
+        lock (_settingsLock)
+        {
+            mutate(Settings);
+            SettingsService.Save(Settings);
+        }
     }
 
     private void EnsureDefaultPaths()

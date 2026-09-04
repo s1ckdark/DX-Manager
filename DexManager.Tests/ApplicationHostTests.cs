@@ -227,4 +227,43 @@ public class ApplicationHostTests : IDisposable
 
         host.Stop();
     }
+
+    [Fact]
+    public void UpdateSettings_AppliesMutationAndPersists()
+    {
+        using var host = CreateHost();
+
+        host.UpdateSettings(s => s.Timing.ProcessTimeoutMs = 12345);
+
+        Assert.Equal(12345, host.Settings.Timing.ProcessTimeoutMs);
+
+        var reloaded = host.SettingsService.Load();
+        Assert.Equal(12345, reloaded.Timing.ProcessTimeoutMs);
+    }
+
+    [Fact]
+    public void UpdateSettings_ConcurrentMutationsDoNotLoseUpdates()
+    {
+        // ProcessTimeoutMs가 아니라 AdbWakeUpDelayMs를 쓴다: Save()가 내부적으로
+        // AppSettings.EnsureDefaults()를 호출하는데, ProcessTimeoutMs의 하한은
+        // 1000이라 0에서 시작해 누적하면 첫 저장에서 기본값(15000)으로 튕겨
+        // 나간다. AdbWakeUpDelayMs는 하한이 0이라 같은 정수 누적 성질을
+        // 가지면서 이 문제를 피한다.
+        using var host = CreateHost();
+
+        host.UpdateSettings(s => s.Timing.AdbWakeUpDelayMs = 0);
+
+        Parallel.For(0, 200, _ =>
+            host.UpdateSettings(s => s.Timing.AdbWakeUpDelayMs += 1));
+
+        Assert.Equal(200, host.Settings.Timing.AdbWakeUpDelayMs);
+    }
+
+    [Fact]
+    public void UpdateSettings_NullMutation_Throws()
+    {
+        using var host = CreateHost();
+
+        Assert.Throws<ArgumentNullException>(() => host.UpdateSettings(null));
+    }
 }
