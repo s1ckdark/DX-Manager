@@ -7,9 +7,12 @@ on:
       - "build/macos/**"
       - "DexManager.AdbProxy/**"
       - "DexManager.Core/**"
+      - "DexManager.Desktop/**"
       - "DexManager.Mac/**"
       - "DexManager.MultiDeviceTests/**"
       - "DexManager.Tests/**"
+      - "DexManager.ViewModels/**"
+      - "DexManager.ViewModels.Tests/**"
       - "DexManager/licenses/**"
       - "DexManager/config/README.txt"
       - "Shared/**"
@@ -29,9 +32,12 @@ on:
       - "build/macos/**"
       - "DexManager.AdbProxy/**"
       - "DexManager.Core/**"
+      - "DexManager.Desktop/**"
       - "DexManager.Mac/**"
       - "DexManager.MultiDeviceTests/**"
       - "DexManager.Tests/**"
+      - "DexManager.ViewModels/**"
+      - "DexManager.ViewModels.Tests/**"
       - "DexManager/licenses/**"
       - "DexManager/config/README.txt"
       - "Shared/**"
@@ -97,6 +103,9 @@ jobs:
 
       - name: Run unit and integration tests
         run: dotnet test DexManager.Tests/DexManager.Tests.csproj --configuration Release --no-build --nologo
+
+      - name: Run ViewModel tests
+        run: dotnet test DexManager.ViewModels.Tests/DexManager.ViewModels.Tests.csproj --configuration Release --no-build --nologo
 
       - name: Run multi-device foundation tests
         run: dotnet run --project DexManager.MultiDeviceTests/DexManager.MultiDeviceTests.csproj --configuration Release --no-build

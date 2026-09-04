@@ -199,6 +199,8 @@ output_staging="$(mktemp -d "$output_directory/.dx-manager-macos-output.XXXXXX")
 if [[ $skip_tests -eq 0 ]]; then
     dotnet test "$repository_root/DexManager.Tests/DexManager.Tests.csproj" \
         --configuration Release --nologo
+    dotnet test "$repository_root/DexManager.ViewModels.Tests/DexManager.ViewModels.Tests.csproj" \
+        --configuration Release --nologo
     dotnet run --project "$repository_root/DexManager.MultiDeviceTests/DexManager.MultiDeviceTests.csproj" \
         --configuration Release
 fi
