@@ -2,6 +2,7 @@
 
 - 작성일: 2026-09-04
 - 개정: 2026-09-04 — 접근안을 Shizuku 경유 Surface 전달에서 scrcpy 자체 기동으로 선회
+- 재개정: 2026-09-04 — Phase 0 검증 실패로 **Shizuku 경로로 복귀**. 근거는 5.5절
 - 상태: 설계 승인됨, Phase 0 재작성 대기
 - 대상: `DXDexWindow` (신규 안드로이드 앱)
 
@@ -26,7 +27,7 @@ DX Manager는 PC에서 scrcpy로 휴대폰의 가상 디스플레이를 미러�
 - 비삼성 기기 지원 및 자체 데스크톱 셸 구현
 - DX Manager(PC)와의 연동 — 이 앱은 완전히 독립적으로 동작한다
 - 기존 DX Companion(`DXDisplayCleanup`)의 수정 — 그 앱의 안전 경계를 그대로 유지한다
-- **Shizuku 의존** — 개정으로 제거되었다(3.2절)
+- ~~**Shizuku 의존** — 개정으로 제거되었다(3.2절)~~ — **재개정으로 복원.** 앱 내장 ADB 클라이언트 경로가 Phase 0에서 막혔다(5.5절)
 - 여러 개의 동시 DeX 창
 - 화면 녹화·캡처
 - Play Store 배포 (7절 참조)
@@ -127,7 +128,9 @@ connect_exit=0
 
 Shizuku는 두 가지 역할을 한다. (a) shell uid 프로세스를 띄우고 유지하는 것, (b) 앱이 그 프로세스에 `Surface` 같은 객체를 건네게 하는 Binder 다리. scrcpy 방식은 (a)만 대체하고 (b)는 대체하지 못하므로, 화면은 Surface 직접 연결이 아니라 H.264 스트림으로 받는다.
 
-**채택 근거**: 사용자가 앱 하나만 설치하면 되고, 입력·문자·클립보드를 scrcpy 프로토콜이 이미 제공하며(4.3절), 특히 `INJECT_TEXT`가 2.5절의 IME 제약을 우회한다. 대가는 앱 안에 ADB 클라이언트를 구현하는 부담과 같은 기기 내 인코딩 왕복이다.
+> **재개정 주석(2026-09-04)**: 아래 채택 근거는 Phase 0 검증 전의 판단이다. 실제 검증에서 앱 내장 ADB 클라이언트 경로가 `exportKeyingMaterial`의 hidden API 제한에 막혀 셸을 얻지 못했다. 5.5절 판정에 따라 **Shizuku 경로로 복귀**했으며, 이 절은 그 결정의 배경으로 보존한다.
+
+**채택 근거(당시)**: 사용자가 앱 하나만 설치하면 되고, 입력·문자·클립보드를 scrcpy 프로토콜이 이미 제공하며(4.3절), 특히 `INJECT_TEXT`가 2.5절의 IME 제약을 우회한다. 대가는 앱 안에 ADB 클라이언트를 구현하는 부담과 같은 기기 내 인코딩 왕복이다.
 
 참고:
 - [Activity launch policy — AOSP](https://source.android.com/docs/core/display/multi_display/activity-launch)
@@ -135,6 +138,8 @@ Shizuku는 두 가지 역할을 한다. (a) shell uid 프로세스를 띄우고 
 - [scrcpy](https://github.com/Genymobile/scrcpy) (Apache-2.0)
 
 ## 3. 아키텍처
+
+> **재개정 주석(2026-09-04)**: 이 장은 앱 내장 ADB 클라이언트를 전제로 작성되었다. 5.5절 판정으로 권한 획득 경로가 **Shizuku**로 되돌아갔으므로, `AdbClient`가 `ShizukuGateway`로 대체되고 `ScrcpyServerController`는 Shizuku를 통해 서버를 기동한다. Surface 직접 연결이 가능하면 `VideoPipeline`도 불필요해진다(5.5절). Phase 1 착수 전에 이 장을 다시 쓴다.
 
 ### 3.1 프로젝트 배치
 
@@ -155,7 +160,7 @@ DXDexWindow/               신규
 | `targetSdk` / `compileSdk` | 36 | Companion과 동일 |
 | 언어 | Java | 저장소의 유일한 안드로이드 앱이 Java |
 | Gradle / AGP | wrapper 8.14.5 / AGP 8.13.2 | `DXDisplayCleanup`에서 검증된 조합 |
-| 신규 의존성 | ADB 클라이언트 라이브러리, `scrcpy-server.jar` 번들 | 이 저장소 안드로이드 코드의 첫 서드파티 의존성 |
+| 신규 의존성 | **Shizuku API/provider** (+ Surface 직접 연결이 불가할 경우 `scrcpy-server.jar` 번들) | 이 저장소 안드로이드 코드의 첫 서드파티 의존성 |
 
 ### 3.2 별도 앱으로 만드는 이유
 
@@ -164,7 +169,7 @@ DX Companion의 README는 다음 안전 경계를 선언한다.
 > `WRITE_SECURE_SETTINGS`를 문서화된 두 복구 설정에만 사용한다.
 > 셸을 제공하거나 임의 명령을 실행하지 않으며, 클라우드에 접속하거나 데이터를 수집하지 않는다.
 
-이 앱은 자기 기기의 adb 데몬에 접속해 shell 명령을 실행한다. 위 선언과 정면으로 충돌하며, DX Manager가 패키지명과 서명 인증서를 검증한 뒤 권한을 부여하는 신뢰 모델과도 맞지 않는다.
+이 앱은 Shizuku를 통해 shell uid 권한으로 임의 앱을 실행하고 입력을 주입한다. 위 선언과 정면으로 충돌하며, DX Manager가 패키지명과 서명 인증서를 검증한 뒤 권한을 부여하는 신뢰 모델과도 맞지 않는다.
 
 따라서 두 앱을 분리하고 **서명 키도 분리한다.**
 
@@ -291,6 +296,47 @@ scrcpy가 실행 중인 새 디스플레이의 크기를 바꾸는 control 메�
 
 실제 기기에서의 표시·조작·정리는 사용자 확인 항목이다. `AGENTS.md` 원칙에 따라 대신 성공했다고 가정하지 않고 미확인으로 명시한다.
 
+### 5.5 Phase 0 판정 (2026-09-04) — Shizuku 경로로 복귀
+
+기기: Galaxy Z Fold (SM-F971N), Android 17 (SDK 37), One UI 9.0. 총 13회의 실기 패스.
+
+| 검증 항목 | 결과 |
+| :--- | :--- |
+| 일반 앱 uid에서 adbd 소켓 접속 | ✅ 가능 (`app uid: 10494`, `connect: OK`) |
+| 앱이 두 엔드포인트를 mDNS로 런타임 발견 | ✅ 가능 (라이브러리의 `AdbMdns`, 6회 중 5회 성공) |
+| 앱 내 TLS 1.3 핸드셰이크 완료 | ✅ 가능 — 단 **인메모리 키에 한함** |
+| **앱 내 ADB 페어링 완료(셸 획득)** | ❌ **불가 — 이번 환경에서 미달성** |
+
+**결론: 접근안을 Shizuku 경유로 되돌린다.**
+
+차단 지점은 `PairingConnectionCtx.exportKeyingMaterial()`이다. TLS 핸드셰이크 직후 SPAKE2용 키 재료를 뽑는 단계에서, 라이브러리가 Conscrypt의 `exportKeyingMaterial(SSLSocket, String, byte[], int)`을 리플렉션으로 호출하는데 `NoSuchMethodException`이 발생한다. Android의 non-SDK interface(hidden API) 제한이 유력하며, 라이브러리 README도 이런 내부 접근에 hidden-API 우회 도구를 언급한다. 그 우회를 도입하는 것은 스파이크 범위를 넘고 프로덕션 앱에 넣기에도 부담이 크다.
+
+13패스 중 **페어링 코드가 실패 원인이었던 적은 한 번도 없다.** 모든 실패는 SPAKE2 교환 이전 단계에서 발생했다.
+
+#### 접근안과 무관하게 유효한 발견
+
+아래는 Shizuku 경로에서도 그대로 적용된다.
+
+- **삼성 보조 런처 자동 부착**(2.3절) — 디스플레이를 누가 만들든 성립한다. 앱이 데스크톱 셸을 구현할 필요가 없다는 이 설계의 핵심 전제.
+- **보조 디스플레이 IME 미표시**(2.5절) — 문자 입력은 IME를 경유하지 않는 경로가 필요하다.
+- **잠금 상태 제약**(2.4절) — 잠긴 화면에서는 가상 디스플레이가 철거된다.
+
+#### ADB 클라이언트 경로에만 해당하는 발견 (기록 보존)
+
+- **adbd의 TLS 리스너 포트 두 개가 모두 회전한다.** 연결 포트와 페어링 포트 모두, 페어링 대화상자를 열어둔 상태에서도 바뀐다. 사람이 값을 전달하는 방식은 원리적으로 성립하지 않으며, 클라이언트가 사용 직전에 mDNS로 발견해야 한다.
+- **AndroidKeyStore 키는 이 라이브러리의 핸드셰이크 경로와 호환되지 않는다.** 번들 Conscrypt와 플랫폼 Conscrypt 양쪽에서 동일한 `RSA routines:OPENSSL_internal:internal error`가 발생했고(4회), 인메모리 RSA 키로 바꾸자 핸드셰이크가 즉시 성공했다. 추출 불가능한 하드웨어 보호 키를 쓰려면 다른 라이브러리나 다른 경로가 필요하다.
+
+#### Shizuku 경로에서 다시 열리는 질문
+
+Shizuku는 shell uid 프로세스와 **Binder 다리**를 모두 제공하므로, 원래 검토했던 두 방식이 다시 선택지가 된다.
+
+| | 화면 전달 | 상태 |
+| :--- | :--- | :--- |
+| Surface 직접 연결 | 인코딩 없음 | **미검증** — Surface를 Shizuku 경유로 shell에 넘길 수 있는지 |
+| Shizuku로 scrcpy-server 기동 | H.264 소켓 | scrcpy 자체는 실기 검증됨(2.2·2.3절) |
+
+Phase 1 착수 전에 전자를 먼저 확인한다. 성립하면 같은 기기 안에서의 인코딩 왕복을 피할 수 있다.
+
 ## 6. 전달 단계
 
 | Phase | 내용 | 완료 조건 |
@@ -316,9 +362,11 @@ Phase 1~2를 전체화면으로 먼저 만드는 것은 의도적이다. 플로�
 
 ## 8. 열린 항목
 
-- **앱 안의 ADB 페어링·인증 구현 난이도가 미검증이다.** Phase 0의 핵심 검증 대상이다. 실패 시 Shizuku 의존으로 되돌아가야 한다.
-- **일반 앱 uid에서 localhost adbd 접속 가능 여부 미검증** (2.6절의 한계).
-- **재부팅 후 재연결 동작 미검증.** ADB 키가 보존되어 자동 재연결된다면 Shizuku 대비 명확한 UX 우위이나, 무선 디버깅 자체가 재부팅 시 꺼지는 기기가 많다.
-- **실행 중인 새 디스플레이의 크기 변경 수단 미검증.** scrcpy control 프로토콜에 해당 메시지가 있으면 4.2절의 재기동을 피할 수 있다.
+- ~~**앱 안의 ADB 페어링·인증 구현 난이도가 미검증이다.**~~ — **해결됨(2026-09-04).** Phase 0에서 13패스에 걸쳐 검증했고 `exportKeyingMaterial`의 hidden API 제한에 막혔다. Shizuku 의존으로 복귀했다(5.5절).
+- **Surface를 Shizuku 경유로 shell 프로세스에 전달할 수 있는지 미검증.** 가능하면 인코딩 왕복을 없앨 수 있다. Phase 1 착수 전 최우선 검증 대상이다(5.5절).
+- **Shizuku 재부팅 후 재시작 문제.** 무선 디버깅으로 PC 없이 시작할 수 있으나 재부팅마다 반복해야 한다. Companion이 보유한 `WRITE_SECURE_SETTINGS`로 자동화하는 아이디어는 여전히 미검증이다.
+- ~~**일반 앱 uid에서 localhost adbd 접속 가능 여부 미검증**~~ — **해결됨(2026-09-04).** 가능하다(`app uid: 10494`, `connect: OK`). 다만 Shizuku 복귀로 이 사실은 더 이상 이 설계에 필요하지 않다.
+- ~~**재부팅 후 재연결 동작 미검증.**~~ — 앱 내장 ADB 클라이언트 경로가 폐기되어 무의미해졌다.
+- **실행 중인 디스플레이의 크기 변경 수단 미검증.** Surface 직접 연결이 되면 `VirtualDisplay.resize()`를 쓸 수 있어 재기동이 불필요하다. scrcpy 경로라면 control 프로토콜에 해당 메시지가 있는지 확인해야 한다.
 - **같은 기기 내 H.264 인코딩→디코딩의 실제 비용 미측정.** 지연·발열·배터리 영향을 Phase 1에서 측정한다.
 - **삼성 내 기기·One UI 버전별 차이 미검증.** 검증은 Galaxy Z Fold(One UI 9.0) 한 대에서만 이루어졌다. 특히 폴더블이 아닌 기기와 One UI 8.x 이하는 확인이 필요하다.
