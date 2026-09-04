@@ -202,11 +202,28 @@ public class ApplicationHostTests : IDisposable
     {
         using var host = CreateHost();
 
+        var started = LocalizationService.Get("Log.DeviceMonitor.Started");
+        var stopped = LocalizationService.Get("Log.DeviceMonitor.Stopped");
+
+        // WaitForFirstPoll은 Start가 감시 타이머를 실제로 돌렸을 때만 통과한다.
+        // 두 번째 Start가 이벤트를 다시 Reset하므로, 두 번 모두 폴링이
+        // 새로 일어났는지 구분해서 볼 수 있다.
         host.Start();
-        host.Stop();
-        host.Start();
+        Assert.True(host.DeviceMonitor.WaitForFirstPoll(5000, CancellationToken.None));
         host.Stop();
 
+        host.Start();
+        Assert.True(host.DeviceMonitor.WaitForFirstPoll(5000, CancellationToken.None));
+        host.Stop();
+
+        // Stop이 타이머를 실제로 회수했을 때만 중지 로그가 남는다
+        // (타이머가 없으면 DeviceMonitorService.StopTimer는 기록 전에 반환한다).
+        var lifecycle = host.Log.GetSessionEntries()
+            .Where(entry => entry.Contains(started) || entry.Contains(stopped))
+            .Select(entry => entry.Contains(started) ? "start" : "stop")
+            .ToArray();
+
+        Assert.Equal(new[] { "start", "stop", "start", "stop" }, lifecycle);
         Assert.False(host.IsDisposed);
     }
 
