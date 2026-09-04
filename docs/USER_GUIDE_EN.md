@@ -611,9 +611,10 @@ scrcpy and bundled dependencies remain under their respective licenses. See
 
 ## Developer and Project
 
-- Developer: [maze](https://github.com/maze-mei)
-- GitHub: [maze-mei/DX-Manager](https://github.com/maze-mei/DX-Manager)
+- Original author: [maze](https://github.com/maze-mei)
+- Maintainer of this fork: [s1ckdark](https://github.com/s1ckdark)
+- GitHub: [s1ckdark/DX-Manager](https://github.com/s1ckdark/DX-Manager)
 - License: [MIT License](../LICENSE)
-- Copyright © 2026 maze
+- Copyright © 2026 maze, s1ckdark
 
 DX Manager is a personally and independently developed project.

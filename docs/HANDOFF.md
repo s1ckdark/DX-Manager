@@ -27,7 +27,7 @@
 - Android 앱 공개 이름: **DX Companion 2.0.0**, versionCode `6`
 - 공개 태그: `v2.0.0` (`cec74a9`)
 - 공개 태그 뒤 README 대표 이미지 갱신: `e8e47e6`
-- 원격 저장소: `https://github.com/maze-mei/DX-Manager`
+- 원격 저장소: `https://github.com/s1ckdark/DX-Manager` (upstream: `maze-mei/DX-Manager`)
 - 이 문서 작성 당시 작업 브랜치: `feature/v2-multi-device`
 - v2.0.1은 최초 물리 기기 결속 뒤 DeX 기기별 설정이 공통 기본값으로 표시되던
   UI 동기화 회귀만 수정한 유지보수 릴리스다.

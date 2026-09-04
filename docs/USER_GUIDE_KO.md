@@ -589,9 +589,10 @@ scrcpy와 동봉된 구성요소는 각각의 라이선스를 따릅니다. 자�
 
 ## 개발자와 프로젝트
 
-- 개발자: [maze](https://github.com/maze-mei)
-- GitHub: [maze-mei/DX-Manager](https://github.com/maze-mei/DX-Manager)
+- 원저작자: [maze](https://github.com/maze-mei)
+- 이 포크 관리자: [s1ckdark](https://github.com/s1ckdark)
+- GitHub: [s1ckdark/DX-Manager](https://github.com/s1ckdark/DX-Manager)
 - 라이선스: [MIT License](../LICENSE)
-- Copyright © 2026 maze
+- Copyright © 2026 maze, s1ckdark
 
 DX Manager는 개인이 독립적으로 개발한 프로젝트입니다.

@@ -401,17 +401,21 @@ authors.
 
 DX Manager's original source code is licensed under the
 [MIT License](LICENSE). Copyright © 2026
-[maze](https://github.com/maze-mei). Bundled third-party components remain
+[maze](https://github.com/maze-mei) and
+[s1ckdark](https://github.com/s1ckdark). Bundled third-party components remain
 under their own licenses. See
 [THIRD_PARTY_NOTICES.md](DexManager/licenses/THIRD_PARTY_NOTICES.md).
 
 ## Developer and Project
 
-- Developer: [maze](https://github.com/maze-mei)
-- GitHub: [maze-mei/DX-Manager](https://github.com/maze-mei/DX-Manager)
-- Copyright © 2026 maze
+- Original author: [maze](https://github.com/maze-mei)
+- Maintainer of this fork: [s1ckdark](https://github.com/s1ckdark)
+- GitHub: [s1ckdark/DX-Manager](https://github.com/s1ckdark/DX-Manager)
+- Copyright © 2026 maze, s1ckdark
 
-DX Manager is an independently developed personal project.
+DX Manager is an independently developed personal project. This repository is
+an independently maintained fork of
+[maze-mei/DX-Manager](https://github.com/maze-mei/DX-Manager).
 
 ---
 
@@ -778,15 +782,19 @@ scrcpy는 해당 개발자들이 유지·관리하는 독립적인 오픈소스 
 ## 라이선스
 
 DX Manager 자체 소스 코드는 [MIT License](LICENSE)로 배포됩니다.
-Copyright © 2026 [maze](https://github.com/maze-mei). 동봉된 제3자
+Copyright © 2026 [maze](https://github.com/maze-mei),
+[s1ckdark](https://github.com/s1ckdark). 동봉된 제3자
 구성요소에는 각각의 라이선스가 적용됩니다. 자세한 내용은
 [THIRD_PARTY_NOTICES.md](DexManager/licenses/THIRD_PARTY_NOTICES.md)를
 참조하십시오.
 
 ## 개발자와 프로젝트
 
-- 개발자: [maze](https://github.com/maze-mei)
-- GitHub: [maze-mei/DX-Manager](https://github.com/maze-mei/DX-Manager)
-- Copyright © 2026 maze
+- 원저작자: [maze](https://github.com/maze-mei)
+- 이 포크 관리자: [s1ckdark](https://github.com/s1ckdark)
+- GitHub: [s1ckdark/DX-Manager](https://github.com/s1ckdark/DX-Manager)
+- Copyright © 2026 maze, s1ckdark
 
-DX Manager는 개인이 독립적으로 개발한 프로젝트입니다.
+DX Manager는 개인이 독립적으로 개발한 프로젝트입니다. 이 저장소는
+[maze-mei/DX-Manager](https://github.com/maze-mei/DX-Manager)에서 갈라져 나와
+독자적으로 유지보수되는 포크입니다.

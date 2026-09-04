@@ -156,7 +156,7 @@ display instead of the simulated DeX display.
 - [Third-party notices](licenses/THIRD_PARTY_NOTICES.md)
 - [DX Manager MIT License](LICENSE)
 
-Project page: https://github.com/maze-mei/DX-Manager
+Project page: https://github.com/s1ckdark/DX-Manager
 
 ---
 
@@ -314,4 +314,4 @@ scrcpy 순정 방식을 사용하려면 **설정 > 경로 / ADB > 프로그램 �
 - [제3자 고지](licenses/THIRD_PARTY_NOTICES.md)
 - [DX Manager MIT 라이선스](LICENSE)
 
-프로젝트 페이지: https://github.com/maze-mei/DX-Manager
+프로젝트 페이지: https://github.com/s1ckdark/DX-Manager
