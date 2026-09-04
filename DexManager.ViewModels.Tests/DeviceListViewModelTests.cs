@@ -97,16 +97,44 @@ public class DeviceListViewModelTests
     public void MarshalsSnapshotChangesThroughTheDispatcher()
     {
         var registry = new PhysicalDeviceRegistry();
-        var dispatcher = new ImmediateUiDispatcher();
+        var dispatcher = new QueueingUiDispatcher();
         using var list = new DeviceListViewModel(registry, dispatcher);
 
-        var before = dispatcher.PostCount;
         registry.Reconcile(new[]
         {
             Device("phone-a", "Galaxy A", "USB-A", DeviceTransportKind.Usb)
         });
 
-        Assert.True(dispatcher.PostCount > before);
+        // 아직 디스패처를 비우지 않았다 — 스냅샷이 목록에 반영되면
+        // 레지스트리 스레드에서 직접 건드렸다는 뜻이다.
+        Assert.True(list.IsEmpty);
+        Assert.Empty(list.Devices);
+
+        dispatcher.Drain();
+
+        // 큐에 들어 있던 작업이 실제로 스냅샷을 반영해야 한다.
+        Assert.Equal(new[] { "phone-a" }, list.Devices.Select(d => d.Identity));
+        Assert.False(list.IsEmpty);
+    }
+
+    [Fact]
+    public void SnapshotPostedBeforeDispose_IsIgnoredWhenItRuns()
+    {
+        var registry = new PhysicalDeviceRegistry();
+        var dispatcher = new QueueingUiDispatcher();
+        var list = new DeviceListViewModel(registry, dispatcher);
+
+        // 스냅샷 변경이 Post까지 도달한 뒤 Dispose가 끼어든다.
+        registry.Reconcile(new[]
+        {
+            Device("phone-a", "Galaxy A", "USB-A", DeviceTransportKind.Usb)
+        });
+        Assert.Equal(1, dispatcher.PendingCount);
+
+        list.Dispose();
+        Assert.Equal(1, dispatcher.Drain());
+
+        Assert.Empty(list.Devices);
     }
 
     [Fact]

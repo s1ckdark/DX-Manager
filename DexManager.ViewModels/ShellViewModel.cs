@@ -53,6 +53,10 @@ public sealed partial class ShellViewModel : ObservableObject, IDisposable
         var current = e?.Current ?? string.Empty;
         _dispatcher.Post(() =>
         {
+            // Post는 비동기다. 구독을 해제해도 이미 큐에 들어간 클로저는
+            // 되돌릴 수 없으므로 실행 시점에 다시 확인한다.
+            if (_disposed) return;
+
             StatusText = string.IsNullOrEmpty(current)
                 ? "No device selected"
                 : $"Selected {current}";
