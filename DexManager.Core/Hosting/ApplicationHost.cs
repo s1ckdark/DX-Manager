@@ -328,9 +328,12 @@ public sealed class ApplicationHost : IDisposable
     /// </summary>
     /// <param name="fallbackSerial">
     /// DeX 세션이 자기 serial을 모를 때 쓸 대체값. 없으면 <c>null</c>.
+    /// <see cref="RuntimeCoordinator"/>가 모르는 런타임에만 쓰인다 —
+    /// 코디네이터가 아는 런타임은 자기 결속 serial로 정리한다.
     /// </param>
     /// <param name="fallbackIdentity">
     /// 같은 용도의 물리 기기 identity 대체값. 없으면 <c>null</c>.
+    /// 적용 범위도 <paramref name="fallbackSerial"/>과 같다.
     /// </param>
     public async Task<IReadOnlyList<Exception>> ShutdownAsync(
         string fallbackSerial,
@@ -386,10 +389,36 @@ public sealed class ApplicationHost : IDisposable
 
         foreach (var runtime in RuntimeFactory.CreatedInstances)
         {
+            // 런타임마다 자기 기기를 겨눈다. CreatedInstances는 생성 순서만
+            // 남은 목록이라 identity 결속을 잃어버렸으므로, 코디네이터에게
+            // 되물어 복원한다. 이걸 하지 않고 호출자가 준 대체값 하나를
+            // 모든 런타임에 그대로 뿌리면 두 가지가 깨진다.
+            // (1) GUI는 대체값이 항상 (null, null)이라 세션이 이미 끝나고
+            //     회수만 밀린 런타임을 통째로 건너뛴다 — overlay 설정이
+            //     폰에 남아 재부팅해도 살아남는다.
+            // (2) 런타임이 둘 이상일 때 한 기기의 serial이 다른 기기의
+            //     런타임을 겨눈다.
+            // 그 결과 코디네이터가 아는 런타임은 DeX를 한 번도 시작한 적이
+            // 없어도 종료 때 overlay 회수를 시도한다. 이는 TUI가 이미 하고
+            // 있던 동작과 같다 — 회수는 멱등이고, 남은 overlay를 놓치는 쪽이
+            // 훨씬 비싸다.
+            var runtimeSerial = fallbackSerial;
+            var runtimeIdentity = fallbackIdentity;
+            DeviceRuntimeBinding binding;
+            if (RuntimeCoordinator != null &&
+                runtime != null &&
+                RuntimeCoordinator.TryGetBinding(
+                    runtime.InstanceId,
+                    out binding))
+            {
+                runtimeSerial = binding.Serial;
+                runtimeIdentity = binding.Identity;
+            }
+
             await ShutdownRuntimeAsync(
                 runtime,
-                fallbackSerial,
-                fallbackIdentity,
+                runtimeSerial,
+                runtimeIdentity,
                 errors);
         }
 
