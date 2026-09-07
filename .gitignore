@@ -35,3 +35,6 @@ dist/
 
 # Agent tooling operational state
 .omc/
+
+# Nested working clone kept outside version control
+DX-manager/
