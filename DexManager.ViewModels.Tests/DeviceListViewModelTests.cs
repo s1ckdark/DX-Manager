@@ -270,9 +270,16 @@ public class DeviceListViewModelTests
     [Fact]
     public void RemovedRowStopsReactingToRuntimeSessionChanges()
     {
-        // Apply가 행을 Dispose한 뒤 RemoveAt하는 순서를 지켜야 한다 — 순서가
-        // 바뀌면 목록에서 빠진 행이 여전히 DeviceRuntimeSessionRegistry.Changed를
-        // 구독한 채로 남아 IsDexRunning이 계속 움직인다.
+        // 주의: 이 테스트는 Dispose와 RemoveAt의 "순서"를 검증하지 않는다 —
+        // 직접 순서를 바꿔 실행해 확인했다: 두 호출 모두 같은 스레드에서
+        // 동기로 연달아 실행되고 그 사이에 Changed가 끼어들 여지가 없어서,
+        // 순서만 바꾸면(둘 다 여전히 호출) 이 테스트는 그대로 통과한다.
+        // 이 테스트가 실제로 잡아내는 것은 Apply가 제거된 행에서
+        // Dispose()를 빠짐없이 호출하는지다 — Dispose() 호출 자체를
+        // 지우면 실패한다. (구독 해제 자체가 실제로 효과가 있는지는
+        // RemovedRowStopsPostingFromRuntimeSessionChanges 가 검증한다 —
+        // 이 테스트의 IsDexRunning 관찰은 ApplyRuntime의 _disposed 가드에
+        // 가려져 구독 해제 여부를 구분하지 못한다.)
         var registry = new PhysicalDeviceRegistry();
         var sessions = new DeviceRuntimeSessionRegistry();
         registry.Reconcile(new[]
@@ -293,8 +300,7 @@ public class DeviceListViewModelTests
         });
         Assert.True(removed.IsDexRunning);
 
-        // phone-b 를 목록에서 뺀다 — Apply가 removed.Dispose()를 먼저
-        // 호출해 구독을 끊어야 한다.
+        // phone-b 를 목록에서 뺀다 — Apply가 removed.Dispose()를 호출해야 한다.
         registry.Reconcile(new[] { Device("phone-a", "Galaxy A", "AAA", DeviceTransportKind.Usb) });
         Assert.True(removed.IsDisposed);
 
@@ -303,5 +309,47 @@ public class DeviceListViewModelTests
         sessions.SetDexSession("BBB", null);
 
         Assert.True(removed.IsDexRunning);
+    }
+
+    [Fact]
+    public void RemovedRowStopsPostingFromRuntimeSessionChanges()
+    {
+        // 위 테스트(RemovedRowStopsReactingToRuntimeSessionChanges)는
+        // ApplyRuntime의 _disposed 가드에 가려서 구독 해제 자체를
+        // 구분하지 못한다. 이 테스트는 그 가드보다 먼저 실행되는
+        // OnSessionsChanged의 dispatcher.Post 호출 자체를 관찰해 —
+        // 구독이 실제로 끊겼는지를 가드 뒤가 아니라 가드 앞에서 잡아낸다.
+        var registry = new PhysicalDeviceRegistry();
+        var sessions = new DeviceRuntimeSessionRegistry();
+        registry.Reconcile(new[]
+        {
+            Device("phone-a", "Galaxy A", "AAA", DeviceTransportKind.Usb)
+        });
+        sessions.Reconcile(registry.Current);
+
+        var dispatcher = new QueueingUiDispatcher();
+        using var vm = new DeviceListViewModel(registry, sessions, dispatcher);
+
+        // 생성자의 첫 Apply는 디스패처를 거치지 않고 동기로 실행된다.
+        Assert.Single(vm.Devices);
+
+        // phone-a 를 목록에서 뺀다. 목록 레벨 SnapshotChanged는 디스패처
+        // 큐를 거치므로 Drain해야 실제로 반영되고 행이 Dispose된다.
+        registry.Reconcile(Array.Empty<DiscoveredDeviceTransport>());
+        dispatcher.Drain();
+        Assert.True(vm.IsEmpty);
+
+        var postCountBeforeSessionChange = dispatcher.PostCount;
+
+        // DeviceListViewModel은 DeviceRuntimeSessionRegistry.Changed를
+        // 직접 구독하지 않는다 — 목록이 비었으므로, 여기서 Post가 하나라도
+        // 더 생긴다면 그건 오직 제거된 행이 여전히 구독 중이라는 뜻이다.
+        sessions.SetDexSession("AAA", new ManagedDisplaySession
+        {
+            Serial = "AAA",
+            DeviceIdentity = "phone-a"
+        });
+
+        Assert.Equal(postCountBeforeSessionChange, dispatcher.PostCount);
     }
 }
