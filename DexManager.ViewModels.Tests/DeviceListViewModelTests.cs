@@ -28,7 +28,7 @@ public class DeviceListViewModelTests
     public void AddsDevicesFromSnapshotAndSelectsFirst()
     {
         var registry = new PhysicalDeviceRegistry();
-        using var list = new DeviceListViewModel(registry, new ImmediateUiDispatcher());
+        using var list = new DeviceListViewModel(registry, new DeviceRuntimeSessionRegistry(), new ImmediateUiDispatcher());
 
         registry.Reconcile(new[]
         {
@@ -47,7 +47,7 @@ public class DeviceListViewModelTests
     public void ReusesViewModelInstanceWhenADeviceChanges()
     {
         var registry = new PhysicalDeviceRegistry();
-        using var list = new DeviceListViewModel(registry, new ImmediateUiDispatcher());
+        using var list = new DeviceListViewModel(registry, new DeviceRuntimeSessionRegistry(), new ImmediateUiDispatcher());
 
         registry.Reconcile(new[]
         {
@@ -75,7 +75,7 @@ public class DeviceListViewModelTests
     public void RemovesDisappearedDeviceAndMovesSelection()
     {
         var registry = new PhysicalDeviceRegistry();
-        using var list = new DeviceListViewModel(registry, new ImmediateUiDispatcher());
+        using var list = new DeviceListViewModel(registry, new DeviceRuntimeSessionRegistry(), new ImmediateUiDispatcher());
 
         registry.Reconcile(new[]
         {
@@ -98,7 +98,7 @@ public class DeviceListViewModelTests
     {
         var registry = new PhysicalDeviceRegistry();
         var dispatcher = new QueueingUiDispatcher();
-        using var list = new DeviceListViewModel(registry, dispatcher);
+        using var list = new DeviceListViewModel(registry, new DeviceRuntimeSessionRegistry(), dispatcher);
 
         registry.Reconcile(new[]
         {
@@ -122,7 +122,7 @@ public class DeviceListViewModelTests
     {
         var registry = new PhysicalDeviceRegistry();
         var dispatcher = new QueueingUiDispatcher();
-        var list = new DeviceListViewModel(registry, dispatcher);
+        var list = new DeviceListViewModel(registry, new DeviceRuntimeSessionRegistry(), dispatcher);
 
         // 스냅샷 변경이 Post까지 도달한 뒤 Dispose가 끼어든다.
         registry.Reconcile(new[]
@@ -141,7 +141,7 @@ public class DeviceListViewModelTests
     public void Dispose_UnsubscribesFromRegistry()
     {
         var registry = new PhysicalDeviceRegistry();
-        var list = new DeviceListViewModel(registry, new ImmediateUiDispatcher());
+        var list = new DeviceListViewModel(registry, new DeviceRuntimeSessionRegistry(), new ImmediateUiDispatcher());
 
         list.Dispose();
 
@@ -157,7 +157,7 @@ public class DeviceListViewModelTests
     public void ReordersDevicesToMatchTheRegistrysSortOrder()
     {
         var registry = new PhysicalDeviceRegistry();
-        using var list = new DeviceListViewModel(registry, new ImmediateUiDispatcher());
+        using var list = new DeviceListViewModel(registry, new DeviceRuntimeSessionRegistry(), new ImmediateUiDispatcher());
 
         registry.Reconcile(new[]
         {
@@ -186,7 +186,7 @@ public class DeviceListViewModelTests
     public void IsEmpty_TracksWhetherTheListHasDevices()
     {
         var registry = new PhysicalDeviceRegistry();
-        using var list = new DeviceListViewModel(registry, new ImmediateUiDispatcher());
+        using var list = new DeviceListViewModel(registry, new DeviceRuntimeSessionRegistry(), new ImmediateUiDispatcher());
 
         Assert.True(list.IsEmpty);
 
@@ -218,7 +218,7 @@ public class DeviceListViewModelTests
         });
 
         var dispatcher = new QueueingUiDispatcher();
-        using var vm = new DeviceListViewModel(registry, dispatcher);
+        using var vm = new DeviceListViewModel(registry, new DeviceRuntimeSessionRegistry(), dispatcher);
 
         // QueueingUiDispatcher를 썼는데도 Drain()을 한 번도 부르지 않은
         // 시점에 이미 두 기기가 보인다 — 생성자의 첫 Apply가 디스패처
@@ -244,7 +244,7 @@ public class DeviceListViewModelTests
         });
 
         var dispatcher = new ImmediateUiDispatcher();
-        using var vm = new DeviceListViewModel(registry, dispatcher);
+        using var vm = new DeviceListViewModel(registry, new DeviceRuntimeSessionRegistry(), dispatcher);
         var removed = vm.Devices.Single(d => d.Identity == "phone-b");
 
         registry.Reconcile(new[] { Device("phone-a", "Galaxy A", "AAA", DeviceTransportKind.Usb) });
@@ -259,11 +259,49 @@ public class DeviceListViewModelTests
         registry.Reconcile(new[] { Device("phone-a", "Galaxy A", "AAA", DeviceTransportKind.Usb) });
 
         var dispatcher = new ImmediateUiDispatcher();
-        var vm = new DeviceListViewModel(registry, dispatcher);
+        var vm = new DeviceListViewModel(registry, new DeviceRuntimeSessionRegistry(), dispatcher);
         var row = vm.Devices.Single();
 
         vm.Dispose();
 
         Assert.True(row.IsDisposed);
+    }
+
+    [Fact]
+    public void RemovedRowStopsReactingToRuntimeSessionChanges()
+    {
+        // Apply가 행을 Dispose한 뒤 RemoveAt하는 순서를 지켜야 한다 — 순서가
+        // 바뀌면 목록에서 빠진 행이 여전히 DeviceRuntimeSessionRegistry.Changed를
+        // 구독한 채로 남아 IsDexRunning이 계속 움직인다.
+        var registry = new PhysicalDeviceRegistry();
+        var sessions = new DeviceRuntimeSessionRegistry();
+        registry.Reconcile(new[]
+        {
+            Device("phone-a", "Galaxy A", "AAA", DeviceTransportKind.Usb),
+            Device("phone-b", "Galaxy B", "BBB", DeviceTransportKind.Usb)
+        });
+        sessions.Reconcile(registry.Current);
+
+        var dispatcher = new ImmediateUiDispatcher();
+        using var vm = new DeviceListViewModel(registry, sessions, dispatcher);
+        var removed = vm.Devices.Single(d => d.Identity == "phone-b");
+
+        sessions.SetDexSession("BBB", new ManagedDisplaySession
+        {
+            Serial = "BBB",
+            DeviceIdentity = "phone-b"
+        });
+        Assert.True(removed.IsDexRunning);
+
+        // phone-b 를 목록에서 뺀다 — Apply가 removed.Dispose()를 먼저
+        // 호출해 구독을 끊어야 한다.
+        registry.Reconcile(new[] { Device("phone-a", "Galaxy A", "AAA", DeviceTransportKind.Usb) });
+        Assert.True(removed.IsDisposed);
+
+        // 제거된 뒤에도 레지스트리 변경을 계속 구독하고 있었다면 여기서
+        // IsDexRunning이 false로 바뀐다 — 구독 해제가 실제로 관측된다.
+        sessions.SetDexSession("BBB", null);
+
+        Assert.True(removed.IsDexRunning);
     }
 }
