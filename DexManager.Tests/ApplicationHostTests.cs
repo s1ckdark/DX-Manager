@@ -290,8 +290,19 @@ public class ApplicationHostTests : IDisposable
         var keyboard = new FakeKeyboardService();
         var host = CreateHost(keyboard: keyboard);
 
-        // 창 닫기 경로와 프로세스 종료 경로가 동시에 도달하는 상황이다.
-        // bool 플래그는 검사와 대입 사이에 다른 스레드를 들여보낸다.
+        // 창 닫기 경로와 프로세스 종료 경로가 Phase 2에서 동시에 도달할 수 있다.
+        // 이 테스트는 bool 플래그가 검사와 대입 사이에 다른 스레드를 들여보내는
+        // 경합을 보이도록 설계되었으나, 실제로는 32스레드 동시 호출에서도
+        // pre-fix 코드에서 재현되지 않는다 (race window가 너무 좁음).
+        // 따라서 이 테스트는 강한 증거가 아니라 최선의 노력으로서의 회귀 방지일 뿐이다.
+        //
+        // 이 테스트가 실제로 검증하는 것:
+        // - Dispose()가 멱등하다 (여러 호출에서도 정리 본문이 한 번만 실행)
+        // - 동시 진입 하에서 DisposeCount가 1로 유지된다
+        // - 어떤 스레드도 예외를 던지지 않는다
+        //
+        // 수정의 정확성은 테스트가 빨간색을 보이는가가 아니라
+        // Interlocked.Exchange의 원자성에 의존한다.
         var start = new ManualResetEventSlim(false);
         var threads = new Thread[32];
         for (var i = 0; i < threads.Length; i++)
