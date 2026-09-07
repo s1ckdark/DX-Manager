@@ -385,3 +385,27 @@ Gatekeeper를 자동으로 우회하지 않는다.
 Apple Silicon 자산을 선택해 개발 장비에서 Rosetta 없이 실행한다. Intel Mac
 개발자는 이 번들 대신 시스템에 설치한 Scrcpy 경로를 지정한다. 배포는 Intel
 패키지를 계속 제공하므로 사용자 지원 범위는 바뀌지 않는다.
+
+## 2026-09 - GUI 종료 시 모든 기기의 overlay 초기화
+
+GUI 종료 시 `ApplicationHost.ShutdownAsync`는 모든 알려진 연결 기기에 overlay
+초기화 명령을 보낸다. 이 설계는 특정 기기에서만 DeX가 실행된 경우에도 전체
+범위로 초기화하는 의도적 선택이다.
+
+이 광범위한 초기화는 **이전 실행이 충돌해 프로세스 기록에 남지 않은 overlay를
+회수하는 유일한 수단**이다. 그러한 overlay는 `HasDeferredDisplayCleanup`이나
+`CurrentSession` 상태로 감지할 수 없으므로, 이 상태에 기반한 좁힌 조건을 사용하면
+정확히 복구해야 할 경우를 건너뛴다. AGENTS.md는 미회수 overlay의 비용을 중복된
+멱등성 명령의 비용보다 훨씬 높게 평가한다.
+
+광범위한 초기화의 부작용은 `DeviceRuntimeCoordinator.TryGetBinding`에서 각 런타임이
+자신의 기기 identity를 조회하고, `DexOrchestrator.FindVerifiedCleanupTransport`가
+조회한 identity가 실제 기기와 일치함을 재확인해 제한된다. 따라서 범위가 넓어도
+잘못된 기기로 초기화 명령이 전달될 수 없다.
+
+사용자가 보는 비용은 종료 시 분리된 기기로 인한 경고와 알려진 기기마다 약 하나의
+adb 타임아웃 분량의 종료 지연이다.
+
+더 좁은 조건—예를 들어 `runtime.Dex.HasDeferredDisplayCleanup || runtime.Dex.CurrentSession != null`—으로
+제한하는 것은 기술적으로 가능하며, 이전에 검토되었다. 가능성 제약으로 인해
+선택되지 않았고 위의 비용-편익 판단으로 인해 거부되었다.
