@@ -34,7 +34,8 @@ public class DeviceViewModelTests
                 Transport("USB-A", DeviceTransportKind.Usb),
                 Transport("10.0.0.2:5555", DeviceTransportKind.Wireless)),
             new DeviceRuntimeSessionRegistry(),
-            new ImmediateUiDispatcher());
+            new ImmediateUiDispatcher(),
+            new FakeDeviceCommands());
 
         Assert.Equal("Galaxy A", vm.DisplayName);
         Assert.Equal("phone-a", vm.Identity);
@@ -48,7 +49,8 @@ public class DeviceViewModelTests
         var vm = new DeviceViewModel(
             Device(Transport("USB-A", DeviceTransportKind.Usb)),
             new DeviceRuntimeSessionRegistry(),
-            new ImmediateUiDispatcher());
+            new ImmediateUiDispatcher(),
+            new FakeDeviceCommands());
 
         var changed = new List<string>();
         vm.PropertyChanged += (_, e) => changed.Add(e.PropertyName);
@@ -66,7 +68,8 @@ public class DeviceViewModelTests
             Device(Transport(
                 "USB-A", DeviceTransportKind.Usb, AdbDeviceStatus.Unauthorized)),
             new DeviceRuntimeSessionRegistry(),
-            new ImmediateUiDispatcher());
+            new ImmediateUiDispatcher(),
+            new FakeDeviceCommands());
 
         Assert.False(vm.IsConnected);
     }
@@ -77,7 +80,8 @@ public class DeviceViewModelTests
         var vm = new DeviceViewModel(
             Device(Transport("USB-A", DeviceTransportKind.Usb)),
             new DeviceRuntimeSessionRegistry(),
-            new ImmediateUiDispatcher());
+            new ImmediateUiDispatcher(),
+            new FakeDeviceCommands());
         var originalName = vm.DisplayName;
         var originalSerial = vm.PrimarySerial;
         var originalConnected = vm.IsConnected;
@@ -106,7 +110,8 @@ public class DeviceViewModelTests
         using var vm = new DeviceViewModel(
             devices.Current.Devices.Single(),
             sessions,
-            dispatcher);
+            dispatcher,
+            new FakeDeviceCommands());
 
         Assert.False(vm.IsDexRunning);
 
@@ -137,7 +142,8 @@ public class DeviceViewModelTests
         var vm = new DeviceViewModel(
             devices.Current.Devices.Single(),
             sessions,
-            dispatcher);
+            dispatcher,
+            new FakeDeviceCommands());
 
         sessions.SetDexSession("AAA", new ManagedDisplaySession
         {
@@ -170,5 +176,80 @@ public class DeviceViewModelTests
             Status = status,
             RawStatus = status.ToString().ToLowerInvariant()
         };
+    }
+
+    private static DeviceViewModel CreateRow(
+        string identity,
+        string serial,
+        IDeviceRuntimeCommands commands,
+        out DeviceRuntimeSessionRegistry sessions)
+    {
+        var devices = new PhysicalDeviceRegistry();
+        devices.Reconcile(new[] { Discovered(identity, "Galaxy", serial) });
+        sessions = new DeviceRuntimeSessionRegistry();
+        sessions.Reconcile(devices.Current);
+
+        return new DeviceViewModel(
+            devices.Current.Devices.Single(),
+            sessions,
+            new ImmediateUiDispatcher(),
+            commands);
+    }
+
+    [Fact]
+    public async Task StartDexCommand_PassesTheRowsOwnIdentityAndSerial()
+    {
+        var commands = new FakeDeviceCommands();
+        using var vm = CreateRow("phone-a", "AAA", commands, out _);
+
+        await vm.StartDexCommand.ExecuteAsync(null);
+
+        // 전역 SelectedSerial이 아니라 행 자신의 값이어야 한다.
+        Assert.Equal(new[] { "start-dex:phone-a:AAA" }, commands.Calls);
+    }
+
+    [Fact]
+    public async Task StopDexCommand_PassesTheRowsOwnIdentityAndSerial()
+    {
+        var commands = new FakeDeviceCommands();
+        using var vm = CreateRow("phone-a", "AAA", commands, out _);
+
+        await vm.StopDexCommand.ExecuteAsync(null);
+
+        Assert.Equal(new[] { "stop-dex:phone-a:AAA" }, commands.Calls);
+    }
+
+    [Fact]
+    public async Task StartDexCommand_DoesNotRunTwiceWhileTheFirstIsStillRunning()
+    {
+        var commands = new FakeDeviceCommands
+        {
+            StartGate = new TaskCompletionSource<bool>()
+        };
+        using var vm = CreateRow("phone-a", "AAA", commands, out _);
+
+        var first = vm.StartDexCommand.ExecuteAsync(null);
+        Assert.True(vm.IsBusy);
+
+        // 사용자가 버튼을 두 번 누른 상황이다. scrcpy 시작은 느리다.
+        Assert.False(vm.StartDexCommand.CanExecute(null));
+
+        commands.StartGate.SetResult(true);
+        await first;
+
+        Assert.False(vm.IsBusy);
+        Assert.Single(commands.Calls);
+    }
+
+    [Fact]
+    public async Task StartDexCommand_ReportsFailureWithoutThrowing()
+    {
+        var commands = new FakeDeviceCommands { StartResult = false };
+        using var vm = CreateRow("phone-a", "AAA", commands, out _);
+
+        await vm.StartDexCommand.ExecuteAsync(null);
+
+        Assert.False(vm.IsBusy);
+        Assert.Equal("DeX did not start.", vm.LastCommandMessage);
     }
 }

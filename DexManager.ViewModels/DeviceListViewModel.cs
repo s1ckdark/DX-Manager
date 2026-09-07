@@ -13,17 +13,20 @@ public sealed partial class DeviceListViewModel : ObservableObject, IDisposable
     private readonly PhysicalDeviceRegistry _registry;
     private readonly DeviceRuntimeSessionRegistry _sessions;
     private readonly IUiDispatcher _dispatcher;
+    private readonly IDeviceRuntimeCommands _commands;
     private bool _disposed;
     private long _appliedGeneration = -1;
 
     public DeviceListViewModel(
         PhysicalDeviceRegistry registry,
         DeviceRuntimeSessionRegistry sessions,
-        IUiDispatcher dispatcher)
+        IUiDispatcher dispatcher,
+        IDeviceRuntimeCommands commands)
     {
         _registry = registry ?? throw new ArgumentNullException(nameof(registry));
         _sessions = sessions ?? throw new ArgumentNullException(nameof(sessions));
         _dispatcher = dispatcher ?? throw new ArgumentNullException(nameof(dispatcher));
+        _commands = commands ?? throw new ArgumentNullException(nameof(commands));
 
         _registry.SnapshotChanged += OnSnapshotChanged;
         Apply(_registry.Current);
@@ -94,7 +97,7 @@ public sealed partial class DeviceListViewModel : ObservableObject, IDisposable
                 v.Identity, info.Identity, StringComparison.OrdinalIgnoreCase));
 
             if (existing != null) existing.Update(info);
-            else Devices.Add(new DeviceViewModel(info, _sessions, _dispatcher));
+            else Devices.Add(new DeviceViewModel(info, _sessions, _dispatcher, _commands));
         }
 
         // 레지스트리가 이미 정렬해 둔 순서(incoming)를 그대로 따라간다.

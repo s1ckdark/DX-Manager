@@ -22,7 +22,8 @@ public sealed partial class ShellViewModel : ObservableObject, IDisposable
         Devices = new DeviceListViewModel(
             host.DeviceRegistry,
             host.RuntimeSessions,
-            dispatcher);
+            dispatcher,
+            new DeviceRuntimeCommands(host));
         Devices.PropertyChanged += OnDeviceListPropertyChanged;
         _host.SelectedSerialChanged += OnSelectedSerialChanged;
     }

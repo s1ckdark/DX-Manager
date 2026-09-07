@@ -28,7 +28,7 @@ public class DeviceListViewModelTests
     public void AddsDevicesFromSnapshotAndSelectsFirst()
     {
         var registry = new PhysicalDeviceRegistry();
-        using var list = new DeviceListViewModel(registry, new DeviceRuntimeSessionRegistry(), new ImmediateUiDispatcher());
+        using var list = new DeviceListViewModel(registry, new DeviceRuntimeSessionRegistry(), new ImmediateUiDispatcher(), new FakeDeviceCommands());
 
         registry.Reconcile(new[]
         {
@@ -47,7 +47,7 @@ public class DeviceListViewModelTests
     public void ReusesViewModelInstanceWhenADeviceChanges()
     {
         var registry = new PhysicalDeviceRegistry();
-        using var list = new DeviceListViewModel(registry, new DeviceRuntimeSessionRegistry(), new ImmediateUiDispatcher());
+        using var list = new DeviceListViewModel(registry, new DeviceRuntimeSessionRegistry(), new ImmediateUiDispatcher(), new FakeDeviceCommands());
 
         registry.Reconcile(new[]
         {
@@ -75,7 +75,7 @@ public class DeviceListViewModelTests
     public void RemovesDisappearedDeviceAndMovesSelection()
     {
         var registry = new PhysicalDeviceRegistry();
-        using var list = new DeviceListViewModel(registry, new DeviceRuntimeSessionRegistry(), new ImmediateUiDispatcher());
+        using var list = new DeviceListViewModel(registry, new DeviceRuntimeSessionRegistry(), new ImmediateUiDispatcher(), new FakeDeviceCommands());
 
         registry.Reconcile(new[]
         {
@@ -98,7 +98,7 @@ public class DeviceListViewModelTests
     {
         var registry = new PhysicalDeviceRegistry();
         var dispatcher = new QueueingUiDispatcher();
-        using var list = new DeviceListViewModel(registry, new DeviceRuntimeSessionRegistry(), dispatcher);
+        using var list = new DeviceListViewModel(registry, new DeviceRuntimeSessionRegistry(), dispatcher, new FakeDeviceCommands());
 
         registry.Reconcile(new[]
         {
@@ -122,7 +122,7 @@ public class DeviceListViewModelTests
     {
         var registry = new PhysicalDeviceRegistry();
         var dispatcher = new QueueingUiDispatcher();
-        var list = new DeviceListViewModel(registry, new DeviceRuntimeSessionRegistry(), dispatcher);
+        var list = new DeviceListViewModel(registry, new DeviceRuntimeSessionRegistry(), dispatcher, new FakeDeviceCommands());
 
         // 스냅샷 변경이 Post까지 도달한 뒤 Dispose가 끼어든다.
         registry.Reconcile(new[]
@@ -141,7 +141,7 @@ public class DeviceListViewModelTests
     public void Dispose_UnsubscribesFromRegistry()
     {
         var registry = new PhysicalDeviceRegistry();
-        var list = new DeviceListViewModel(registry, new DeviceRuntimeSessionRegistry(), new ImmediateUiDispatcher());
+        var list = new DeviceListViewModel(registry, new DeviceRuntimeSessionRegistry(), new ImmediateUiDispatcher(), new FakeDeviceCommands());
 
         list.Dispose();
 
@@ -157,7 +157,7 @@ public class DeviceListViewModelTests
     public void ReordersDevicesToMatchTheRegistrysSortOrder()
     {
         var registry = new PhysicalDeviceRegistry();
-        using var list = new DeviceListViewModel(registry, new DeviceRuntimeSessionRegistry(), new ImmediateUiDispatcher());
+        using var list = new DeviceListViewModel(registry, new DeviceRuntimeSessionRegistry(), new ImmediateUiDispatcher(), new FakeDeviceCommands());
 
         registry.Reconcile(new[]
         {
@@ -186,7 +186,7 @@ public class DeviceListViewModelTests
     public void IsEmpty_TracksWhetherTheListHasDevices()
     {
         var registry = new PhysicalDeviceRegistry();
-        using var list = new DeviceListViewModel(registry, new DeviceRuntimeSessionRegistry(), new ImmediateUiDispatcher());
+        using var list = new DeviceListViewModel(registry, new DeviceRuntimeSessionRegistry(), new ImmediateUiDispatcher(), new FakeDeviceCommands());
 
         Assert.True(list.IsEmpty);
 
@@ -218,7 +218,7 @@ public class DeviceListViewModelTests
         });
 
         var dispatcher = new QueueingUiDispatcher();
-        using var vm = new DeviceListViewModel(registry, new DeviceRuntimeSessionRegistry(), dispatcher);
+        using var vm = new DeviceListViewModel(registry, new DeviceRuntimeSessionRegistry(), dispatcher, new FakeDeviceCommands());
 
         // QueueingUiDispatcher를 썼는데도 Drain()을 한 번도 부르지 않은
         // 시점에 이미 두 기기가 보인다 — 생성자의 첫 Apply가 디스패처
@@ -244,7 +244,7 @@ public class DeviceListViewModelTests
         });
 
         var dispatcher = new ImmediateUiDispatcher();
-        using var vm = new DeviceListViewModel(registry, new DeviceRuntimeSessionRegistry(), dispatcher);
+        using var vm = new DeviceListViewModel(registry, new DeviceRuntimeSessionRegistry(), dispatcher, new FakeDeviceCommands());
         var removed = vm.Devices.Single(d => d.Identity == "phone-b");
 
         registry.Reconcile(new[] { Device("phone-a", "Galaxy A", "AAA", DeviceTransportKind.Usb) });
@@ -259,7 +259,7 @@ public class DeviceListViewModelTests
         registry.Reconcile(new[] { Device("phone-a", "Galaxy A", "AAA", DeviceTransportKind.Usb) });
 
         var dispatcher = new ImmediateUiDispatcher();
-        var vm = new DeviceListViewModel(registry, new DeviceRuntimeSessionRegistry(), dispatcher);
+        var vm = new DeviceListViewModel(registry, new DeviceRuntimeSessionRegistry(), dispatcher, new FakeDeviceCommands());
         var row = vm.Devices.Single();
 
         vm.Dispose();
@@ -290,7 +290,7 @@ public class DeviceListViewModelTests
         sessions.Reconcile(registry.Current);
 
         var dispatcher = new ImmediateUiDispatcher();
-        using var vm = new DeviceListViewModel(registry, sessions, dispatcher);
+        using var vm = new DeviceListViewModel(registry, sessions, dispatcher, new FakeDeviceCommands());
         var removed = vm.Devices.Single(d => d.Identity == "phone-b");
 
         sessions.SetDexSession("BBB", new ManagedDisplaySession
@@ -328,7 +328,7 @@ public class DeviceListViewModelTests
         sessions.Reconcile(registry.Current);
 
         var dispatcher = new QueueingUiDispatcher();
-        using var vm = new DeviceListViewModel(registry, sessions, dispatcher);
+        using var vm = new DeviceListViewModel(registry, sessions, dispatcher, new FakeDeviceCommands());
 
         // 생성자의 첫 Apply는 디스패처를 거치지 않고 동기로 실행된다.
         Assert.Single(vm.Devices);

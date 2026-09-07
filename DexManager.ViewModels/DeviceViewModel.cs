@@ -1,4 +1,5 @@
 using CommunityToolkit.Mvvm.ComponentModel;
+using CommunityToolkit.Mvvm.Input;
 using DexManager.Models;
 using DexManager.Services;
 
@@ -12,16 +13,19 @@ public sealed partial class DeviceViewModel : ObservableObject, IDisposable
 {
     private readonly DeviceRuntimeSessionRegistry _sessions;
     private readonly IUiDispatcher _dispatcher;
+    private readonly IDeviceRuntimeCommands _commands;
     private bool _disposed;
 
     public DeviceViewModel(
         PhysicalDeviceInfo info,
         DeviceRuntimeSessionRegistry sessions,
-        IUiDispatcher dispatcher)
+        IUiDispatcher dispatcher,
+        IDeviceRuntimeCommands commands)
     {
         if (info == null) throw new ArgumentNullException(nameof(info));
         _sessions = sessions ?? throw new ArgumentNullException(nameof(sessions));
         _dispatcher = dispatcher ?? throw new ArgumentNullException(nameof(dispatcher));
+        _commands = commands ?? throw new ArgumentNullException(nameof(commands));
 
         Identity = info.Identity ?? string.Empty;
         Update(info);
@@ -52,6 +56,74 @@ public sealed partial class DeviceViewModel : ObservableObject, IDisposable
 
     // 단일창 슬롯(Slots)은 Task 10이 SingleWindowSlotViewModel과 함께
     // 도입한다. 이 Task는 DeX 세션 상태만 다루므로 여기서는 만들지 않는다.
+
+    /// <summary>
+    /// 이 행의 명령이 하나 진행 중인지 여부. scrcpy 시작은 느리므로
+    /// 버튼을 두 번 눌러 세션이 겹치는 것을 막는다.
+    /// </summary>
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(StartDexCommand))]
+    [NotifyCanExecuteChangedFor(nameof(StopDexCommand))]
+    private bool _isBusy;
+
+    /// <summary>마지막 명령의 결과 문구. 실패해도 예외를 올리지 않는다.</summary>
+    [ObservableProperty]
+    private string _lastCommandMessage = string.Empty;
+
+    private bool CanRunCommand() => !_disposed && !IsBusy;
+
+    [RelayCommand(CanExecute = nameof(CanRunCommand))]
+    private async Task StartDexAsync(CancellationToken cancellationToken)
+    {
+        IsBusy = true;
+        try
+        {
+            var started = await _commands.StartDexAsync(
+                Identity,
+                PrimarySerial,
+                cancellationToken);
+            LastCommandMessage = started
+                ? "DeX started."
+                : "DeX did not start.";
+        }
+        catch (OperationCanceledException)
+        {
+            LastCommandMessage = "DeX start was cancelled.";
+        }
+        catch (Exception ex)
+        {
+            // 명령 실패가 창을 죽이면 안 된다. 행에 문구로만 남긴다.
+            LastCommandMessage = $"DeX start failed: {ex.Message}";
+        }
+        finally
+        {
+            IsBusy = false;
+        }
+    }
+
+    [RelayCommand(CanExecute = nameof(CanRunCommand))]
+    private async Task StopDexAsync(CancellationToken cancellationToken)
+    {
+        IsBusy = true;
+        try
+        {
+            var stopped = await _commands.StopDexAsync(
+                Identity,
+                PrimarySerial,
+                cancellationToken);
+            LastCommandMessage = stopped
+                ? "DeX stopped and the display overlay was cleaned up."
+                : "DeX stopped, but display cleanup was deferred.";
+        }
+        catch (Exception ex)
+        {
+            LastCommandMessage = $"DeX stop failed: {ex.Message}";
+        }
+        finally
+        {
+            IsBusy = false;
+        }
+    }
 
     /// <summary>
     /// 새 스냅샷의 값으로 갱신한다. 기존 인스턴스를 재사용하므로
