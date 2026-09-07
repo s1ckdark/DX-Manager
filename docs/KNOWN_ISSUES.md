@@ -155,6 +155,35 @@ Intel ZIP은 아키텍처와 외부 경로를 검사하고 Apple Silicon Mac의 
 실행 파일 기동을 확인했지만, Intel 실기 전체 DeX 흐름은 GitHub의
 `macos-15-intel` 자동 빌드와 별도로 실제 Intel Mac 확인이 남아 있다.
 
+## macOS GUI Phase 2 실기 검증 범위
+
+Phase 2(DeX 시작/중지 + 단일창 슬롯)의 실기 검증 8개 항목은 **이 개발 환경에서 하나도
+수행하지 못했다.** 사용자가 직접 확인해야 하는 실기 테스트는 대신 성공했다고 가정하지
+않고 아래처럼 미확인 항목으로 남긴다(`AGENTS.md` 원칙).
+
+- 연결된 Android 기기 없음 — `adb devices`가 빈 목록을 반환했다(2026-09-08).
+- GUI 자체가 이 환경에서 기동하지 않는다 — `dotnet run --project DexManager.Desktop`이
+  `System.InvalidOperationException: Avalonia.Native was not able to start the RenderTimer.
+  Native error code is: -6661`로 종료 코드 134를 내고 죽는다. 스택은 `Avalonia.AppBuilder.Setup()`
+  내부에서 끝나며, 이 저장소의 어떤 코드도 실행되기 전이다. 즉 코드 결함이 아니라 이 환경의
+  제약이다.
+
+미확인 항목 8개(스펙 5.3절, `docs/TODO.md`의 "macOS GUI Phase 2" 체크리스트 참조):
+
+1. 기기 목록에 연결된 기기가 나타난다 — 미확인
+2. `Start DeX` → scrcpy 창과 `DeX` 표시 — 미확인
+3. `Stop DeX` → 창 닫힘과 `DeX` 표시 제거 — 미확인
+4. 중지 뒤 `adb shell settings get global overlay_display_devices`가 `null` — **미확인**
+5. 슬롯 1에 앱 패키지 지정 후 `Start` → 앱 창 — 미확인
+6. 슬롯 `Stop` → 창 닫힘 — 미확인
+7. 창을 닫은 뒤 `pgrep -fl scrcpy`가 비어 있음 — 미확인
+8. DeX 실행 중 창을 닫아도 overlay가 회수됨 — **미확인**
+
+4번과 8번은 이번 Phase가 지키려던 display-overlay 불변식을 실제로 행사하는 유일한
+검사다. 나머지 6개는 GUI 조작 흐름 확인이고, 자동 테스트와 코드 검토로만 뒷받침되어
+있다. 4번과 8번이 실기에서 통과하기 전까지 이 불변식은 "지키도록 작성된 코드"이지
+"실기로 지켜짐이 확인된 코드"가 아니다.
+
 ## 개발용 Scrcpy 번들 아키텍처
 
 저장소의 `tools/scrcpy`는 Apple Silicon용 Scrcpy 4.1이며 macOS 개발

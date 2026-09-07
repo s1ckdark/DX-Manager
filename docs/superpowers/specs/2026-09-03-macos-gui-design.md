@@ -280,7 +280,12 @@ Phase 4에서 전송 상태창은 주 창 기준 또는 화면 중앙 기준으�
 
 ### 5.1 기존 안전망
 
-xUnit 95개 + 다중기기 회귀 39개(총 134개)가 통과 중이다. Phase 0(`ApplicationHost` 추출)은 동작 변경이 없어야 하므로, **134개 전부 통과**가 완료 조건이다.
+xUnit 186개(`DexManager.ViewModels.Tests` 50개 + `DexManager.Tests` 136개) + 다중기기 회귀 39개(총 225개)가 통과 중이다(2026-09-08, Phase 2 종료 시점 실측). Phase 0(`ApplicationHost` 추출)은 동작 변경이 없어야 하므로, **전부 통과**가 완료 조건이다.
+
+- `dotnet test DexManager.Mac.sln` — xUnit 186개
+- `dotnet run --project DexManager.MultiDeviceTests -c Release` — 39개
+
+빌드는 `DexManager.Tests/ApplicationHostTests.cs`에서 `xUnit1031`(블로킹 `.GetAwaiter().GetResult()`) 경고 1건을 낸다. Phase 0 Task 3에서 브리프 verbatim 코드로 발생했으며 의도적으로 미해결 상태로 남아 있다 — `docs/TODO.md`의 지연 항목 목록 참조.
 
 ### 5.2 신규 테스트
 
@@ -313,7 +318,7 @@ DX Manager.app/Contents/
 | :--- | :--- | :--- |
 | 0 | `Platform.Mac` 분리 + `ApplicationHost` 추출 | ✅ 완료 — 101개 xUnit + 39개 다중기기 통과, 기능 변경 없음 |
 | 1 | `Desktop` 골격 + `MainWindow` (기기 목록·선택·상태) | 앱 기동, 연결 기기 표시 |
-| 2 | DeX 시작/중지 + 단일창 슬롯 | 실사용 가능 |
+| 2 | DeX 시작/중지 + 단일창 슬롯 | ✅ 완료 — 실사용 가능. 실기 검증은 KNOWN_ISSUES 참조 |
 | 3 | `SettingsWindow` (연결·값·상호작용·테마) | 설정 변경·영구 저장 |
 | 4 | 무선 ADB + 파일 전송 + 전송 상태창 (화면 기준 배치, 4.5절 결정 2) | |
 | 5 | 진단 + 로그 + 기기 폴더 탐색 | |
@@ -346,7 +351,11 @@ Phase 0 최종 리뷰가 지적한 사항이다. 공통 원인은 하나다 — 
 2. **`Start()`/`Stop()`이 없다.** `DeviceMonitor.Start()` 호출은 현재 소비자 몫이다(`InteractiveHost.cs:72`). 소비자가 둘이면 시작·중지 책임이 미정의다. `Start()`는 우연히 멱등이지만(`if (_timer != null) return;`) `Stop()`은 소비자별이 아니어서 한 호스트가 멈추면 양쪽 감시가 함께 죽는다.
 3. **인스턴스가 단일 사용인데 계약에 없다.** `InteractiveHost.cs:854`가 `DeviceMonitor`를 dispose한 뒤 재시작하면 `DeviceMonitorService`가 `ObjectDisposedException`을 던진다(`DeviceMonitorService.cs:73-84`). `IsDisposed` 노출이든 문서화된 단일 사용 계약이든, 명시가 필요하다.
 4. **`SelectedSerial`에 변경 알림이 없다.** MVVM 바인딩에는 `INotifyPropertyChanged`나 이벤트가 필요하다. **GUI가 첫 ViewModel을 작성하기 전에 결정해야 한다** — 나중에 넣으면 모든 소비자를 수정해야 한다.
-5. **`Settings`가 공유 가변 `AppSettings`를 저장 조율 없이 노출한다.** 소비자 둘이 편집하면 `SettingsService.Save`에서 경쟁하며, TUI의 설정 메뉴도 같은 객체를 통해 쓴다.
+5. ~~**`Settings`가 공유 가변 `AppSettings`를 저장 조율 없이 노출한다.**~~ — **해결됨(2026-09-07, Phase 2 Task 4).**
+   TUI 설정 메뉴(`InteractiveHost.cs:792`)가 `_settings`를 직접 수정하는 대신
+   `ApplicationHost.UpdateSettings`를 거친다. 입력은 잠금 밖에서 받아 프롬프트가
+   잠금을 붙잡지 않게 하고, 해제된 호스트에 대한 호출은 `ObjectDisposedException`으로
+   막는다.
 6. ~~**Core 서비스 13개가 전부 구체 타입으로 노출된다.**~~ — **결정됨(2026-09-05, Phase 1).** 인터페이스를 새로 만들지 않고 소비 규칙을 둔다: `ShellViewModel`만 `ApplicationHost` 전체를 받고(앱 수명주기를 소유해야 하므로), 나머지 ViewModel은 자기가 쓰는 서비스만 생성자로 받는다. 인터페이스 13개를 미리 만드는 것은 두 번째 구현이 없는 상태의 추측이다. 좁은 생성자 의존성은 비용 없이 결합을 제한하고, 추출이 필요해지는 시점에는 각 생성자가 이미 경계를 알려준다.
 
 ### 8.2 Phase 0에서 지연 처리한 기타 항목
