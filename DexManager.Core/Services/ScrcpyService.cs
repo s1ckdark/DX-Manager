@@ -18,16 +18,19 @@ namespace DexManager.Services
         private ScrcpyRuntimeInfo(
             int majorVersion,
             int minorVersion,
-            int sdlMajorVersion)
+            int sdlMajorVersion,
+            string displayVersion)
         {
             MajorVersion = majorVersion;
             MinorVersion = minorVersion;
             SdlMajorVersion = sdlMajorVersion;
+            DisplayVersion = displayVersion;
         }
 
         public int MajorVersion { get; private set; }
         public int MinorVersion { get; private set; }
         public int SdlMajorVersion { get; private set; }
+        public string DisplayVersion { get; private set; }
 
         public bool SupportsKeepActiveLongOption
         {
@@ -42,6 +45,11 @@ namespace DexManager.Services
         public bool RequiresRightShiftWorkaround
         {
             get { return SdlMajorVersion >= 3; }
+        }
+
+        public bool MeetsRecommendedVersion
+        {
+            get { return MajorVersion >= 4; }
         }
 
         public string StayAwakeArgument
@@ -64,15 +72,58 @@ namespace DexManager.Services
             }
         }
 
+        internal static ScrcpyRuntimeInfo ParseVersionOutput(string versionText)
+        {
+            var major = 4;
+            var minor = 1;
+            var sdlMajor = 3;
+            string displayVersion = null;
+
+            var text = versionText ?? string.Empty;
+            var versionMatch = Regex.Match(
+                text,
+                @"scrcpy\s+(\d+)\.(\d+)(?:\.(\d+))?",
+                RegexOptions.IgnoreCase);
+            if (versionMatch.Success)
+            {
+                major = int.Parse(
+                    versionMatch.Groups[1].Value,
+                    CultureInfo.InvariantCulture);
+                minor = int.Parse(
+                    versionMatch.Groups[2].Value,
+                    CultureInfo.InvariantCulture);
+                displayVersion = versionMatch.Groups[3].Success
+                    ? major + "." + minor + "." + versionMatch.Groups[3].Value
+                    : major + "." + minor;
+            }
+
+            var sdlMatch = Regex.Match(
+                text,
+                @"SDL:\s*(\d+)\.",
+                RegexOptions.IgnoreCase);
+            if (sdlMatch.Success)
+            {
+                sdlMajor = int.Parse(
+                    sdlMatch.Groups[1].Value,
+                    CultureInfo.InvariantCulture);
+            }
+            else
+            {
+                sdlMajor = major >= 4 ? 3 : 2;
+            }
+
+            return new ScrcpyRuntimeInfo(
+                major,
+                minor,
+                sdlMajor,
+                displayVersion ?? (major + "." + minor));
+        }
+
         public static ScrcpyRuntimeInfo Detect(
             string scrcpyPath,
             int timeoutMs,
             ProcessRunner processRunner)
         {
-            var major = 4;
-            var minor = 1;
-            var sdlMajor = 3;
-
             try
             {
                 var result = processRunner.Run(
@@ -81,43 +132,15 @@ namespace DexManager.Services
                     Path.GetDirectoryName(scrcpyPath),
                     Math.Min(Math.Max(timeoutMs, 1000), 5000),
                     false);
-                var text = (result.StandardOutput ?? string.Empty) + "\n" +
-                    (result.StandardError ?? string.Empty);
-                var versionMatch = Regex.Match(
-                    text,
-                    @"scrcpy\s+(\d+)\.(\d+)",
-                    RegexOptions.IgnoreCase);
-                if (versionMatch.Success)
-                {
-                    major = int.Parse(
-                        versionMatch.Groups[1].Value,
-                        CultureInfo.InvariantCulture);
-                    minor = int.Parse(
-                        versionMatch.Groups[2].Value,
-                        CultureInfo.InvariantCulture);
-                }
-
-                var sdlMatch = Regex.Match(
-                    text,
-                    @"SDL:\s*(\d+)\.",
-                    RegexOptions.IgnoreCase);
-                if (sdlMatch.Success)
-                {
-                    sdlMajor = int.Parse(
-                        sdlMatch.Groups[1].Value,
-                        CultureInfo.InvariantCulture);
-                }
-                else
-                {
-                    sdlMajor = major >= 4 ? 3 : 2;
-                }
+                return ParseVersionOutput(
+                    (result.StandardOutput ?? string.Empty) + "\n" +
+                    (result.StandardError ?? string.Empty));
             }
             catch
             {
                 // Preserve the bundled scrcpy 4.1 behavior if probing fails.
+                return ParseVersionOutput(string.Empty);
             }
-
-            return new ScrcpyRuntimeInfo(major, minor, sdlMajor);
         }
     }
 

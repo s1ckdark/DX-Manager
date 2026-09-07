@@ -566,6 +566,10 @@
   <data name="Environment.AdminNo" xml:space="preserve"><value>일반 권한입니다. 시스템 PATH 등록 시 관리자 실행이 필요합니다.</value></data>
   <data name="Environment.AdbDevice" xml:space="preserve"><value>ADB 장치</value></data>
   <data name="Environment.AdbVersion" xml:space="preserve"><value>ADB 버전</value></data>
+  <data name="Environment.ScrcpyVersion" xml:space="preserve"><value>Scrcpy 버전</value></data>
+  <data name="Environment.ScrcpyVersionValue" xml:space="preserve"><value>{0} (SDL {1})</value></data>
+  <data name="Environment.ScrcpyVersionOutdated" xml:space="preserve"><value>{0} (SDL {1}) - 4.0 이상 권장. flex display와 --keep-active를 사용할 수 없습니다</value></data>
+  <data name="Environment.ScrcpyVersionUnknown" xml:space="preserve"><value>Scrcpy 런타임 정보를 확인할 수 없습니다</value></data>
   <data name="Environment.PcCaptureFolder" xml:space="preserve"><value>PC 스크린샷 폴더</value></data>
   <data name="Environment.DeviceCaptureFolder" xml:space="preserve"><value>휴대폰 스크린샷 폴더</value></data>
   <data name="Environment.FolderWriteFailed" xml:space="preserve"><value>폴더에 쓸 수 없습니다: {0} · {1}</value></data>

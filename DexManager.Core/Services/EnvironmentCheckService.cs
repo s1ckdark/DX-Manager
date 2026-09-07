@@ -62,6 +62,11 @@ namespace DexManager.Services
                     "Environment.FileTransferHelper"),
                 proxyCandidate);
             AddAdbVersionCheck(results);
+            results.Add(BuildScrcpyVersionCheck(
+                ResolveScrcpyRuntimeInfo(
+                    _scrcpyService,
+                    scrcpyPath,
+                    _logService)));
 
             results.Add(new EnvironmentCheckItem
             {
@@ -128,6 +133,64 @@ namespace DexManager.Services
             _logService.Info(LocalizationService.Get(
                 "Log.Environment.Completed"));
             return results;
+        }
+
+        internal static ScrcpyRuntimeInfo ResolveScrcpyRuntimeInfo(
+            ScrcpyService scrcpyService,
+            string scrcpyPath,
+            LogService logService)
+        {
+            if (scrcpyService != null)
+                return scrcpyService.RuntimeInfo;
+
+            // The macOS host builds scrcpy services per physical device, so the
+            // diagnostics page probes the configured executable directly.
+            if (string.IsNullOrWhiteSpace(scrcpyPath) || !File.Exists(scrcpyPath))
+                return null;
+
+            try
+            {
+                return ScrcpyRuntimeInfo.Detect(
+                    scrcpyPath,
+                    3000,
+                    new ProcessRunner(logService));
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        internal static EnvironmentCheckItem BuildScrcpyVersionCheck(
+            ScrcpyRuntimeInfo runtimeInfo)
+        {
+            var name = LocalizationService.Get(
+                "Environment.ScrcpyVersion");
+            if (runtimeInfo == null)
+            {
+                return new EnvironmentCheckItem
+                {
+                    Name = name,
+                    Status = EnvironmentCheckStatus.Warning,
+                    Message = LocalizationService.Get(
+                        "Environment.ScrcpyVersionUnknown")
+                };
+            }
+
+            var supported = runtimeInfo.MeetsRecommendedVersion;
+            return new EnvironmentCheckItem
+            {
+                Name = name,
+                Status = supported
+                    ? EnvironmentCheckStatus.Passed
+                    : EnvironmentCheckStatus.Warning,
+                Message = LocalizationService.Format(
+                    supported
+                        ? "Environment.ScrcpyVersionValue"
+                        : "Environment.ScrcpyVersionOutdated",
+                    runtimeInfo.DisplayVersion,
+                    runtimeInfo.SdlMajorVersion)
+            };
         }
 
         private void AddAdbVersionCheck(

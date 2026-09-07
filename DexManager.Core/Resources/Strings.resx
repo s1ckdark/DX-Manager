@@ -566,6 +566,10 @@
   <data name="Environment.AdminNo" xml:space="preserve"><value>Running with standard privileges. Administrator access is required to modify system PATH.</value></data>
   <data name="Environment.AdbDevice" xml:space="preserve"><value>ADB device</value></data>
   <data name="Environment.AdbVersion" xml:space="preserve"><value>ADB version</value></data>
+  <data name="Environment.ScrcpyVersion" xml:space="preserve"><value>Scrcpy version</value></data>
+  <data name="Environment.ScrcpyVersionValue" xml:space="preserve"><value>{0} (SDL {1})</value></data>
+  <data name="Environment.ScrcpyVersionOutdated" xml:space="preserve"><value>{0} (SDL {1}) - 4.0+ recommended; flex display and --keep-active unavailable</value></data>
+  <data name="Environment.ScrcpyVersionUnknown" xml:space="preserve"><value>Scrcpy runtime information is unavailable</value></data>
   <data name="Environment.PcCaptureFolder" xml:space="preserve"><value>PC screenshot folder</value></data>
   <data name="Environment.DeviceCaptureFolder" xml:space="preserve"><value>Phone screenshot folder</value></data>
   <data name="Environment.FolderWriteFailed" xml:space="preserve"><value>Cannot write to folder: {0} · {1}</value></data>
