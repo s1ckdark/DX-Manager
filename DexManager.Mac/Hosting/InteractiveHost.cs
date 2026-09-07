@@ -38,7 +38,6 @@ public sealed class InteractiveHost : IDisposable
     private bool _isRunning;
     private bool _disposed;
     private int _shutdownStarted;
-    private int _runtimeServicesDisposed;
 
     public InteractiveHost()
     {
@@ -837,80 +836,12 @@ public sealed class InteractiveHost : IDisposable
                 _activeRuntime?.Dex.CurrentSession?.DeviceIdentity ??
                 _selectedDeviceIdentity ??
                 string.Empty;
-            var errors = new List<Exception>();
 
             AnsiConsole.Info("Shutting down DX Manager and cleaning up active sessions...");
-            try
-            {
-                _deviceMonitor?.Stop();
-            }
-            catch (Exception ex)
-            {
-                errors.Add(ex);
-            }
 
-            try
-            {
-                _deviceMonitor?.Dispose();
-            }
-            catch (Exception ex)
-            {
-                errors.Add(ex);
-            }
-
-            try
-            {
-                _keyboardService?.Dispose();
-            }
-            catch (Exception ex)
-            {
-                errors.Add(ex);
-            }
-
-            if (_activeRuntime != null)
-            {
-                try
-                {
-                    _activeRuntime.FileTransfers.RequestShutdown();
-                    _activeRuntime.PhoneTransfers.RequestShutdown();
-                    _activeRuntime.CompanionGuardian.RequestShutdown();
-                    _activeRuntime.ScreenOff.RequestShutdown();
-                    _activeRuntime.SingleWindows.RequestShutdown();
-                    _activeRuntime.Dex.RequestShutdown();
-                }
-                catch (Exception ex)
-                {
-                    errors.Add(ex);
-                }
-
-                try
-                {
-                    _activeRuntime.SingleWindows.StopAll();
-                }
-                catch (Exception ex)
-                {
-                    errors.Add(ex);
-                }
-
-                try
-                {
-                    await _activeRuntime.Dex.ShutdownAsync(
-                        fallbackSerial,
-                        fallbackIdentity);
-                    if (_activeRuntime.Dex.HasDeferredDisplayCleanup)
-                    {
-                        errors.Add(new InvalidOperationException(
-                            "DeX display cleanup was deferred because the " +
-                            "target device was unavailable."));
-                    }
-                }
-                catch (Exception ex)
-                {
-                    errors.Add(ex);
-                }
-            }
-
-            DisposeRuntimeServices(errors);
+            var errors = await _host.ShutdownAsync(
+                fallbackSerial,
+                fallbackIdentity);
 
             foreach (var error in errors)
             {
@@ -938,35 +869,5 @@ public sealed class InteractiveHost : IDisposable
             _disposed = true;
             Shutdown();
             _host?.Dispose();
-        }
-
-        private void DisposeRuntimeServices(ICollection<Exception> errors)
-        {
-            if (Interlocked.Exchange(ref _runtimeServicesDisposed, 1) != 0)
-                return;
-            if (_activeRuntime == null) return;
-
-            var disposables = new IDisposable[]
-            {
-                _activeRuntime.SingleWindows,
-                _activeRuntime.Scrcpy,
-                _activeRuntime.ScreenOff,
-                _activeRuntime.PhoneTransfers,
-                _activeRuntime.CompanionGuardian,
-                _activeRuntime.FileTransfers
-            };
-
-            foreach (var disposable in disposables)
-            {
-                try
-                {
-                    disposable.Dispose();
-                }
-                catch (Exception ex)
-                {
-                    _logService.Error("macOS runtime service disposal failed.", ex);
-                    errors.Add(ex);
-                }
-            }
         }
     }

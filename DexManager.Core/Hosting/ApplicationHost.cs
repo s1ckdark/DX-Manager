@@ -1,4 +1,5 @@
 using System.Threading;
+using System.Threading.Tasks;
 using DexManager.Models;
 using DexManager.Platform;
 using DexManager.Services;
@@ -279,22 +280,54 @@ public sealed class ApplicationHost : IDisposable
     }
 
     /// <summary>
-    /// 이 호스트가 이미 해제되었는지 여부. 해제된 호스트는 재사용할 수 없다 —
+    /// 이 호스트가 이미 해제되었는지 여부. <see cref="ShutdownAsync"/>가 모든
+    /// 정리 단계를 마친 시점에 원자적으로 <c>true</c>가 된다 — 정리 도중에는
+    /// 여전히 <c>false</c>다. 해제된 호스트는 재사용할 수 없다 —
     /// <see cref="DeviceMonitor"/>가 <see cref="ObjectDisposedException"/>을 던진다.
     /// 인스턴스 하나는 한 번만 사용한다.
     /// </summary>
     public bool IsDisposed => Volatile.Read(ref _disposed) != 0;
 
+    private int _shutdownStarted;
+
     /// <summary>
-    /// 호스트가 소유한 서비스를 정리한다. 멱등하다.
-    /// 정리 중 발생한 예외는 모두 수집한 뒤 <see cref="AggregateException"/>으로
-    /// 던진다 — 앞선 실패가 뒤의 정리를 막지 않게 하기 위함이다.
+    /// 호스트가 소유한 런타임과 서비스를 정리한다. 멱등하다 — 두 번째
+    /// 호출부터는 아무 일도 하지 않고 빈 목록을 돌려준다.
+    /// 예외를 던지지 않고 수집해 돌려주므로, 호출자가 자기 방식으로
+    /// 보고할 수 있다. 앞선 실패가 뒤의 정리를 막지 않는다.
     /// </summary>
-    public void Dispose()
+    /// <param name="fallbackSerial">
+    /// DeX 세션이 자기 serial을 모를 때 쓸 대체값. 없으면 <c>null</c>.
+    /// </param>
+    /// <param name="fallbackIdentity">
+    /// 같은 용도의 물리 기기 identity 대체값. 없으면 <c>null</c>.
+    /// </param>
+    public async Task<IReadOnlyList<Exception>> ShutdownAsync(
+        string fallbackSerial,
+        string fallbackIdentity)
     {
-        if (Interlocked.Exchange(ref _disposed, 1) != 0) return;
+        if (Interlocked.Exchange(ref _shutdownStarted, 1) != 0)
+            return Array.Empty<Exception>();
 
         var errors = new List<Exception>();
+
+        try
+        {
+            DeviceMonitor?.Stop();
+        }
+        catch (Exception ex)
+        {
+            errors.Add(ex);
+        }
+
+        foreach (var runtime in RuntimeFactory.CreatedInstances)
+        {
+            await ShutdownRuntimeAsync(
+                runtime,
+                fallbackSerial,
+                fallbackIdentity,
+                errors);
+        }
 
         try
         {
@@ -313,6 +346,105 @@ public sealed class ApplicationHost : IDisposable
         {
             errors.Add(ex);
         }
+
+        Interlocked.Exchange(ref _disposed, 1);
+        return errors;
+    }
+
+    /// <summary>
+    /// 런타임 하나를 정리한다. 순서는 TUI가 검증해 온 순서를 그대로 따른다 —
+    /// 먼저 모든 서비스에 종료를 알려 새 작업을 막고, 단일창을 내리고,
+    /// DeX overlay를 회수한 뒤, 마지막에 서비스를 해제한다.
+    /// </summary>
+    private static async Task ShutdownRuntimeAsync(
+        DeviceRuntimeServiceSet runtime,
+        string fallbackSerial,
+        string fallbackIdentity,
+        ICollection<Exception> errors)
+    {
+        if (runtime == null) return;
+
+        try
+        {
+            runtime.FileTransfers.RequestShutdown();
+            runtime.PhoneTransfers.RequestShutdown();
+            runtime.CompanionGuardian.RequestShutdown();
+            runtime.ScreenOff.RequestShutdown();
+            runtime.SingleWindows.RequestShutdown();
+            runtime.Dex.RequestShutdown();
+        }
+        catch (Exception ex)
+        {
+            errors.Add(ex);
+        }
+
+        try
+        {
+            runtime.SingleWindows.StopAll();
+        }
+        catch (Exception ex)
+        {
+            errors.Add(ex);
+        }
+
+        try
+        {
+            var serial = runtime.Dex.CurrentSession?.Serial ?? fallbackSerial;
+            var identity = runtime.Dex.CurrentSession?.DeviceIdentity
+                ?? fallbackIdentity
+                ?? string.Empty;
+
+            await runtime.Dex.ShutdownAsync(serial, identity);
+
+            if (runtime.Dex.HasDeferredDisplayCleanup)
+            {
+                errors.Add(new InvalidOperationException(
+                    "DeX display cleanup was deferred because the " +
+                    "target device was unavailable."));
+            }
+        }
+        catch (Exception ex)
+        {
+            errors.Add(ex);
+        }
+
+        var disposables = new IDisposable[]
+        {
+            runtime.SingleWindows,
+            runtime.Scrcpy,
+            runtime.ScreenOff,
+            runtime.PhoneTransfers,
+            runtime.CompanionGuardian,
+            runtime.FileTransfers
+        };
+
+        foreach (var disposable in disposables)
+        {
+            try
+            {
+                disposable.Dispose();
+            }
+            catch (Exception ex)
+            {
+                errors.Add(ex);
+            }
+        }
+    }
+
+    /// <summary>
+    /// 호스트가 소유한 서비스를 정리한다. 멱등하다 — 내부적으로
+    /// <see cref="ShutdownAsync"/>를 실행하므로 반복 호출해도 안전하다.
+    /// 정리 중 발생한 예외는 모두 수집한 뒤 <see cref="AggregateException"/>으로
+    /// 던진다 — 앞선 실패가 뒤의 정리를 막지 않게 하기 위함이다.
+    /// </summary>
+    public void Dispose()
+    {
+        // ShutdownAsync 안의 await가 호출자의 SynchronizationContext를 잡으면
+        // UI 스레드에서 부를 때 교착한다. 스레드 풀로 넘겨 컨텍스트를 끊는다.
+        var errors = Task
+            .Run(() => ShutdownAsync(null, null))
+            .GetAwaiter()
+            .GetResult();
 
         if (errors.Count > 0)
         {

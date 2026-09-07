@@ -302,4 +302,47 @@ public class ApplicationHostTests : IDisposable
 
         Assert.Equal(1, keyboard.DisposeCallCount);
     }
+
+    [Fact]
+    public async Task ShutdownAsync_DisposesRuntimeServicesCreatedByTheFactory()
+    {
+        using var root = new TempHostRoot();
+        var host = root.CreateHost();
+        var runtime = host.RuntimeFactory.Create();
+
+        var errors = await host.ShutdownAsync(null, null);
+
+        Assert.Empty(errors);
+        // SingleWindowService.Dispose는 멱등이며 두 번째 호출이 조용히 반환한다.
+        // 이미 해제됐다면 StopAll이 새 프로세스를 만들지 않는다.
+        Assert.Equal(0, runtime.SingleWindows.RunningCount);
+        Assert.True(host.IsDisposed);
+    }
+
+    [Fact]
+    public async Task ShutdownAsync_IsIdempotentAndReportsNoErrorsOnSecondCall()
+    {
+        using var root = new TempHostRoot();
+        var host = root.CreateHost();
+        host.RuntimeFactory.Create();
+
+        var first = await host.ShutdownAsync(null, null);
+        var second = await host.ShutdownAsync(null, null);
+
+        Assert.Empty(first);
+        Assert.Empty(second);
+    }
+
+    [Fact]
+    public void Dispose_AfterShutdownAsync_DoesNotThrow()
+    {
+        using var root = new TempHostRoot();
+        var host = root.CreateHost();
+        host.RuntimeFactory.Create();
+
+        host.ShutdownAsync(null, null).GetAwaiter().GetResult();
+
+        // 종료 훅이 ShutdownAsync를 부른 뒤 using이 Dispose를 또 부른다.
+        host.Dispose();
+    }
 }
