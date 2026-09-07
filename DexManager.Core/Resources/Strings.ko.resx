@@ -296,6 +296,14 @@
   <data name="Log.Dex.ShutdownCleanupFailed" xml:space="preserve"><value>프로그램 종료 전 ADB 정리에 실패했습니다.</value></data>
   <data name="Log.Dex.SessionStarted" xml:space="preserve"><value>관리 세션 시작: {0}</value></data>
   <data name="Log.Dex.SessionEnded" xml:space="preserve"><value>관리 세션 종료: {0}</value></data>
+  <data name="Log.ApplicationHost.DeviceMonitorStopFailed" xml:space="preserve"><value>종료 중 기기 감시를 중지하지 못했습니다.</value></data>
+  <data name="Log.ApplicationHost.DeviceMonitorDisposeFailed" xml:space="preserve"><value>종료 중 기기 감시자를 해제하지 못했습니다.</value></data>
+  <data name="Log.ApplicationHost.KeyboardServiceDisposeFailed" xml:space="preserve"><value>종료 중 키보드 서비스를 해제하지 못했습니다.</value></data>
+  <data name="Log.ApplicationHost.RuntimeRequestShutdownFailed" xml:space="preserve"><value>종료 중 하나 이상의 런타임 서비스에 종료 신호를 보내지 못했습니다.</value></data>
+  <data name="Log.ApplicationHost.RuntimeStopAllFailed" xml:space="preserve"><value>종료 중 모든 Single Window 세션을 중지하지 못했습니다.</value></data>
+  <data name="Log.ApplicationHost.RuntimeDexShutdownFailed" xml:space="preserve"><value>DeX 세션을 정상적으로 종료하지 못했습니다.</value></data>
+  <data name="Log.ApplicationHost.RuntimeDisplayCleanupDeferred" xml:space="preserve"><value>대상 기기를 사용할 수 없어 DeX 디스플레이 정리가 지연되었습니다.</value></data>
+  <data name="Log.ApplicationHost.RuntimeDisposalFailed" xml:space="preserve"><value>런타임 종료 중 {0}을(를) 해제하지 못했습니다.</value></data>
   <data name="Log.Environment.Completed" xml:space="preserve"><value>환경 점검을 완료했습니다.</value></data>
   <data name="Log.Hotkey.LowLevelEnabled" xml:space="preserve"><value>저수준 키보드 후크 핫키 사용: 캡처={0}, 종료={1}</value></data>
   <data name="Log.Hotkey.MessageReceived" xml:space="preserve"><value>WM_HOTKEY 수신: WParam={0}, LParam={1}</value></data>

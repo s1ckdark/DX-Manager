@@ -311,12 +311,46 @@ public sealed class ApplicationHost : IDisposable
 
         var errors = new List<Exception>();
 
+        // 원래 InteractiveHost.ShutdownAsync의 순서를 그대로 유지한다:
+        // 감시 중지 → 감시자·키보드 해제 → 런타임 정리. 관례상 더 나은
+        // 순서가 있어 보여도, 실제 기기로 검증된 이 순서를 임의로 바꾸지
+        // 않는다 — 바꾸려면 그 자체가 별도의 의도적인 변경이어야 한다.
         try
         {
             DeviceMonitor?.Stop();
         }
         catch (Exception ex)
         {
+            Log.Error(
+                LocalizationService.Get(
+                    "Log.ApplicationHost.DeviceMonitorStopFailed"),
+                ex);
+            errors.Add(ex);
+        }
+
+        try
+        {
+            DeviceMonitor?.Dispose();
+        }
+        catch (Exception ex)
+        {
+            Log.Error(
+                LocalizationService.Get(
+                    "Log.ApplicationHost.DeviceMonitorDisposeFailed"),
+                ex);
+            errors.Add(ex);
+        }
+
+        try
+        {
+            _keyboardService?.Dispose();
+        }
+        catch (Exception ex)
+        {
+            Log.Error(
+                LocalizationService.Get(
+                    "Log.ApplicationHost.KeyboardServiceDisposeFailed"),
+                ex);
             errors.Add(ex);
         }
 
@@ -329,24 +363,6 @@ public sealed class ApplicationHost : IDisposable
                 errors);
         }
 
-        try
-        {
-            DeviceMonitor?.Dispose();
-        }
-        catch (Exception ex)
-        {
-            errors.Add(ex);
-        }
-
-        try
-        {
-            _keyboardService?.Dispose();
-        }
-        catch (Exception ex)
-        {
-            errors.Add(ex);
-        }
-
         Interlocked.Exchange(ref _disposed, 1);
         return errors;
     }
@@ -355,8 +371,11 @@ public sealed class ApplicationHost : IDisposable
     /// 런타임 하나를 정리한다. 순서는 TUI가 검증해 온 순서를 그대로 따른다 —
     /// 먼저 모든 서비스에 종료를 알려 새 작업을 막고, 단일창을 내리고,
     /// DeX overlay를 회수한 뒤, 마지막에 서비스를 해제한다.
+    /// 수집하는 예외마다 그 자리에서 Error로 로그를 남긴다 — GUI는 콘솔이
+    /// 없어 반환값의 <see cref="AggregateException"/> 메시지 말고는 달리
+    /// 남는 흔적이 없기 때문이다.
     /// </summary>
-    private static async Task ShutdownRuntimeAsync(
+    private async Task ShutdownRuntimeAsync(
         DeviceRuntimeServiceSet runtime,
         string fallbackSerial,
         string fallbackIdentity,
@@ -375,6 +394,10 @@ public sealed class ApplicationHost : IDisposable
         }
         catch (Exception ex)
         {
+            Log.Error(
+                LocalizationService.Get(
+                    "Log.ApplicationHost.RuntimeRequestShutdownFailed"),
+                ex);
             errors.Add(ex);
         }
 
@@ -384,6 +407,10 @@ public sealed class ApplicationHost : IDisposable
         }
         catch (Exception ex)
         {
+            Log.Error(
+                LocalizationService.Get(
+                    "Log.ApplicationHost.RuntimeStopAllFailed"),
+                ex);
             errors.Add(ex);
         }
 
@@ -398,13 +425,24 @@ public sealed class ApplicationHost : IDisposable
 
             if (runtime.Dex.HasDeferredDisplayCleanup)
             {
-                errors.Add(new InvalidOperationException(
+                // 콘솔에 그대로 노출되는 예외 메시지이므로 문구를 바꾸지
+                // 않는다 — 로그 쪽 설명만 지역화 키로 별도로 남긴다.
+                var deferredError = new InvalidOperationException(
                     "DeX display cleanup was deferred because the " +
-                    "target device was unavailable."));
+                    "target device was unavailable.");
+                Log.Error(
+                    LocalizationService.Get(
+                        "Log.ApplicationHost.RuntimeDisplayCleanupDeferred"),
+                    deferredError);
+                errors.Add(deferredError);
             }
         }
         catch (Exception ex)
         {
+            Log.Error(
+                LocalizationService.Get(
+                    "Log.ApplicationHost.RuntimeDexShutdownFailed"),
+                ex);
             errors.Add(ex);
         }
 
@@ -426,6 +464,11 @@ public sealed class ApplicationHost : IDisposable
             }
             catch (Exception ex)
             {
+                Log.Error(
+                    LocalizationService.Format(
+                        "Log.ApplicationHost.RuntimeDisposalFailed",
+                        disposable.GetType().Name),
+                    ex);
                 errors.Add(ex);
             }
         }
