@@ -232,4 +232,38 @@ public class DeviceListViewModelTests
         dispatcher.Drain();
         Assert.Single(vm.Devices);
     }
+
+    [Fact]
+    public void RemovingADeviceDisposesItsViewModel()
+    {
+        var registry = new PhysicalDeviceRegistry();
+        registry.Reconcile(new[]
+        {
+            Device("phone-a", "Galaxy A", "AAA", DeviceTransportKind.Usb),
+            Device("phone-b", "Galaxy B", "BBB", DeviceTransportKind.Usb)
+        });
+
+        var dispatcher = new ImmediateUiDispatcher();
+        using var vm = new DeviceListViewModel(registry, dispatcher);
+        var removed = vm.Devices.Single(d => d.Identity == "phone-b");
+
+        registry.Reconcile(new[] { Device("phone-a", "Galaxy A", "AAA", DeviceTransportKind.Usb) });
+
+        Assert.True(removed.IsDisposed);
+    }
+
+    [Fact]
+    public void DisposingTheListDisposesEveryRow()
+    {
+        var registry = new PhysicalDeviceRegistry();
+        registry.Reconcile(new[] { Device("phone-a", "Galaxy A", "AAA", DeviceTransportKind.Usb) });
+
+        var dispatcher = new ImmediateUiDispatcher();
+        var vm = new DeviceListViewModel(registry, dispatcher);
+        var row = vm.Devices.Single();
+
+        vm.Dispose();
+
+        Assert.True(row.IsDisposed);
+    }
 }

@@ -76,7 +76,13 @@ public sealed partial class DeviceListViewModel : ObservableObject, IDisposable
             var identity = Devices[i].Identity;
             var stillPresent = incoming.Any(d => string.Equals(
                 d.Identity, identity, StringComparison.OrdinalIgnoreCase));
-            if (!stillPresent) Devices.RemoveAt(i);
+            if (!stillPresent)
+            {
+                // 행이 건 구독을 끊고 뽑는다. 순서를 바꾸면 뽑힌 행이
+                // 계속 이벤트를 받는다.
+                Devices[i].Dispose();
+                Devices.RemoveAt(i);
+            }
         }
 
         foreach (var info in incoming)
@@ -123,5 +129,8 @@ public sealed partial class DeviceListViewModel : ObservableObject, IDisposable
         if (_disposed) return;
         _disposed = true;
         _registry.SnapshotChanged -= OnSnapshotChanged;
+
+        foreach (var device in Devices) device.Dispose();
+        Devices.Clear();
     }
 }

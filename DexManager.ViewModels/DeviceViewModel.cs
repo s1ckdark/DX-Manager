@@ -7,8 +7,10 @@ namespace DexManager.ViewModels;
 /// 기기 1대의 표시용 상태. <see cref="Identity"/>는 불변이며 목록 안에서
 /// 이 ViewModel을 식별하는 키다.
 /// </summary>
-public sealed partial class DeviceViewModel : ObservableObject
+public sealed partial class DeviceViewModel : ObservableObject, IDisposable
 {
+    private bool _disposed;
+
     public DeviceViewModel(PhysicalDeviceInfo info)
     {
         if (info == null) throw new ArgumentNullException(nameof(info));
@@ -37,7 +39,7 @@ public sealed partial class DeviceViewModel : ObservableObject
     /// </summary>
     public void Update(PhysicalDeviceInfo info)
     {
-        if (info == null) return;
+        if (info == null || _disposed) return;
 
         DisplayName = info.DisplayName ?? string.Empty;
         IsConnected = info.IsConnected;
@@ -49,5 +51,18 @@ public sealed partial class DeviceViewModel : ObservableObject
         TransportSummary = info.Transports == null
             ? string.Empty
             : string.Join(", ", info.Transports.Select(t => $"{t.Kind}: {t.Serial}"));
+    }
+
+    /// <summary>이 행이 이미 해제되었는지 여부.</summary>
+    public bool IsDisposed => _disposed;
+
+    /// <summary>
+    /// 이 행이 건 구독을 해제한다. 멱등하다.
+    /// 목록에서 제거될 때와 목록 자체가 해제될 때 호출된다.
+    /// </summary>
+    public void Dispose()
+    {
+        if (_disposed) return;
+        _disposed = true;
     }
 }
