@@ -7,34 +7,20 @@ namespace DexManager.Tests;
 
 public class ApplicationHostTests : IDisposable
 {
-    private readonly string _root;
+    private readonly TempHostRoot _tempRoot;
 
     public ApplicationHostTests()
     {
-        _root = Path.Combine(
-            Path.GetTempPath(),
-            "dxm-host-tests",
-            Guid.NewGuid().ToString("N"));
+        _tempRoot = new TempHostRoot();
     }
 
     public void Dispose()
     {
-        try
-        {
-            if (Directory.Exists(_root)) Directory.Delete(_root, true);
-        }
-        catch
-        {
-            // 임시 디렉터리 정리 실패는 테스트 결과에 영향을 주지 않는다.
-        }
+        _tempRoot.Dispose();
     }
 
-    private ApplicationHost CreateHost(FakeKeyboardService keyboard = null) => new ApplicationHost(
-        new FakePlatformService(),
-        new FakePathProvider(_root),
-        new FakeCaptureService(),
-        keyboard ?? new FakeKeyboardService(),
-        new FakeAutoStartService());
+    private ApplicationHost CreateHost(FakeKeyboardService keyboard = null) =>
+        _tempRoot.CreateHost(keyboard);
 
     [Fact]
     public void Constructor_ComposesAllServices()
@@ -141,9 +127,9 @@ public class ApplicationHostTests : IDisposable
     public void EnsureDefaultPaths_DisablesHidInputOnMac()
     {
         // 실제 SettingsService/직렬화 경로로 "HID가 켜져 있던" 상태를 미리 저장해 둔다.
-        // ApplicationHost가 읽는 것과 동일한 <_root>/config/settings.json 파일을 생성한다.
+        // ApplicationHost가 읽는 것과 동일한 <_tempRoot.Root>/config/settings.json 파일을 생성한다.
         var seedLog = new LogService();
-        var seedSettingsService = new SettingsService(seedLog, _root);
+        var seedSettingsService = new SettingsService(seedLog, _tempRoot.Root);
         var seededSettings = seedSettingsService.Load();
         seededSettings.Scrcpy.UseHidKeyboard = true;
         seededSettings.Scrcpy.UseHidMouse = true;
@@ -174,7 +160,7 @@ public class ApplicationHostTests : IDisposable
         // AdbSelectionMode가 Manual이 아닌 한 기본(번들) ADB 경로로 강제 교체되어야 한다.
         // 실제 SettingsService/직렬화 경로로 사전 상태를 저장해 둔다.
         var seedLog = new LogService();
-        var seedSettingsService = new SettingsService(seedLog, _root);
+        var seedSettingsService = new SettingsService(seedLog, _tempRoot.Root);
         var seededSettings = seedSettingsService.Load();
         const string preConfiguredAdbPath = "/bin/ls";
         Assert.True(File.Exists(preConfiguredAdbPath));
@@ -182,13 +168,8 @@ public class ApplicationHostTests : IDisposable
         seededSettings.Paths.AdbSelectionMode = AdbSelectionMode.Auto;
         seedSettingsService.Save(seededSettings);
 
-        var portablePathProvider = new FakePathProvider(_root, isPortablePackage: true);
-        using var host = new ApplicationHost(
-            new FakePlatformService(),
-            portablePathProvider,
-            new FakeCaptureService(),
-            new FakeKeyboardService(),
-            new FakeAutoStartService());
+        var portablePathProvider = new FakePathProvider(_tempRoot.Root, isPortablePackage: true);
+        using var host = _tempRoot.CreateHost(pathProvider: portablePathProvider);
 
         // 포터블 패키지에서는 이미 유효했던 ADB 경로였더라도 기본 경로로 교체된다.
         Assert.NotEqual(preConfiguredAdbPath, host.Settings.Paths.AdbPath);

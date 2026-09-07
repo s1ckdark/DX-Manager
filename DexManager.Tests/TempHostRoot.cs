@@ -4,12 +4,14 @@ using DexManager.Tests.FakePlatform;
 namespace DexManager.Tests;
 
 /// <summary>
-/// 테스트용 임시 디렉터리와 그 위에서 동작하는 <see cref="ApplicationHost"/>를
-/// 만든다.
+/// 테스트용 임시 디렉터리와 그 위에서 동작하는 <see cref="ApplicationHost"/>를 만든다.
+/// 이 프로젝트의 호스트 생성을 위한 유일한 고정 장치이다.
 /// </summary>
 public sealed class TempHostRoot : IDisposable
 {
     private readonly string _root;
+
+    public string Root => _root;
 
     public TempHostRoot()
     {
@@ -19,11 +21,13 @@ public sealed class TempHostRoot : IDisposable
             Guid.NewGuid().ToString("N"));
     }
 
-    public ApplicationHost CreateHost() => new ApplicationHost(
+    public ApplicationHost CreateHost(
+        FakeKeyboardService keyboard = null,
+        FakePathProvider pathProvider = null) => new ApplicationHost(
         new FakePlatformService(),
-        new FakePathProvider(_root),
+        pathProvider ?? new FakePathProvider(_root),
         new FakeCaptureService(),
-        new FakeKeyboardService(),
+        keyboard ?? new FakeKeyboardService(),
         new FakeAutoStartService());
 
     public void Dispose()
