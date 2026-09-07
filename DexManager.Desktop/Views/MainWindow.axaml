@@ -4,24 +4,28 @@
         x:Class="DexManager.Desktop.Views.MainWindow"
         x:DataType="vm:ShellViewModel"
         Title="DX Manager"
-        Width="900" Height="600"
-        MinWidth="640" MinHeight="400">
-  <Grid RowDefinitions="Auto,*,Auto" Margin="16">
+        Width="980" Height="640"
+        MinWidth="820" MinHeight="480">
+  <Grid RowDefinitions="Auto,*,Auto" ColumnDefinitions="320,*" Margin="16">
 
-    <TextBlock Grid.Row="0"
+    <TextBlock Grid.Row="0" Grid.Column="0"
                Text="Connected devices"
                FontSize="18"
                FontWeight="SemiBold"
                Margin="0,0,0,12" />
 
-    <Border Grid.Row="1"
+    <Border Grid.Row="1" Grid.Column="0"
             BorderThickness="1"
             BorderBrush="{DynamicResource SystemControlForegroundBaseMediumLowBrush}"
-            CornerRadius="4">
+            CornerRadius="4"
+            Margin="0,0,12,0">
       <Panel>
         <TextBlock Text="No devices connected. Plug in a Galaxy device."
                    HorizontalAlignment="Center"
                    VerticalAlignment="Center"
+                   TextWrapping="Wrap"
+                   TextAlignment="Center"
+                   Margin="16"
                    Opacity="0.6"
                    IsVisible="{Binding Devices.IsEmpty}" />
 
@@ -35,12 +39,18 @@
               <StackPanel Margin="4">
                 <StackPanel Orientation="Horizontal" Spacing="8">
                   <TextBlock Text="{Binding DisplayName}" FontWeight="SemiBold" />
+                  <!-- Foreground를 고정하지 않는다. 선택된 행의 강조 배경
+                       위에서 하드코딩된 Green은 거의 읽히지 않는다. -->
                   <TextBlock Text="Connected"
-                             Foreground="Green"
+                             Opacity="0.85"
                              IsVisible="{Binding IsConnected}" />
                   <TextBlock Text="Disconnected"
                              Opacity="0.6"
                              IsVisible="{Binding !IsConnected}" />
+                  <TextBlock Text="DeX"
+                             FontWeight="SemiBold"
+                             Opacity="0.85"
+                             IsVisible="{Binding IsDexRunning}" />
                 </StackPanel>
                 <TextBlock Text="{Binding TransportSummary}"
                            Opacity="0.7"
@@ -52,7 +62,82 @@
       </Panel>
     </Border>
 
-    <TextBlock Grid.Row="2"
+    <ScrollViewer Grid.Row="1" Grid.Column="1"
+                  IsVisible="{Binding Devices.SelectedDevice, Converter={x:Static ObjectConverters.IsNotNull}}">
+      <StackPanel DataContext="{Binding Devices.SelectedDevice}"
+                  x:DataType="vm:DeviceViewModel"
+                  Spacing="16">
+
+        <TextBlock Text="{Binding DisplayName}"
+                   FontSize="18"
+                   FontWeight="SemiBold" />
+
+        <StackPanel Orientation="Horizontal" Spacing="8">
+          <Button Content="Start DeX"
+                  Command="{Binding StartDexCommand}"
+                  IsVisible="{Binding !IsDexRunning}" />
+          <Button Content="Stop DeX"
+                  Command="{Binding StopDexCommand}"
+                  IsVisible="{Binding IsDexRunning}" />
+          <TextBlock Text="Working…"
+                     VerticalAlignment="Center"
+                     Opacity="0.7"
+                     IsVisible="{Binding IsBusy}" />
+        </StackPanel>
+
+        <TextBlock Text="{Binding LastCommandMessage}"
+                   Opacity="0.75"
+                   TextWrapping="Wrap"
+                   IsVisible="{Binding LastCommandMessage, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+
+        <TextBlock Text="Single app windows"
+                   FontWeight="SemiBold"
+                   Margin="0,8,0,0" />
+
+        <ItemsControl ItemsSource="{Binding Slots}">
+          <ItemsControl.ItemTemplate>
+            <DataTemplate x:DataType="vm:SingleWindowSlotViewModel">
+              <Border BorderThickness="1"
+                      BorderBrush="{DynamicResource SystemControlForegroundBaseMediumLowBrush}"
+                      CornerRadius="4"
+                      Padding="12"
+                      Margin="0,0,0,8">
+                <StackPanel Spacing="6">
+                  <Grid ColumnDefinitions="Auto,*,Auto,Auto" ColumnSpacing="8">
+                    <TextBlock Grid.Column="0"
+                               Text="{Binding Title}"
+                               FontWeight="SemiBold"
+                               VerticalAlignment="Center"
+                               Width="96" />
+                    <TextBox Grid.Column="1"
+                             Text="{Binding AppPackage}"
+                             Watermark="com.sec.android.app.sbrowser"
+                             VerticalAlignment="Center" />
+                    <Button Grid.Column="2"
+                            Content="Start"
+                            Command="{Binding StartCommand}"
+                            IsVisible="{Binding !IsRunning}" />
+                    <Button Grid.Column="3"
+                            Content="Stop"
+                            Command="{Binding StopCommand}"
+                            IsVisible="{Binding IsRunning}" />
+                  </Grid>
+
+                  <!-- 슬롯의 LastCommandMessage도 기기 행과 같은 모양으로
+                       보여준다. 시작이 던지는 예외가 조용히 사라지면 안 된다. -->
+                  <TextBlock Text="{Binding LastCommandMessage}"
+                             Opacity="0.75"
+                             TextWrapping="Wrap"
+                             IsVisible="{Binding LastCommandMessage, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                </StackPanel>
+              </Border>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+      </StackPanel>
+    </ScrollViewer>
+
+    <TextBlock Grid.Row="2" Grid.Column="0" Grid.ColumnSpan="2"
                Text="{Binding StatusText}"
                Margin="0,12,0,0"
                Opacity="0.8" />
