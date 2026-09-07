@@ -411,4 +411,17 @@ public class ApplicationHostTests : IDisposable
         // 통째로 건너뛰어져서" 우연히 false가 된 게 아님을 보인다.
         Assert.True(runtime.Dex.IsShutdownRequested);
     }
+
+    [Fact]
+    public void UpdateSettings_AfterDispose_Throws()
+    {
+        using var root = new TempHostRoot();
+        var host = root.CreateHost();
+        host.Dispose();
+
+        // Start/Stop이 세운 패턴과 같아야 한다 — 해제된 호스트에 쓰기를
+        // 허용하면 디스크에 남는 마지막 값이 종료 순서에 좌우된다.
+        Assert.Throws<ObjectDisposedException>(
+            () => host.UpdateSettings(s => s.VirtualDisplay.Width = 1280));
+    }
 }

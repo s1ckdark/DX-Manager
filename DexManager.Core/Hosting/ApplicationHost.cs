@@ -181,9 +181,28 @@ public sealed class ApplicationHost : IDisposable
     /// 설정을 바꿀 때는 <see cref="Settings"/>를 직접 수정하지 말고
     /// 이 메서드를 쓴다.
     /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <paramref name="mutate"/>가 건드리지 않은 필드도 값이 바뀔 수 있다.
+    /// 저장 경로가 <c>Save</c> → <c>SaveCore</c> → <c>EnsureDefaults()</c>로
+    /// 이어지며, <c>EnsureDefaults</c>는 호출자가 들고 있는 살아있는
+    /// <see cref="Settings"/> 객체 자체를 정규화한다. 폼을 이 객체에
+    /// 양방향 바인딩하면 저장 직후 화면 값이 정규화된 값으로 바뀐다.
+    /// </para>
+    /// <para>
+    /// 잠금 안에서 사용자 입력을 기다리지 않는다. 입력을 먼저 받아
+    /// mutation으로 포장한 뒤 넘긴다 — 그러지 않으면 다른 소비자가
+    /// 프롬프트가 닫힐 때까지 막힌다.
+    /// </para>
+    /// </remarks>
+    /// <exception cref="ObjectDisposedException">
+    /// 호스트가 이미 해제된 경우.
+    /// </exception>
     public void UpdateSettings(Action<AppSettings> mutate)
     {
         if (mutate == null) throw new ArgumentNullException(nameof(mutate));
+        if (IsDisposed)
+            throw new ObjectDisposedException(nameof(ApplicationHost));
 
         lock (_settingsLock)
         {
