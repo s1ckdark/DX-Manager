@@ -38,3 +38,6 @@ dist/
 
 # Nested working clone kept outside version control
 DX-manager/
+
+# Subagent-driven development scratch (plans live in docs/superpowers/)
+.superpowers/
