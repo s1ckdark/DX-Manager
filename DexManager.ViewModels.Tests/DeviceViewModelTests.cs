@@ -220,8 +220,23 @@ public class DeviceViewModelTests
     }
 
     [Fact]
-    public async Task StartDexCommand_DoesNotRunTwiceWhileTheFirstIsStillRunning()
+    public async Task StartDexCommand_ReportsBusyAndBlocksCanExecuteWhileRunning()
     {
+        // 주의: 이 테스트의 이름과 실제로 검증하는 것을 정확히 구분해야
+        // 한다. CommunityToolkit.Mvvm의 [RelayCommand]가 만드는
+        // AsyncRelayCommand는 기본적으로 재진입을 막는다(명령 인스턴스
+        // 하나 안에서). 즉 CanExecute(null)이 false인데도 ExecuteAsync를
+        // 다시 부르면(버튼이 아니라 코드로 직접) 실제로 동시 실행될 수
+        // 있다는 것이 확인되었다 — 그래서 여기서는 두 번째 ExecuteAsync를
+        // 직접 부르지 않는다. 이 테스트가 실제로 검증하는 것은 "실행
+        // 중에는 IsBusy가 true이고 CanExecute가 false를 보고한다"는
+        // 것뿐이다. 아래 Assert.Single은 실행을 한 번만 걸었으니 호출도
+        // 한 번뿐이라는 당연한 사실만 확인한다 — 재진입 방지 자체의
+        // 증거는 아니다. 명령 사이의 실제 교차 잠금(Start 진행 중에
+        // Stop이 막히는 것)은 StopDexCommand_IsNotExecutableWhileStartIsRunning이
+        // 검증한다 — IsBusy가 두 명령의 CanExecute에 공유되기 때문에
+        // 가능한 보장이며, 이는 AsyncRelayCommand의 재진입 방지가 명령
+        // 인스턴스별로만 적용되어 주지 못하는 것이다.
         var commands = new FakeDeviceCommands
         {
             StartGate = new TaskCompletionSource<bool>()
@@ -239,6 +254,30 @@ public class DeviceViewModelTests
 
         Assert.False(vm.IsBusy);
         Assert.Single(commands.Calls);
+    }
+
+    [Fact]
+    public async Task StopDexCommand_IsNotExecutableWhileStartIsRunning()
+    {
+        // StartDexCommand와 StopDexCommand는 서로 다른 AsyncRelayCommand
+        // 인스턴스다. 툴킷의 재진입 방지는 명령 인스턴스 안에서만
+        // 작동하므로, Start가 진행 중일 때 Stop이 실행 가능한지 여부는
+        // 툴킷이 아니라 두 명령이 공유하는 IsBusy → CanRunCommand에
+        // 달려 있다. 이 테스트가 그 교차 잠금을 직접 검증한다.
+        var commands = new FakeDeviceCommands
+        {
+            StartGate = new TaskCompletionSource<bool>()
+        };
+        using var vm = CreateRow("phone-a", "AAA", commands, out _);
+
+        var first = vm.StartDexCommand.ExecuteAsync(null);
+
+        Assert.False(vm.StopDexCommand.CanExecute(null));
+
+        commands.StartGate.SetResult(true);
+        await first;
+
+        Assert.True(vm.StopDexCommand.CanExecute(null));
     }
 
     [Fact]
