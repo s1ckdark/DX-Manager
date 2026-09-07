@@ -41,14 +41,7 @@ public sealed class InteractiveHost : IDisposable
 
     public InteractiveHost()
     {
-        var pathProvider = new MacPathProvider();
-
-        _host = new ApplicationHost(
-            new MacPlatformService(),
-            pathProvider,
-            new MacCaptureService(pathProvider.DefaultScreenshotFolder),
-            new MacKeyboardService(),
-            new MacAutoStartService());
+        _host = MacApplicationHostFactory.Create();
 
         _host.DeviceMonitor.DeviceConnected += (_, e) =>
         {
