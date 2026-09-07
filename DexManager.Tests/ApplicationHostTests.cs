@@ -309,6 +309,9 @@ public class ApplicationHostTests : IDisposable
         using var root = new TempHostRoot();
         var host = root.CreateHost();
         var runtime = host.RuntimeFactory.Create();
+        // 아직 아무 것도 종료를 요청받지 않았다는 사전 조건 — 아래 단언이
+        // "원래 false였다가 실제로 바뀐 값"을 보게 하려는 것이다.
+        Assert.False(runtime.Dex.IsShutdownRequested);
 
         var errors = await host.ShutdownAsync(null, null);
 
@@ -316,6 +319,14 @@ public class ApplicationHostTests : IDisposable
         // SingleWindowService.Dispose는 멱등이며 두 번째 호출이 조용히 반환한다.
         // 이미 해제됐다면 StopAll이 새 프로세스를 만들지 않는다.
         Assert.Equal(0, runtime.SingleWindows.RunningCount);
+        // 위 두 단언은 ShutdownAsync가 런타임 반복문을 건너뛰어도 참이다
+        // (RunningCount는 시작 전이나 후나 0이다). 이 단언이 실제 증거다 —
+        // Dex.IsShutdownRequested가 true가 되는 유일한 경로는
+        // ApplicationHost.ShutdownAsync의 런타임 반복문이 이 인스턴스에
+        // 대해 runtime.Dex.RequestShutdown() 또는 runtime.Dex.ShutdownAsync()를
+        // 실제로 호출하는 것뿐이다. 반복문이 건너뛰어지면 이 값은 계속
+        // false로 남는다.
+        Assert.True(runtime.Dex.IsShutdownRequested);
         Assert.True(host.IsDisposed);
     }
 
@@ -344,5 +355,60 @@ public class ApplicationHostTests : IDisposable
 
         // 종료 훅이 ShutdownAsync를 부른 뒤 using이 Dispose를 또 부른다.
         host.Dispose();
+    }
+
+    [Fact]
+    public async Task ShutdownAsync_LogsEachCollectedExceptionAtTheStepThatFailed()
+    {
+        // Ruling C 회귀 방지: DisposeRuntimeServices가 하던 실패-로그 남기기가
+        // ApplicationHost.ShutdownAsync로 옮겨오면서 사라졌던 결함이다.
+        // 여기서는 가짜 중 유일하게 실패를 주입할 수 있는 키보드 서비스로
+        // 재현한다 — 수집된 예외 목록에 그 예외가 들어있을 뿐 아니라,
+        // 그 실패를 가리키는 ERROR 로그 항목도 남아야 한다. GUI에는 콘솔이
+        // 없어 이 로그가 유일한 흔적이기 때문이다.
+        var thrown = new InvalidOperationException("keyboard dispose boom");
+        var keyboard = new FakeKeyboardService { ThrowOnDispose = thrown };
+        using var root = new TempHostRoot();
+        var host = root.CreateHost(keyboard: keyboard);
+
+        var errors = await host.ShutdownAsync(null, null);
+
+        Assert.Contains(thrown, errors);
+        var expectedMessage = LocalizationService.Get(
+            "Log.ApplicationHost.KeyboardServiceDisposeFailed");
+        Assert.Contains(
+            host.Log.GetSessionEntries(),
+            entry =>
+                entry.Contains("[ERROR]", StringComparison.Ordinal) &&
+                entry.Contains(expectedMessage, StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task ShutdownAsync_DisposesKeyboardServiceBeforeTheRuntimeLoop()
+    {
+        // Ruling B 회귀 방지: 브리핑을 그대로 옮긴 코드는 DeviceMonitor·키보드
+        // 해제를 런타임 반복문 뒤로 미뤄버렸었다. 원래 순서(감시 중지 →
+        // 감시자·키보드 해제 → 런타임 정리)로 되돌린 것을 고정한다.
+        // 가짜로 대체할 수 있는 참여자는 키보드 서비스뿐이라 순서 전체를
+        // 못박을 수는 없다 — 키보드 해제 시점에 아직 런타임 반복문의 관측
+        // 가능한 효과(Dex.RequestShutdown 호출)가 일어나지 않았다는 것만
+        // 확인한다.
+        using var root = new TempHostRoot();
+        var keyboard = new FakeKeyboardService();
+        var host = root.CreateHost(keyboard: keyboard);
+        var runtime = host.RuntimeFactory.Create();
+
+        var runtimeShutdownRequestedDuringKeyboardDispose = true;
+        keyboard.OnDispose = () =>
+            runtimeShutdownRequestedDuringKeyboardDispose =
+                runtime.Dex.IsShutdownRequested;
+
+        await host.ShutdownAsync(null, null);
+
+        Assert.Equal(1, keyboard.DisposeCallCount);
+        Assert.False(runtimeShutdownRequestedDuringKeyboardDispose);
+        // 반복문이 실제로는 돌았다는 것도 함께 확인해, 위 단언이 "반복문이
+        // 통째로 건너뛰어져서" 우연히 false가 된 게 아님을 보인다.
+        Assert.True(runtime.Dex.IsShutdownRequested);
     }
 }
