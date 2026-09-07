@@ -128,6 +128,13 @@ public sealed class ApplicationHost : IDisposable
     public DeviceRuntimeServiceFactory RuntimeFactory { get; private set; }
 
     /// <summary>
+    /// 물리 기기별 런타임을 하나로 유지하는 코디네이터.
+    /// GUI는 이것을 통해서만 런타임을 얻는다. TUI는 단일 런타임 동작을
+    /// 유지하므로 사용하지 않는다.
+    /// </summary>
+    public DeviceRuntimeCoordinator RuntimeCoordinator { get; private set; }
+
+    /// <summary>
     /// 현재 선택된 기기의 transport serial. 진단 서비스가 이 값을 읽는다.
     /// 소비 호스트(TUI/GUI)가 갱신한다.
     /// <c>null</c>을 대입하면 <see cref="string.Empty"/>로 정규화되므로
@@ -296,6 +303,10 @@ public sealed class ApplicationHost : IDisposable
             Log,
             RuntimeSessions,
             _platformService);
+
+        RuntimeCoordinator = new DeviceRuntimeCoordinator(
+            RuntimeFactory,
+            RuntimeSessions);
     }
 
     /// <summary>
