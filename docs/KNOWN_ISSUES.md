@@ -154,3 +154,15 @@ Apple Silicon ZIP은 Apple Silicon Mac에서 실제 바이너리 기동을 확�
 Intel ZIP은 아키텍처와 외부 경로를 검사하고 Apple Silicon Mac의 Rosetta에서
 실행 파일 기동을 확인했지만, Intel 실기 전체 DeX 흐름은 GitHub의
 `macos-15-intel` 자동 빌드와 별도로 실제 Intel Mac 확인이 남아 있다.
+
+## 개발용 Scrcpy 번들 아키텍처
+
+저장소의 `tools/scrcpy`는 Apple Silicon용 Scrcpy 4.1이며 macOS 개발
+빌드에만 복사된다. Intel Mac에서는 이 실행 파일이 기동하지 않으므로 설정에서
+시스템에 설치한 Scrcpy 경로를 지정한다. 배포 패키지는 아키텍처별 공식
+Scrcpy를 따로 내려받으므로 영향을 받지 않는다.
+
+`tools/scrcpy`를 직접 교체할 때는 파일 수정 시각을 확인한다. 새 파일의 수정
+시각이 기존 빌드 산출물보다 과거이면 `CopyToOutputDirectory=PreserveNewest`가
+복사를 건너뛰어 이전 실행 파일이 그대로 남는다. 교체 뒤
+`touch tools/scrcpy/*` 또는 `dotnet clean`으로 산출물을 갱신한다.

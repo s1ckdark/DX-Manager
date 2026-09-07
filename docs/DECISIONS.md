@@ -368,3 +368,20 @@ transport에서 `EnsureVirtualDisplay`가 성공하거나 명시적 reset이 성
 Apple Developer ID와 notarization 자격 증명은 저장소에 넣지 않는다. 인증서가
 구성되기 전 자동 artifact에는 Developer ID 서명·공증이 없음을 문서에 표시하고
 Gatekeeper를 자동으로 우회하지 않는다.
+
+## 2026-09 - 개발용 macOS Scrcpy 번들은 Apple Silicon 4.1로 맞춘다
+
+저장소의 `tools/scrcpy`는 macOS 개발 빌드에만 복사된다. 배포 패키지는
+`scripts/Package-Mac-Release.sh`가 `CopyBundledMacTools=false`로 publish한
+뒤 아키텍처별 공식 Scrcpy를 SHA-256 검증과 함께 내려받으므로 이 번들을
+사용하지 않는다.
+
+이 번들에는 x86_64용 Scrcpy 3.3.4가 들어 있어 문서와 코드가 기준으로 삼는
+4.1과 어긋나 있었다. 버전 감지에 실패하면 기준인 4.1 동작으로 되돌아가므로
+감지 실패 시 3.3.4 실행 파일에 `--keep-active`를 전달할 수 있었다. 공식
+`scrcpy-macos-aarch64-v4.1` 아카이브로 교체해 개발 빌드를 기준 동작에
+맞춘다.
+
+Apple Silicon 자산을 선택해 개발 장비에서 Rosetta 없이 실행한다. Intel Mac
+개발자는 이 번들 대신 시스템에 설치한 Scrcpy 경로를 지정한다. 배포는 Intel
+패키지를 계속 제공하므로 사용자 지원 범위는 바뀌지 않는다.
