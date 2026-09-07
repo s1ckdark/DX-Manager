@@ -48,9 +48,23 @@ public sealed partial class DeviceListViewModel : ObservableObject, IDisposable
     {
         if (_disposed) return;
 
-        // 구독과 생성자의 첫 Apply 사이에 감시 스레드가 Reconcile을 돌리면
-        // 새 스냅샷이 먼저 큐에 들어가고 생성자의 오래된 스냅샷이 나중에
-        // 실행된다. 세대가 뒤로 가는 반영은 버린다.
+        // 이 가드가 막는 것: 생성자의 구독과 동기 Apply 사이에 Reconcile이
+        // 두 번 이상 끼면, 그 사이 세대들이 디스패처 큐에 먼저 쌓인다.
+        // 생성자는 그중 최신 세대를 곧바로 반영하는데, 가드가 없으면
+        // 큐에 남아 있던 옛 세대들이 뒤늦게 실행되며 최신 상태 위에
+        // 거꾸로 덮인다. 그 일시적 되돌림과 중복 Apply를 막는다.
+        //
+        // 이 가드가 막지 "않는" 것: PhysicalDeviceRegistry.Reconcile은
+        // 기기 목록이 실제로 바뀔 때만 SnapshotChanged를 올리고, 그때만
+        // Generation을 1 증가시킨다. 즉 이벤트로 전달되는 세대는 항상
+        // 단조 증가하며 순서대로 도착하므로, 최종 상태는 이 가드가 없어도
+        // 결국 옳다 — 이 가드는 영구적 오류가 아니라 일시적 되돌림만 막는다.
+        //
+        // 이 가드를 직접 검증하는 테스트는 없다: 구독과 첫 Apply 사이의
+        // 경합 창에 주입할 수 있는 이음새가 프로덕션 코드에 없고, 그런
+        // 이음새를 추가하는 것은 이 클래스의 설계를 오염시킨다고 판단해
+        // 추가하지 않았다. 따라서 이 가드를 실수로 지워도 기존 테스트
+        // 스위트는 잡아내지 못한다.
         var generation = snapshot?.Generation ?? 0;
         if (generation <= _appliedGeneration) return;
         _appliedGeneration = generation;

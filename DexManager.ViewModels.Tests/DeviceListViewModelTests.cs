@@ -201,8 +201,15 @@ public class DeviceListViewModelTests
     }
 
     [Fact]
-    public void ConstructionAppliesTheCurrentGenerationAndIgnoresOlderOnes()
+    public void ConstructionAppliesThePreExistingSnapshotSynchronously()
     {
+        // 주의: 이 테스트 이름이 말하는 것과 검증하는 것을 정확히 구분해야
+        // 한다. 이 테스트는 "생성자의 첫 Apply가 디스패처를 거치지 않고
+        // 동기로 실행된다"는 것만 검증한다. DeviceListViewModel.Apply의
+        // 세대 가드(_appliedGeneration)는 검증하지 않는다 — 가드를
+        // 완전히 제거해도 이 테스트는 그대로 통과한다(수동으로 확인함).
+        // 가드가 막는 경합(구독-Apply 사이에 Reconcile이 여러 번 끼는 것)은
+        // 주입할 수 있는 프로덕션 이음새가 없어 테스트로 재현할 수 없다.
         var registry = new PhysicalDeviceRegistry();
         registry.Reconcile(new[]
         {
@@ -213,16 +220,15 @@ public class DeviceListViewModelTests
         var dispatcher = new QueueingUiDispatcher();
         using var vm = new DeviceListViewModel(registry, dispatcher);
 
-        // 생성자가 최신 스냅샷을 즉시 반영했다.
+        // QueueingUiDispatcher를 썼는데도 Drain()을 한 번도 부르지 않은
+        // 시점에 이미 두 기기가 보인다 — 생성자의 첫 Apply가 디스패처
+        // 큐를 거치지 않고 직접 실행되었다는 증거다.
         Assert.Equal(2, vm.Devices.Count);
 
-        // 한 기기가 빠진 새 스냅샷이 오면 세대가 높으므로 반영된다.
+        // 생성 이후의 변경은 정상적으로 디스패처 큐를 거친다.
         registry.Reconcile(new[] { Device("phone-a", "Galaxy A", "AAA", DeviceTransportKind.Usb) });
-        dispatcher.Drain();
+        Assert.Equal(1, dispatcher.PendingCount);
 
-        Assert.Single(vm.Devices);
-
-        // 큐에 남아 있던 예전 세대가 뒤늦게 실행돼도 되돌리지 않는다.
         dispatcher.Drain();
         Assert.Single(vm.Devices);
     }
