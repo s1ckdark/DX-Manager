@@ -12,6 +12,14 @@
         `--stop-dex` 후 `overlay=null`·디스플레이 `0 1` 복귀 확인)
 - [x] macOS GUI Phase 1 — Avalonia Desktop 골격과 MainWindow
 
+- [ ] 온디바이스 DeX 창 — **보류.** 전제 검증 후 착수 여부 결정
+  - 설계와 기술적 타당성은 확정됐으나 제품 가치가 미검증이다.
+    스펙 0절에 보류 근거 기록: DeX는 화면을 넓히려고 만든 것인데 폰 화면 안에 넣으면
+    그 이유가 사라지고, 입력 모델도 맞지 않으며, One UI의 분할/팝업 뷰가 이미 답을 갖고 있다.
+  - [ ] `android-display-mirror` + `android-display-extend` 설치해 일주일 실사용
+  - [ ] 판정: 계속 켜게 되는가? 아니면 스펙 폐기. 맞다면 무엇이 부족한지가 그때 드러난다
+  - 앱 코드는 아직 한 줄도 없다(문서만). 접는 비용이 가장 싼 시점이다.
+
 - [ ] macOS GUI Phase 2 착수 전 선행 정리 (Phase 1 최종 리뷰 지적)
   - [ ] `ApplicationHost`로 정리(teardown) 책임 이관 — **Phase 2의 첫 작업**
     - 현상: 조립은 `ApplicationHost`가 공유하나 정리는 `InteractiveHost.ShutdownAsync`에만 있다.
