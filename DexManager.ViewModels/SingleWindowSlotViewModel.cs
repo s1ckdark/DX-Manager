@@ -118,11 +118,16 @@ public sealed partial class SingleWindowSlotViewModel : ObservableObject, IDispo
     }
 
     [RelayCommand]
-    private void Stop()
+    private async Task StopAsync()
     {
         try
         {
-            _commands.StopSingleWindow(_identity, Slot);
+            // IDeviceRuntimeCommands.StopSingleWindow는 TryGet을 부르는데,
+            // TryGet은 GetOrCreate와 같은 자물쇠를 공유한다. 다른 기기의
+            // GetOrCreate가 scrcpy 프로브를 기다리는 동안에는 이 조회도
+            // 그 자물쇠에 걸려 몇 초씩 막힐 수 있다 — StartAsync와 같은
+            // 이유로 스레드 풀에 넘긴다.
+            await Task.Run(() => _commands.StopSingleWindow(_identity, Slot));
             LastCommandMessage = string.Empty;
         }
         catch (Exception ex)

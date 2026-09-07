@@ -59,12 +59,12 @@ public class SingleWindowSlotViewModelTests
     }
 
     [Fact]
-    public void StopCommand_PassesTheSlot()
+    public async Task StopCommand_PassesTheSlot()
     {
         var commands = new FakeDeviceCommands();
         var vm = new SingleWindowSlotViewModel(3, "phone-a", () => "AAA", commands);
 
-        vm.StopCommand.Execute(null);
+        await vm.StopCommand.ExecuteAsync(null);
 
         Assert.Equal(new[] { "stop-slot:phone-a:3" }, commands.Calls);
     }
@@ -130,8 +130,14 @@ public class SingleWindowSlotViewModelTests
         // DeviceRuntimeCoordinator.GetOrCreate를 부르는데, 이 메서드는
         // scrcpy 버전 프로브 동안 최대 ~3초 자물쇠를 쥔다. 슬롯의 시작
         // 명령이 이걸 스레드 풀로 넘기지 않으면 호출자(=UI) 스레드가
-        // 그대로 막힌다. 게이트를 걸어 시작 호출이 스레드 풀에서
-        // 대기하는 동안, 명령을 건 호출은 즉시 반환되는지 확인한다.
+        // 그대로 막힌다.
+        //
+        // 호출 자체를 별도 워커 스레드에서 걸어, 오프로딩이 빠져
+        // 동기적으로 막히더라도 이 테스트의 실행 스레드가 아니라 그
+        // 워커 스레드가 막히게 한다 — 그래야 "호출이 곧바로
+        // 반환됐는가"를 외부 timeout 래퍼 없이 유한 시간 안에 판정할
+        // 수 있다. 오프로딩이 없으면 이 테스트는 행이 아니라 아래
+        // Assert.True에서 곧바로 실패한다.
         var commands = new FakeDeviceCommands
         {
             StartSingleWindowGate = new ManualResetEventSlim(false)
@@ -141,14 +147,17 @@ public class SingleWindowSlotViewModelTests
             AppPackage = "com.example.app"
         };
 
-        var task = vm.StartCommand.ExecuteAsync(null);
+        var (returnedPromptly, invocation) = InvokeOnBackgroundThread(
+            () => vm.StartCommand.ExecuteAsync(null),
+            TimeSpan.FromSeconds(2));
 
-        // 오프로딩되지 않았다면 ExecuteAsync 자체가 게이트에서 막혀
-        // 이 줄에 도달하지 못했을 것이다.
-        Assert.False(task.IsCompleted);
+        Assert.True(
+            returnedPromptly,
+            "StartCommand.ExecuteAsync did not return within 2s — " +
+            "the calling thread was blocked (offload missing).");
 
         commands.StartSingleWindowGate.Set();
-        await task;
+        await invocation;
 
         Assert.Equal(
             new[] { "start-slot:phone-a:AAA:1:com.example.app" },
@@ -178,7 +187,7 @@ public class SingleWindowSlotViewModelTests
     }
 
     [Fact]
-    public void StopCommand_CatchesFailuresAndReportsThemWithoutThrowing()
+    public async Task StopCommand_CatchesFailuresAndReportsThemWithoutThrowing()
     {
         var commands = new FakeDeviceCommands
         {
@@ -186,8 +195,62 @@ public class SingleWindowSlotViewModelTests
         };
         var vm = new SingleWindowSlotViewModel(1, "phone-a", () => "AAA", commands);
 
-        vm.StopCommand.Execute(null);
+        await vm.StopCommand.ExecuteAsync(null);
 
         Assert.Contains("no such slot", vm.LastCommandMessage);
+    }
+
+    [Fact]
+    public async Task StopCommand_DoesNotBlockTheCallingThread()
+    {
+        // IDeviceRuntimeCommands.StopSingleWindow는 TryGet을 부르는데,
+        // TryGet은 GetOrCreate와 같은 자물쇠를 공유한다 — 다른 기기가
+        // scrcpy를 프로브하는 동안 몇 초씩 막힐 수 있다. StopAsync도
+        // Start와 같은 이유로 스레드 풀에 넘겨야 한다.
+        var commands = new FakeDeviceCommands
+        {
+            StopSingleWindowGate = new ManualResetEventSlim(false)
+        };
+        var vm = new SingleWindowSlotViewModel(3, "phone-a", () => "AAA", commands);
+
+        var (returnedPromptly, invocation) = InvokeOnBackgroundThread(
+            () => vm.StopCommand.ExecuteAsync(null),
+            TimeSpan.FromSeconds(2));
+
+        Assert.True(
+            returnedPromptly,
+            "StopCommand.ExecuteAsync did not return within 2s — " +
+            "the calling thread was blocked (offload missing).");
+
+        commands.StopSingleWindowGate.Set();
+        await invocation;
+
+        Assert.Equal(new[] { "stop-slot:phone-a:3" }, commands.Calls);
+    }
+
+    /// <summary>
+    /// 주어진 호출을 별도 워커 스레드에서 실행해, 그 호출 자체가
+    /// 곧바로 반환되는지 확인한다. 오프로딩이 빠지면 호출이 그
+    /// 워커 스레드에서 동기적으로 막히므로, 여기서 시간 제한을 두어
+    /// (외부 timeout 래퍼 없이) 테스트 스스로 유한 시간 안에 실패할
+    /// 수 있게 한다 — 테스트 자신의 호출 스레드는 절대 막히지 않는다.
+    /// </summary>
+    private static (bool ReturnedPromptly, Task Invocation) InvokeOnBackgroundThread(
+        Func<Task> invoke, TimeSpan bound)
+    {
+        Task invocation = null;
+        var invoked = new ManualResetEventSlim(false);
+        var worker = new Thread(() =>
+        {
+            invocation = invoke();
+            invoked.Set();
+        })
+        {
+            IsBackground = true
+        };
+        worker.Start();
+
+        var returnedPromptly = invoked.Wait(bound);
+        return (returnedPromptly, invocation);
     }
 }

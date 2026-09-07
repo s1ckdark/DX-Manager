@@ -19,6 +19,11 @@ public sealed class FakeDeviceCommands : IDeviceRuntimeCommands
     /// 스레드 풀로 넘어갔는지 확인하는 데 쓴다.</summary>
     public ManualResetEventSlim StartSingleWindowGate { get; set; }
 
+    /// <summary>설정하면 StopSingleWindow가 이 게이트가 풀릴 때까지
+    /// 동기적으로 대기한다. 슬롯 중지가 호출자 스레드를 막지 않고
+    /// 스레드 풀로 넘어갔는지 확인하는 데 쓴다.</summary>
+    public ManualResetEventSlim StopSingleWindowGate { get; set; }
+
     /// <summary>설정하면 StartSingleWindow가 이 예외를 던진다.</summary>
     public Exception StartSingleWindowException { get; set; }
 
@@ -57,6 +62,7 @@ public sealed class FakeDeviceCommands : IDeviceRuntimeCommands
 
     public void StopSingleWindow(string identity, int slot)
     {
+        StopSingleWindowGate?.Wait();
         if (StopSingleWindowException != null) throw StopSingleWindowException;
         Calls.Add($"stop-slot:{identity}:{slot}");
     }
