@@ -160,6 +160,91 @@ public class DeviceViewModelTests
         Assert.False(vm.IsDexRunning);
     }
 
+    // --- 단일창 슬롯 배선(task-10) ---
+
+    [Fact]
+    public void ConstructorCreatesThreeSlotsNumberedOneToThree()
+    {
+        using var vm = CreateRow("phone-a", "AAA", new FakeDeviceCommands(), out _);
+
+        Assert.Equal(new[] { 1, 2, 3 }, vm.Slots.Select(s => s.Slot));
+    }
+
+    [Fact]
+    public void SlotsReflectTheSessionThatAlreadyExistsAtConstructionTime()
+    {
+        // 슬롯은 레지스트리 구독보다 먼저 만들어져야 한다 — 그래야
+        // 생성자의 첫 ApplyRuntime 호출이 슬롯까지 반영된다. 레지스트리에
+        // 이미 실행 중인 슬롯 상태를 만들어 둔 뒤 행을 생성해서, 뒤이은
+        // Changed 이벤트 없이도 생성 시점부터 슬롯에 반영되는지 확인한다.
+        var devices = new PhysicalDeviceRegistry();
+        devices.Reconcile(new[] { Discovered("phone-a", "Galaxy A", "AAA") });
+        var sessions = new DeviceRuntimeSessionRegistry();
+        sessions.Reconcile(devices.Current);
+        sessions.SetSingleWindow(
+            "AAA", 2, displayId: 1, processId: 100,
+            windowHandle: IntPtr.Zero,
+            stayAwakeRequested: false,
+            screenOffRequested: false);
+
+        using var vm = new DeviceViewModel(
+            devices.Current.Devices.Single(),
+            sessions,
+            new ImmediateUiDispatcher(),
+            new FakeDeviceCommands());
+
+        Assert.True(vm.Slots.Single(s => s.Slot == 2).IsRunning);
+        Assert.False(vm.Slots.Single(s => s.Slot == 1).IsRunning);
+        Assert.False(vm.Slots.Single(s => s.Slot == 3).IsRunning);
+    }
+
+    [Fact]
+    public void SlotsFollowLaterRegistryChanges()
+    {
+        var commands = new FakeDeviceCommands();
+        using var vm = CreateRow("phone-a", "AAA", commands, out var sessions);
+
+        Assert.False(vm.Slots.Single(s => s.Slot == 3).IsRunning);
+
+        sessions.SetSingleWindow(
+            "AAA", 3, displayId: 2, processId: 200,
+            windowHandle: IntPtr.Zero,
+            stayAwakeRequested: false,
+            screenOffRequested: false);
+
+        Assert.True(vm.Slots.Single(s => s.Slot == 3).IsRunning);
+
+        sessions.ClearSingleWindow("AAA", 3);
+
+        Assert.False(vm.Slots.Single(s => s.Slot == 3).IsRunning);
+    }
+
+    [Fact]
+    public void DisposedRowDisposesEachSlotAndClearsTheCollection()
+    {
+        var vm = CreateRow("phone-a", "AAA", new FakeDeviceCommands(), out _);
+        var capturedSlot = vm.Slots.Single(s => s.Slot == 1);
+
+        vm.Dispose();
+
+        Assert.Empty(vm.Slots);
+
+        // 부모가 해제될 때 슬롯도 함께 해제되어야 한다. 컬렉션만 비운
+        // 것이 아니라 슬롯 자신도 해제됐다는 것을 확인하려면, 컬렉션
+        // 바깥에서 직접 캡처해 둔 슬롯 인스턴스에 최신 세션을 넣어 봐도
+        // 더 이상 반영되지 않아야 한다.
+        capturedSlot.ApplyRuntime(new DeviceRuntimeSessionSnapshot
+        {
+            Identity = "phone-a",
+            SingleWindows = new List<SingleWindowRuntimeSnapshot>
+            {
+                new SingleWindowRuntimeSnapshot { Slot = 1, IsRunning = true }
+            }
+        });
+
+        Assert.False(capturedSlot.IsRunning);
+    }
+
     private static DiscoveredDeviceTransport Discovered(
         string identity,
         string name,

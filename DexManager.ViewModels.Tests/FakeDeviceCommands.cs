@@ -14,6 +14,17 @@ public sealed class FakeDeviceCommands : IDeviceRuntimeCommands
     public bool StopResult { get; set; } = true;
     public TaskCompletionSource<bool> StartGate { get; set; }
 
+    /// <summary>설정하면 StartSingleWindow가 이 게이트가 풀릴 때까지
+    /// 동기적으로 대기한다. 슬롯 시작이 호출자 스레드를 막지 않고
+    /// 스레드 풀로 넘어갔는지 확인하는 데 쓴다.</summary>
+    public ManualResetEventSlim StartSingleWindowGate { get; set; }
+
+    /// <summary>설정하면 StartSingleWindow가 이 예외를 던진다.</summary>
+    public Exception StartSingleWindowException { get; set; }
+
+    /// <summary>설정하면 StopSingleWindow가 이 예외를 던진다.</summary>
+    public Exception StopSingleWindowException { get; set; }
+
     public async Task<bool> StartDexAsync(
         string identity,
         string serial,
@@ -38,8 +49,15 @@ public sealed class FakeDeviceCommands : IDeviceRuntimeCommands
         string serial,
         int slot,
         string appPackage)
-        => Calls.Add($"start-slot:{identity}:{serial}:{slot}:{appPackage}");
+    {
+        StartSingleWindowGate?.Wait();
+        if (StartSingleWindowException != null) throw StartSingleWindowException;
+        Calls.Add($"start-slot:{identity}:{serial}:{slot}:{appPackage}");
+    }
 
     public void StopSingleWindow(string identity, int slot)
-        => Calls.Add($"stop-slot:{identity}:{slot}");
+    {
+        if (StopSingleWindowException != null) throw StopSingleWindowException;
+        Calls.Add($"stop-slot:{identity}:{slot}");
+    }
 }

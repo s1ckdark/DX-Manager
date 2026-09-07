@@ -1,3 +1,4 @@
+using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using DexManager.Models;
@@ -30,6 +31,17 @@ public sealed partial class DeviceViewModel : ObservableObject, IDisposable
         Identity = info.Identity ?? string.Empty;
         Update(info);
 
+        // 구독보다 먼저 슬롯을 만들어야 아래 첫 ApplyRuntime 호출이
+        // 슬롯까지 반영된다.
+        for (var slot = 1; slot <= 3; slot++)
+        {
+            Slots.Add(new SingleWindowSlotViewModel(
+                slot,
+                Identity,
+                () => PrimarySerial,
+                _commands));
+        }
+
         // DexOrchestrator에는 public event가 없다. 상태 변화를 실시간으로
         // 관측하는 유일한 경로가 이 레지스트리다.
         _sessions.Changed += OnSessionsChanged;
@@ -54,8 +66,9 @@ public sealed partial class DeviceViewModel : ObservableObject, IDisposable
     [ObservableProperty]
     private bool _isDexRunning;
 
-    // 단일창 슬롯(Slots)은 Task 10이 SingleWindowSlotViewModel과 함께
-    // 도입한다. 이 Task는 DeX 세션 상태만 다루므로 여기서는 만들지 않는다.
+    /// <summary>이 기기의 단일창 슬롯 1~3. 생성자에서 채워지며 이후
+    /// 개수가 바뀌지 않는다.</summary>
+    public ObservableCollection<SingleWindowSlotViewModel> Slots { get; } = new();
 
     /// <summary>
     /// 이 행의 명령이 하나 진행 중인지 여부. scrcpy 시작은 느리므로
@@ -163,6 +176,8 @@ public sealed partial class DeviceViewModel : ObservableObject, IDisposable
 
         var session = snapshot?.FindByIdentity(Identity);
         IsDexRunning = session?.Dex?.IsRunning == true;
+
+        foreach (var slot in Slots) slot.ApplyRuntime(session);
     }
 
     /// <summary>이 행이 이미 해제되었는지 여부.</summary>
@@ -177,5 +192,8 @@ public sealed partial class DeviceViewModel : ObservableObject, IDisposable
         if (_disposed) return;
         _disposed = true;
         _sessions.Changed -= OnSessionsChanged;
+
+        foreach (var slot in Slots) slot.Dispose();
+        Slots.Clear();
     }
 }
