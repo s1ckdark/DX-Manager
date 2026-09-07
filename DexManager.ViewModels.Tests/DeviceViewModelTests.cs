@@ -60,4 +60,24 @@ public class DeviceViewModelTests
 
         Assert.False(vm.IsConnected);
     }
+
+    [Fact]
+    public void Update_AfterDispose_DoesNotChangeObservableProperties()
+    {
+        var vm = new DeviceViewModel(Device(Transport("USB-A", DeviceTransportKind.Usb)));
+        var originalName = vm.DisplayName;
+        var originalSerial = vm.PrimarySerial;
+        var originalConnected = vm.IsConnected;
+
+        vm.Dispose();
+
+        // 변경된 정보로 갱신하려 시도한다.
+        vm.Update(Device(
+            Transport("USB-B", DeviceTransportKind.Wireless, AdbDeviceStatus.Offline)));
+
+        // 해제된 행은 갱신되지 않아야 한다.
+        Assert.Equal(originalName, vm.DisplayName);
+        Assert.Equal(originalSerial, vm.PrimarySerial);
+        Assert.Equal(originalConnected, vm.IsConnected);
+    }
 }
