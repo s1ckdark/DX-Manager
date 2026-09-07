@@ -13,6 +13,7 @@ public sealed partial class DeviceListViewModel : ObservableObject, IDisposable
     private readonly PhysicalDeviceRegistry _registry;
     private readonly IUiDispatcher _dispatcher;
     private bool _disposed;
+    private long _appliedGeneration = -1;
 
     public DeviceListViewModel(
         PhysicalDeviceRegistry registry,
@@ -46,6 +47,13 @@ public sealed partial class DeviceListViewModel : ObservableObject, IDisposable
     private void Apply(DeviceRegistrySnapshot snapshot)
     {
         if (_disposed) return;
+
+        // 구독과 생성자의 첫 Apply 사이에 감시 스레드가 Reconcile을 돌리면
+        // 새 스냅샷이 먼저 큐에 들어가고 생성자의 오래된 스냅샷이 나중에
+        // 실행된다. 세대가 뒤로 가는 반영은 버린다.
+        var generation = snapshot?.Generation ?? 0;
+        if (generation <= _appliedGeneration) return;
+        _appliedGeneration = generation;
 
         var incoming = snapshot?.Devices ?? new List<PhysicalDeviceInfo>();
 

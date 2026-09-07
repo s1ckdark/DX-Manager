@@ -199,4 +199,31 @@ public class DeviceListViewModelTests
         registry.Reconcile(Array.Empty<DiscoveredDeviceTransport>());
         Assert.True(list.IsEmpty);
     }
+
+    [Fact]
+    public void ConstructionAppliesTheCurrentGenerationAndIgnoresOlderOnes()
+    {
+        var registry = new PhysicalDeviceRegistry();
+        registry.Reconcile(new[]
+        {
+            Device("phone-a", "Galaxy A", "AAA", DeviceTransportKind.Usb),
+            Device("phone-b", "Galaxy B", "BBB", DeviceTransportKind.Usb)
+        });
+
+        var dispatcher = new QueueingUiDispatcher();
+        using var vm = new DeviceListViewModel(registry, dispatcher);
+
+        // 생성자가 최신 스냅샷을 즉시 반영했다.
+        Assert.Equal(2, vm.Devices.Count);
+
+        // 한 기기가 빠진 새 스냅샷이 오면 세대가 높으므로 반영된다.
+        registry.Reconcile(new[] { Device("phone-a", "Galaxy A", "AAA", DeviceTransportKind.Usb) });
+        dispatcher.Drain();
+
+        Assert.Single(vm.Devices);
+
+        // 큐에 남아 있던 예전 세대가 뒤늦게 실행돼도 되돌리지 않는다.
+        dispatcher.Drain();
+        Assert.Single(vm.Devices);
+    }
 }
