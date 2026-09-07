@@ -1,3 +1,4 @@
+using System.Threading;
 using DexManager.Models;
 using DexManager.Platform;
 using DexManager.Services;
@@ -21,7 +22,7 @@ public sealed class ApplicationHost : IDisposable
 
     private readonly object _settingsLock = new object();
 
-    private bool _disposed;
+    private int _disposed;
     private string _selectedSerial = string.Empty;
 
     public ApplicationHost(
@@ -158,7 +159,7 @@ public sealed class ApplicationHost : IDisposable
     /// </summary>
     public void Start()
     {
-        if (_disposed)
+        if (IsDisposed)
             throw new ObjectDisposedException(nameof(ApplicationHost));
         DeviceMonitor.Start();
     }
@@ -169,7 +170,7 @@ public sealed class ApplicationHost : IDisposable
     /// </summary>
     public void Stop()
     {
-        if (_disposed) return;
+        if (IsDisposed) return;
         DeviceMonitor.Stop();
     }
 
@@ -282,7 +283,7 @@ public sealed class ApplicationHost : IDisposable
     /// <see cref="DeviceMonitor"/>가 <see cref="ObjectDisposedException"/>을 던진다.
     /// 인스턴스 하나는 한 번만 사용한다.
     /// </summary>
-    public bool IsDisposed => _disposed;
+    public bool IsDisposed => Volatile.Read(ref _disposed) != 0;
 
     /// <summary>
     /// 호스트가 소유한 서비스를 정리한다. 멱등하다.
@@ -291,8 +292,7 @@ public sealed class ApplicationHost : IDisposable
     /// </summary>
     public void Dispose()
     {
-        if (_disposed) return;
-        _disposed = true;
+        if (Interlocked.Exchange(ref _disposed, 1) != 0) return;
 
         var errors = new List<Exception>();
 

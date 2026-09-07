@@ -283,4 +283,31 @@ public class ApplicationHostTests : IDisposable
 
         Assert.Throws<ArgumentNullException>(() => host.UpdateSettings(null));
     }
+
+    [Fact]
+    public void Dispose_ConcurrentCalls_DisposeKeyboardServiceOnce()
+    {
+        var keyboard = new FakeKeyboardService();
+        var host = CreateHost(keyboard: keyboard);
+
+        // 창 닫기 경로와 프로세스 종료 경로가 동시에 도달하는 상황이다.
+        // bool 플래그는 검사와 대입 사이에 다른 스레드를 들여보낸다.
+        var start = new ManualResetEventSlim(false);
+        var threads = new Thread[32];
+        for (var i = 0; i < threads.Length; i++)
+        {
+            threads[i] = new Thread(() =>
+            {
+                start.Wait();
+                try { host.Dispose(); }
+                catch (AggregateException) { }
+            });
+            threads[i].Start();
+        }
+
+        start.Set();
+        foreach (var thread in threads) thread.Join();
+
+        Assert.Equal(1, keyboard.DisposeCallCount);
+    }
 }
