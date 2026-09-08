@@ -20,6 +20,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DexManager.ViewModels.Tests
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DexManager.Desktop", "DexManager.Desktop\DexManager.Desktop.csproj", "{E402DC87-EBA8-4752-9A32-B145416AC078}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DexManager.Desktop.Tests", "DexManager.Desktop.Tests\DexManager.Desktop.Tests.csproj", "{F9143A3C-0FF5-4A40-A6C2-33CFF3A607AD}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -62,6 +64,10 @@ Global
 		{E402DC87-EBA8-4752-9A32-B145416AC078}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{E402DC87-EBA8-4752-9A32-B145416AC078}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{E402DC87-EBA8-4752-9A32-B145416AC078}.Release|Any CPU.Build.0 = Release|Any CPU
+		{F9143A3C-0FF5-4A40-A6C2-33CFF3A607AD}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{F9143A3C-0FF5-4A40-A6C2-33CFF3A607AD}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{F9143A3C-0FF5-4A40-A6C2-33CFF3A607AD}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{F9143A3C-0FF5-4A40-A6C2-33CFF3A607AD}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

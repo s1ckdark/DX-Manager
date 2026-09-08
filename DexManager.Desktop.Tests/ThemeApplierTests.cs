@@ -3,12 +3,11 @@ using DexManager.Desktop;
 using DexManager.Models;
 using Xunit;
 
-namespace DexManager.Tests;
+namespace DexManager.Desktop.Tests;
 
 /// <summary>
 /// ThemeApplier.MapToVariant의 AppTheme → ThemeVariant 매핑을 검증한다.
-/// DexManager.Desktop에는 전용 테스트 프로젝트가 없으므로, Avalonia
-/// Application을 만들지 않고도 닿을 수 있는 이 순수 정적 매핑만
+/// Application.Current를 만들지 않고도 닿을 수 있는 이 순수 정적 매핑만
 /// 여기서 고정한다(Application.Current 접근부는 실행 확인 대상).
 /// </summary>
 public class ThemeApplierTests
