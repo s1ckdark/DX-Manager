@@ -157,32 +157,112 @@ Intel ZIP은 아키텍처와 외부 경로를 검사하고 Apple Silicon Mac의 
 
 ## macOS GUI Phase 2 실기 검증 범위
 
-Phase 2(DeX 시작/중지 + 단일창 슬롯)의 실기 검증 8개 항목은 **이 개발 환경에서 하나도
-수행하지 못했다.** 사용자가 직접 확인해야 하는 실기 테스트는 대신 성공했다고 가정하지
-않고 아래처럼 미확인 항목으로 남긴다(`AGENTS.md` 원칙).
+Phase 2(DeX 시작/중지 + 단일창 슬롯) 종료 시점에는 실기 검증 8개 항목을 **이 개발
+환경에서 하나도 수행하지 못했다.** 이후 Phase 3 진행 중(Task 10 착수, 2026-09-08)
+사용자가 실제 Mac에서 GUI를 사용해 그중 일부를 실증했다. 아래는 그 결과를 반영해
+갱신한 상태다. 여전히 사용자가 직접 확인하지 않은 항목은 성공했다고 가정하지 않고
+미확인으로 남긴다(`AGENTS.md` 원칙).
 
-- 연결된 Android 기기 없음 — `adb devices`가 빈 목록을 반환했다(2026-09-08).
-- GUI 자체가 이 환경에서 기동하지 않는다 — `dotnet run --project DexManager.Desktop`이
-  `System.InvalidOperationException: Avalonia.Native was not able to start the RenderTimer.
-  Native error code is: -6661`로 종료 코드 134를 내고 죽는다. 스택은 `Avalonia.AppBuilder.Setup()`
-  내부에서 끝나며, 이 저장소의 어떤 코드도 실행되기 전이다. 즉 코드 결함이 아니라 이 환경의
-  제약이다.
+- 이 개발 환경 자체는 여전히 GUI를 기동하지 못한다 — `dotnet run --project
+  DexManager.Desktop`이 `System.InvalidOperationException: Avalonia.Native was not
+  able to start the RenderTimer. Native error code is: -6661`로 종료 코드 134를 내고
+  죽는다. 스택은 `Avalonia.AppBuilder.Setup()` 내부에서 끝나며, 이 저장소의 어떤
+  코드도 실행되기 전이다. 즉 코드 결함이 아니라 이 환경의 제약이다. 아래 검증은 모두
+  사용자의 실제 Mac에서 이루어졌다.
 
-미확인 항목 8개(스펙 5.3절, `docs/TODO.md`의 "macOS GUI Phase 2" 체크리스트 참조):
+미확인 항목 8개(스펙 5.3절, `docs/TODO.md`의 "macOS GUI Phase 2" 체크리스트 참조) 중
+현재 상태:
 
-1. 기기 목록에 연결된 기기가 나타난다 — 미확인
-2. `Start DeX` → scrcpy 창과 `DeX` 표시 — 미확인
-3. `Stop DeX` → 창 닫힘과 `DeX` 표시 제거 — 미확인
+1. 기기 목록에 연결된 기기가 나타난다 — **확인됨.** 근거: 사용자가 실기 세션에서
+   기기를 선택해 Start DeX를 실행했다(아래 UI-2 항목 참조) — 목록에 기기가 없었다면
+   시작 자체가 불가능하다.
+2. `Start DeX` → scrcpy 창이 뜨고 `DeX` 표시가 붙는다 — **확인됨(창이 뜨는 동작만).**
+   같은 세션에서 Start DeX 실행 결과로 창이 떴고, 그 화면에서 잠금화면 미러링 문제
+   (UI-2, 아래 "macOS GUI Phase 3 알려진 한계" 참조)를 사용자가 발견했다 — 창이 뜨지
+   않았다면 이 문제를 볼 수 없었다. 목록 행의 `DeX` 표시 자체를 사용자가 별도로
+   확인했다는 보고는 없다.
+3. `Stop DeX` → 창 닫힘과 `DeX` 표시 제거 — 미확인 (Stop을 눌렀다는 보고 없음)
 4. 중지 뒤 `adb shell settings get global overlay_display_devices`가 `null` — **미확인**
-5. 슬롯 1에 앱 패키지 지정 후 `Start` → 앱 창 — 미확인
+5. 슬롯 1에 앱 패키지 지정 후 `Start` → 앱 창 — 미확인 (사용자는 슬롯 UI 화면을
+   봤을 뿐(UI-3 항목) 실행하지는 않았다)
 6. 슬롯 `Stop` → 창 닫힘 — 미확인
 7. 창을 닫은 뒤 `pgrep -fl scrcpy`가 비어 있음 — 미확인
 8. DeX 실행 중 창을 닫아도 overlay가 회수됨 — **미확인**
 
 4번과 8번은 이번 Phase가 지키려던 display-overlay 불변식을 실제로 행사하는 유일한
-검사다. 나머지 6개는 GUI 조작 흐름 확인이고, 자동 테스트와 코드 검토로만 뒷받침되어
-있다. 4번과 8번이 실기에서 통과하기 전까지 이 불변식은 "지키도록 작성된 코드"이지
-"실기로 지켜짐이 확인된 코드"가 아니다.
+검사이며, 사용자의 실기 세션에서도 명시적으로 확인되지 않았다. 자동 테스트와 코드
+검토로만 뒷받침되어 있다. 4번과 8번이 실기에서 통과하기 전까지 이 불변식은 "지키도록
+작성된 코드"이지 "실기로 지켜짐이 확인된 코드"가 아니다.
+
+## macOS GUI Phase 3 알려진 한계
+
+1. **폰 잠금화면은 PC에서 해제할 수 없다 — 구조적 제약이다.** DeX는
+   `overlay_display_devices`로 새 가상 디스플레이를 만들고 scrcpy가
+   `--display-id <가상 디스플레이>`로 그 화면만 미러링한다. Android의 keyguard(잠금화면)는
+   항상 주 디스플레이(0)에만 렌더링되며 그 디스플레이는 미러링 대상이 아니다. scrcpy
+   플래그 설정 문제가 아니다 — `StayAwake`/`TurnScreenOff`는 화면 전원 상태만 건드릴 뿐
+   keyguard 렌더링 위치와 무관하다. 이번 Phase가 제공한 대응은 앱 내 잠금 해제가 아니라
+   UI-2의 시작 전 감지 + 안내다.
+
+2. **UI-2의 잠금 감지는 best-effort이며 실기 미검증이다.** `AdbService.ParseLockState`
+   (`DexManager.Core/Services/AdbService.cs:542`)가 `dumpsys window` 출력에서
+   `mShowingLockscreen` → `mDreamingLockscreen` → `mKeyguardShowing` →
+   `isStatusBarKeyguard` 순서로, 출력에 실제로 나타나는 첫 필드의 값을 취한다(dumpsys
+   출력 순서에 비의존적이도록 위치가 아닌 우선순위 기반). 네 필드 중 무엇도 나타나지
+   않으면(One UI 빌드에 따라 필드명이 다를 수 있다) `LockState.Unknown`으로
+   **fail-open**한다 — 즉 미인식 출력은 "잠기지 않음"으로 취급해 DeX 시작을 막지 않는다
+   (오탐으로 정상 시작을 막는 쪽이 더 나쁘다는 판단). `IsDeviceLocked` 자체가 adb 실행
+   실패까지도 `try/catch`로 감싸 `Unknown`으로 fail-open한다(UI-2 fix round 1). 다만
+   어떤 One UI 빌드에서 네 필드가 전혀 나타나지 않으면 이 게이트는 그냥 발동하지 않는다
+   — 실제 기기 스모크 테스트가 아직 없다.
+
+3. **단축키가 macOS에서 전혀 동작하지 않는다.** `MacKeyboardService.Start`/`Stop`/
+   `ReloadConfiguration`(`DexManager.Platform.Mac/Platform/MacKeyboardService.cs`)이
+   모두 빈 no-op이고, `ApplicationHost`도 이 서비스의 `Start()`를 호출하지 않는다.
+   실제로 동작하는 유일한 단축키 경로는 `DexManager/Services/HotkeyService.cs`의 Win32
+   `RegisterHotKey`뿐이며 WinForms(Windows) 전용이다. 설정 화면(Task 10)은 단축키
+   문자열을 캡처해 저장하고 화면에도 그렇게 안내하지만, macOS에는 저장된 값을 실제로
+   듣는 쪽이 없다.
+
+4. **HID 키보드/마우스(`-K`/`-M`)는 Windows 전용이다.**
+   `DexManager.Core/Services/ScrcpyService.cs:415-416`,
+   `DexManager.Core/Services/SingleWindowService.cs:623-624`가
+   `OperatingSystem.IsWindows()`로 게이팅하므로 macOS에서는 `UseHidKeyboard`/
+   `UseHidMouse` 체크박스를 켜도 scrcpy 인자에 반영되지 않는다. Slot 탭 툴팁(UI-3)에
+   이 사실을 명시했다.
+
+5. **설정 창은 대부분 지역화되지 않았다.** 문자열 약 40개 중 약 38개가 하드코딩
+   영어다(Ruling 6). MainWindow도 원래 전부 하드코딩 영어였으므로 이번 Phase의 회귀는
+   아니며, Phase 3 Task 8의 범위는 "언어 설정 저장 + 신규 문자열 런타임 적용"으로
+   한정됐다. 지역화 완성은 후속 과제다(`docs/TODO.md`의 Phase 3 지연 항목 참조).
+
+6. **파킹된 리뷰 발견 사항 (수정하지 않기로 결정, 기록만 남김 — 상세는
+   `docs/TODO.md`의 "macOS GUI Phase 3 리뷰에서 지연된 정리 항목" 참조):**
+   - `SettingsViewModel`의 `SelectedIdentity` 재계산(Task 5)이 `IDeviceSelectionSource`에
+     문서화되지 않은 암묵적 UI-스레드 불변식에 의존한다.
+   - 단축키 캡처 필드(Task 10)가 포커스 상태에서 Tab/Shift+Tab/Escape를 삼킨다.
+   - UI-1(Save/Cancel 창 닫기) 이후, Save가 무효 페이지를 조용히 건너뛰고도 창을
+     닫아 — 수정 전에는 창이 열려 있어 사용자가 보고 고칠 수 있었던 안전망이 사라졌다.
+
+## macOS GUI Phase 3 실기 검증 범위
+
+Phase 3가 도입한 `SettingsWindow`의 시각·상호작용 동작은 개발 중 어떤 윈도우 서버에서도
+실행되지 않았다(이 개발 환경은 GUI가 기동하지 않는다 — 위 "macOS GUI Phase 2 실기 검증
+범위" 참조). 다만 사용자가 실기에서 UI-1/UI-3의 근거가 된 조작(설정 창 열기, 탭 이동,
+Cancel 클릭, 슬롯 화면 확인)을 했으므로 **창 자체가 뜨고 탭·버튼이 반응한다는 사실은
+실증됐다.** 아래는 그 실증 범위를 벗어나 여전히 미확인인 항목이다.
+
+- 테마를 바꾸면 열려 있는 다른 창에도 실시간으로 반영되는가 (Task 7)
+- 언어를 바꾸고 저장하면 "재시작 후 적용" 안내가 뜨는가 (Task 8)
+- 단축키 필드가 실제 키 입력을 캡처해 텍스트로 표시하는가 (Task 10)
+- 대상 기기가 DeX 실행 중일 때 안내 문구가 뜨는가 (Task 5)
+- 기기를 선택하지 않았을 때 Display/Stream·Slot 탭이 placeholder로 전환되는가
+  (Task 11/12)
+- Save/Cancel을 눌렀을 때 실제로 창이 닫히는가 — UI-1의 수정 자체는 자동 테스트로만
+  검증됐다. 사용자가 신고한 것은 수정 **전** 동작이며, 수정 후 재확인 보고는 없다.
+
+이 목록은 코드 검토와 자동 테스트(xUnit 284개 — Desktop 17 + ViewModels 112 +
+Core 155 — + 다중기기 39개)로만 뒷받침된다.
 
 ## 개발용 Scrcpy 번들 아키텍처
 
