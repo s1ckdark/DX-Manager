@@ -6,15 +6,6 @@ namespace DexManager.Desktop;
 
 internal static class Program
 {
-    // 실기기(SM-F971N)로 확인한 값: overlay 회수 + scrcpy 종료는 정상
-    // 상황에서 1~2초 안에 끝난다(.omc/research/2026-09-08-realdevice-lock-findings.md
-    // 7절). 5초는 그 여유분이다 - 이보다 오래 걸린다는 건 adb/scrcpy가
-    // 이미 응답 불능이라는 뜻이라 신호 처리기를 더 붙잡고 있어도 회수가
-    // 되지 않는다. 오히려 launchd 등 상위 프로세스 관리자가 SIGKILL로
-    // 더 거칠게 끊어버릴 위험만 커지므로, 예산을 넘기면 정리를 포기하고
-    // 기본 종료로 넘긴다(HandleTerminationSignal 참고).
-    private static readonly TimeSpan SignalCleanupBudget = TimeSpan.FromSeconds(5);
-
     private static PosixSignalRegistration[] _signalRegistrations;
 
     [STAThread]
@@ -84,6 +75,10 @@ internal static class Program
     /// Environment.Exit을 부르지 않는 이유도 이것이다 - 그럴 필요가 없고,
     /// 우리가 직접 종료 코드를 고르는 것보다 신호별 기본 동작에 맡기는
     /// 편이 더 예측 가능하다.
+    ///
+    /// 예산은 신호 종류에 따라 다르다(<see cref="SignalCleanupBudgets"/>) -
+    /// SIGINT(대화형 Ctrl+C)는 짧게, SIGTERM/SIGHUP(비대화형)은 실제 adb
+    /// 정리 사슬이 필요로 하는 시간에 맞춰 더 길게 잡는다.
     /// </summary>
     private static void HandleTerminationSignal(PosixSignalContext ctx)
     {
@@ -93,7 +88,7 @@ internal static class Program
         {
             BoundedExecutor.RunWithBudget(
                 () => app.TryRunShutdownCleanup(),
-                SignalCleanupBudget);
+                SignalCleanupBudgets.For(ctx.Signal));
         }
         catch
         {
