@@ -45,9 +45,9 @@ internal static class Program
         using var cts = new CancellationTokenSource();
         _cts = cts;
 
-        RegisterSignalHandlers();
         try
         {
+            RegisterSignalHandlers();
             using var host = new InteractiveHost();
             _host = host;
 
@@ -132,22 +132,40 @@ internal static class Program
     }
 
     /// <summary>
-    /// SIGINT/SIGTERM/SIGHUP을 한곳에 등록한다. GUI(DexManager.Desktop.Program)와
-    /// 달리 SIGINT까지 여기서 등록하는 이유는, 기존에 <c>Console.CancelKeyPress</c>가
-    /// 하던 일(협조적 취소 - 대시보드 루프나 --dex의 watch 루프가 cts를 보고
-    /// 자기 흐름대로 정리한 뒤 정상 반환)을 그대로 승계하면서 SIGTERM/SIGHUP과
-    /// 등록 지점을 하나로 합쳐 "두 메커니즘이 같은 신호를 다르게 본다"는
-    /// 혼란을 없애기 위해서다. HandleSignal 안에서 SIGINT는 다른 두 신호와
-    /// 완전히 다른 분기를 탄다 - 이중 등록도, 이중 정리도 없다.
+    /// SIGINT/SIGTERM/SIGHUP을 한곳에 등록한다 - 이제 세 신호 모두
+    /// HandleSignalCore 안에서 같은 정리 경로(가드+예산으로 감싼
+    /// host.Shutdown())를 탄다. 등록을 하나로 모은 이유가 "세 신호를 같게
+    /// 다룬다"였던 이전 버전과 달리, 지금은 실제로 그렇다 - 유일한 차이는
+    /// 예산 길이(SignalCleanupBudgets.For)와 SIGINT가 추가로 cts를 취소해
+    /// 협조적으로 기다리는 코드에 기회를 준다는 것뿐이다(HandleSignalCore
+    /// 참고).
+    ///
+    /// <c>PosixSignalRegistration.Create</c> 각각이 던질 수 있다고 보고
+    /// (예: 플랫폼 미지원) 하나씩 등록하며 이미 등록된 것들을 리스트에
+    /// 모은다 - 뒤엣것이 던지면 앞서 등록된 것들을 여기서 바로 정리하고
+    /// 다시 던진다. 그러지 않으면 앞선 등록이 아무 데도 저장되지 못한 채
+    /// 새어 나간다(_signalRegistrations는 전부 성공해야 대입되므로).
+    /// 호출부(Main)는 이제 이 메서드를 try 안에서 부르므로, 그래도 던지면
+    /// "Fatal error" 경로로 정상 보고된다.
     /// </summary>
     private static void RegisterSignalHandlers()
     {
-        _signalRegistrations = new[]
+        var registrations = new List<PosixSignalRegistration>(3);
+        try
         {
-            PosixSignalRegistration.Create(PosixSignal.SIGINT, HandleSignal),
-            PosixSignalRegistration.Create(PosixSignal.SIGTERM, HandleSignal),
-            PosixSignalRegistration.Create(PosixSignal.SIGHUP, HandleSignal),
-        };
+            registrations.Add(PosixSignalRegistration.Create(PosixSignal.SIGINT, HandleSignal));
+            registrations.Add(PosixSignalRegistration.Create(PosixSignal.SIGTERM, HandleSignal));
+            registrations.Add(PosixSignalRegistration.Create(PosixSignal.SIGHUP, HandleSignal));
+            _signalRegistrations = registrations.ToArray();
+        }
+        catch
+        {
+            foreach (var registration in registrations)
+            {
+                registration.Dispose();
+            }
+            throw;
+        }
     }
 
     private static void DisposeSignalHandlers()
@@ -161,32 +179,43 @@ internal static class Program
     }
 
     /// <summary>
-    /// SIGINT/SIGTERM/SIGHUP 공통 진입점이지만 SIGINT는 근본적으로 다르게
-    /// 다룬다 - 하나로 합쳐 등록한 이유(RegisterSignalHandlers 참고)가
-    /// "같은 취급"을 뜻하지는 않는다.
+    /// SIGINT/SIGTERM/SIGHUP 공통 진입점. 세 신호 모두 <b>같은</b> 정리
+    /// 경로를 탄다 - SignalCleanupGuard로 감싼 host.Shutdown()을
+    /// SignalCleanupBudgets.For(signal) 예산 안에서 동기 실행하고,
+    /// ctx.Cancel은 항상 false로 둬 정리가 끝나든 예산을 넘기든 신호의
+    /// 기본 동작(프로세스 종료)이 그대로 이어지게 한다. GUI
+    /// (DexManager.Desktop.Program.HandleTerminationSignal)와 동일한 설계다.
     ///
-    /// <b>SIGINT(Ctrl+C)</b>: 예전 <c>Console.CancelKeyPress</c>와 동일하게
-    /// <c>ctx.Cancel = true</c>로 기본 종료(즉시 프로세스 종료)를 막고
-    /// <c>cts.Cancel()</c>만 한다. 그러면 Main의 대시보드 루프 또는 --dex의
-    /// watch 루프가 취소를 알아채고 자신의 정리된 종료 흐름
-    /// (WaitForDexCleanupAsync → StopDexAsync, 또는 대시보드라면 host.RunAsync
-    /// 끝의 ShutdownAsync)을 끝까지 돌린 뒤 정상적으로 반환해 `using host`
-    /// Dispose까지 이어진다. 이 흐름이 SIGTERM/SIGHUP 쪽 정리(host.Shutdown()을
-    /// 직접, 예산 안에서 부르는 것)보다 세밀하므로 그대로 둔다 - 여기서
-    /// host.Shutdown()을 같이 부르면 정상 흐름과 경쟁해 이중 정리가 된다.
-    /// 그래서 SIGINT는 SignalCleanupGuard/host.Shutdown 경로를 절대 타지 않는다
-    /// - 이것이 "SIGINT는 두 번 정리하지 않는다"를 만족시키는 방법이다.
-    ///
-    /// <b>SIGTERM/SIGHUP</b>: 협조할 루프가 없다 - launchd, `pkill -TERM`,
-    /// 제어 터미널 끊김 어느 쪽도 cts를 지켜보고 있지 않는다. ctx.Cancel을
-    /// false로 두면(기본 종료 진행) 관리 코드가 `using host`까지 unwind될
-    /// 기회 자체가 없으므로, 여기서 직접 SignalCleanupGuard로 감싸 정확히
-    /// 한 번, 예산(SignalCleanupBudgets) 안에서 동기적으로 정리한다.
-    /// InteractiveHost.ShutdownAsync 자신도 내부 Interlocked 가드를 갖고
-    /// 있어(중복 호출은 이미 안전하다) 이 바깥 가드가 없어도 깨지지는
-    /// 않지만, GUI와 같은 패턴을 유지해 신호 두 개가 겹치는 경쟁(예:
-    /// SIGTERM 직후 SIGHUP)을 이 호출부에서도 명시적으로 방어하고, 이
-    /// 파일만 보고도 "정확히 한 번"을 테스트할 수 있는 seam을 남긴다.
+    /// <para>
+    /// 이전 버전은 SIGINT를 <c>ctx.Cancel = true</c> + <c>cts.Cancel()</c>만
+    /// 하는 별도 분기로 두어, 대시보드 루프나 하위 메뉴가 취소를 "관측"하고
+    /// 스스로 정리된 종료를 밟기를 기대했다. 코드 리뷰가 실기 pty로 반증했다:
+    /// .NET Unix의 <c>StdInReader</c>는 blocking <c>read()</c>가 EINTR로
+    /// 깨면 재시도하므로, <c>Console.ReadLine()</c>에 블로킹된 대시보드
+    /// 프롬프트는 cts가 취소돼도 반환하지 않는다 - Enter를 눌러야만
+    /// 풀린다. <c>ctx.Cancel = true</c>가 기본 종료까지 억제해서, 두 번째
+    /// Ctrl+C도 아무 효과가 없었다(옛 <c>Console.CancelKeyPress</c> 방식도
+    /// 재현 결과 완전히 동일 - 이 버전이 만든 회귀가 아니라 선재 결함이었지만,
+    /// 이 코드가 "정상 종료"라고 주석으로 단언한 것은 사실과 달랐다). 이
+    /// 함수가 사실상 SIGTERM/SIGHUP과 유일하게 신뢰할 수 있던 정리 경로를
+    /// 만들었던 것과 대비해, 대시보드에서 Ctrl+C는 SIGTERM으로 죽이거나
+    /// Enter를 눌러야만 나갈 수 있었다 - 가장 흔한 종료 신호가 개행 없이는
+    /// 절대 신뢰할 수 없는 정리 경로였던 셈이다.
+    /// </para>
+    /// <para>
+    /// 지금은 SIGINT도 SIGTERM/SIGHUP과 똑같이 신호 처리기 자신이 직접
+    /// 정리한다 - 어떤 코드가 무엇에 블로킹돼 있든 상관없다. 예산은
+    /// SignalCleanupBudgets.Interactive(5초, SIGTERM/SIGHUP의 15초보다
+    /// 짧다 - Ctrl+C는 화면 앞에 사람이 있고 "지금 멈춰라"라는 기대가
+    /// 있으므로). cts.Cancel()은 그래도 먼저 호출해 둔다 - --dex의 watch
+    /// 루프(Task.Delay(500, cts.Token))처럼 실제로 토큰을 관측할 수 있는
+    /// 코드가 있다면 정리된 중단 메시지를 낼 최선의 기회를 준다는 뜻이고,
+    /// 아무도 관측하지 못해도(대시보드처럼) 해가 되지 않는다 - 진짜 정리는
+    /// 뒤따르는 guard 경로가 보장한다. SignalCleanupGuard가 신호 경로들
+    /// 사이의 중복 실행을 막고, InteractiveHost._shutdownStarted와
+    /// ApplicationHost._shutdownStarted가 신호 경로와 (드물게 실행될 수
+    /// 있는) 정상 경로 사이의 중복까지 막는다 - 3중 가드.
+    /// </para>
     /// </summary>
     private static void HandleSignal(PosixSignalContext ctx)
     {
@@ -210,9 +239,9 @@ internal static class Program
         {
             if (ctx.Signal == PosixSignal.SIGINT)
             {
-                ctx.Cancel = true;
+                // 최선의 노력일 뿐이다 - 실제로 관측하는 코드가 없어도
+                // 무해하다. 진짜 정리는 아래 guard 경로가 한다.
                 cts?.Cancel();
-                return;
             }
 
             if (cleanupAction == null) return;
@@ -225,9 +254,8 @@ internal static class Program
         {
             // 신호 처리기에서 예외가 새어 나가면 CLR이 fail-fast로 프로세스를
             // 죽인다 - 의도한 "정리하고 기본 종료"가 크래시로 바뀐다. 프로세스는
-            // 어차피 곧 종료되므로(SIGTERM/SIGHUP 기본 동작, 또는 SIGINT는
-            // cts.Cancel로 이미 정상 종료가 진행 중이므로) 여기서는 삼키는
-            // 편이 크래시보다 낫다.
+            // 어차피 곧 종료되므로(세 신호 모두 기본 동작이 종료다) 여기서는
+            // 삼키는 편이 크래시보다 낫다.
         }
     }
 

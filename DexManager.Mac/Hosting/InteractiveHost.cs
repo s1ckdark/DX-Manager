@@ -800,26 +800,42 @@ public sealed class InteractiveHost : IDisposable
                     mutate = s => s.Scrcpy.StayAwake = !s.Scrcpy.StayAwake;
                     break;
                 case "8":
-                    Console.Write("Enter Scrcpy Path (blank for auto-detect): ");
-                    var scrcpyPath = (Console.ReadLine() ?? string.Empty).Trim();
-                    if (!string.Equals(
-                            scrcpyPath,
-                            _settings.Paths.ScrcpyPath ?? string.Empty,
-                            StringComparison.Ordinal))
-                        mutate = s => s.Paths.ScrcpyPath = scrcpyPath;
+                {
+                    // 그냥 Enter는 절대 파괴적이지 않다 - 유지다. 지우려면
+                    // "-"를 명시적으로 입력해야 한다(PathPromptInput 참고).
+                    // 콘솔 입력은 GUI 텍스트 상자와 달리 항상 빈 줄에서
+                    // 시작하므로, 빈 입력을 "비움"으로 해석하면 값을 보러
+                    // 들어왔다가 취소하려는 사용자의 설정을 조용히 지우게
+                    // 된다(코드 리뷰 지적).
+                    var currentScrcpy = _settings.Paths.ScrcpyPath ?? string.Empty;
+                    var currentScrcpyDisplay = string.IsNullOrEmpty(currentScrcpy)
+                        ? "(auto)"
+                        : currentScrcpy;
+                    Console.Write(
+                        $"Enter Scrcpy Path [{currentScrcpyDisplay}] (Enter to keep, '-' to clear): ");
+                    var scrcpyResult = PathPromptInput.Resolve(currentScrcpy, Console.ReadLine());
+                    if (scrcpyResult.Changed)
+                        mutate = s => s.Paths.ScrcpyPath = scrcpyResult.Value;
                     break;
+                }
                 case "9":
+                {
                     // ADB Path는 값만 쓰지 않는다 - PathService는
                     // AdbSelectionMode == Manual일 때만 Paths.AdbPath를
                     // 읽으므로(PathService.cs:43), 경로만 써 넣고 모드를
                     // 안 바꾸면 GUI PR #5가 고친 것과 같은 무동작 칸이
                     // 된다. GUI의 PathsSettingsViewModel.Save()와 같은
                     // 규칙(AdbPathEditRule)을 그대로 따른다: 트림 후
-                    // 채워서 편집 -> Manual, 비워서 편집 -> Auto, 바뀌지
-                    // 않았으면 모드를 건드리지 않는다.
-                    Console.Write("Enter ADB Path (blank to switch back to auto-detect): ");
+                    // 채워서 편집 -> Manual, 비워서 편집("-") -> Auto,
+                    // 바뀌지 않았으면(Enter만 누름 포함) 모드를 건드리지
+                    // 않는다. 그냥 Enter가 Manual 경로를 지우던 문제도
+                    // PathPromptInput의 "빈 입력=유지" 규칙으로 함께 막혔다.
+                    var currentAdb = _settings.Paths.AdbPath ?? string.Empty;
+                    var currentAdbDisplay = string.IsNullOrEmpty(currentAdb) ? "(auto)" : currentAdb;
+                    Console.Write(
+                        $"Enter ADB Path [{currentAdbDisplay}] (Enter to keep, '-' to clear): ");
                     var adbInput = Console.ReadLine();
-                    var adbResult = AdbPathEditRule.Apply(_settings.Paths.AdbPath, adbInput);
+                    var adbResult = AdbPathEditRule.Apply(currentAdb, adbInput);
                     if (adbResult.Changed)
                     {
                         mutate = s =>
@@ -830,6 +846,7 @@ public sealed class InteractiveHost : IDisposable
                         };
                     }
                     break;
+                }
             }
 
             if (mutate != null)
