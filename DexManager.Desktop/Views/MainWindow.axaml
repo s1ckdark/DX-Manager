@@ -1,6 +1,7 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:vm="clr-namespace:DexManager.ViewModels;assembly=DexManager.ViewModels"
+        xmlns:local="clr-namespace:DexManager.Desktop.Views"
         x:Class="DexManager.Desktop.Views.MainWindow"
         x:DataType="vm:ShellViewModel"
         Title="DX Manager"
@@ -137,10 +138,17 @@
       </StackPanel>
     </ScrollViewer>
 
-    <TextBlock Grid.Row="2" Grid.Column="0" Grid.ColumnSpan="2"
-               Text="{Binding StatusText}"
-               Margin="0,12,0,0"
-               Opacity="0.8" />
+    <Grid Grid.Row="2" Grid.Column="0" Grid.ColumnSpan="2"
+          ColumnDefinitions="*,Auto"
+          Margin="0,12,0,0">
+      <TextBlock Grid.Column="0"
+                 Text="{Binding StatusText}"
+                 VerticalAlignment="Center"
+                 Opacity="0.8" />
+      <Button Grid.Column="1"
+              Content="{x:Static local:SettingsWindowStrings.SettingsButtonLabel}"
+              Command="{Binding OpenSettingsCommand}" />
+    </Grid>
 
   </Grid>
 </Window>

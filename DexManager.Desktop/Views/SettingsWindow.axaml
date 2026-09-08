@@ -1,0 +1,270 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="clr-namespace:DexManager.ViewModels;assembly=DexManager.ViewModels"
+        xmlns:local="clr-namespace:DexManager.Desktop.Views"
+        x:Class="DexManager.Desktop.Views.SettingsWindow"
+        x:DataType="vm:SettingsViewModel"
+        Title="Settings"
+        Width="760" Height="620"
+        MinWidth="640" MinHeight="480">
+  <Grid RowDefinitions="*,Auto,Auto" Margin="16">
+
+    <TabControl Grid.Row="0">
+
+      <!-- Display/Stream: null when no device is selected. The placeholder
+           TextBlock and the real content are siblings under the same
+           SettingsViewModel-scoped Grid so their IsVisible bindings resolve
+           against SettingsViewModel.DisplayStream (null-check) before the
+           inner StackPanel's DataContext is overridden to the page VM. -->
+      <TabItem Header="Display / Stream">
+        <Grid x:DataType="vm:SettingsViewModel">
+          <TextBlock Text="Select a device to edit its display and stream settings."
+                     HorizontalAlignment="Center"
+                     VerticalAlignment="Center"
+                     TextAlignment="Center"
+                     TextWrapping="Wrap"
+                     Opacity="0.6"
+                     Margin="24"
+                     IsVisible="{Binding DisplayStream, Converter={x:Static ObjectConverters.IsNull}}" />
+
+          <ScrollViewer IsVisible="{Binding DisplayStream, Converter={x:Static ObjectConverters.IsNotNull}}">
+            <StackPanel DataContext="{Binding DisplayStream}"
+                        x:DataType="vm:DisplayStreamSettingsViewModel"
+                        Spacing="10"
+                        Margin="16">
+
+              <TextBlock Text="{Binding ValidationMessage}"
+                         Foreground="Red"
+                         TextWrapping="Wrap"
+                         IsVisible="{Binding ValidationMessage, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+
+              <Grid ColumnDefinitions="140,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto" RowSpacing="8" ColumnSpacing="8">
+                <TextBlock Grid.Row="0" Grid.Column="0" Text="Width" VerticalAlignment="Center" />
+                <TextBox Grid.Row="0" Grid.Column="1" Text="{Binding Values.Width, Mode=TwoWay}" />
+
+                <TextBlock Grid.Row="1" Grid.Column="0" Text="Height" VerticalAlignment="Center" />
+                <TextBox Grid.Row="1" Grid.Column="1" Text="{Binding Values.Height, Mode=TwoWay}" />
+
+                <TextBlock Grid.Row="2" Grid.Column="0" Text="DPI" VerticalAlignment="Center" />
+                <TextBox Grid.Row="2" Grid.Column="1" Text="{Binding Values.Dpi, Mode=TwoWay}" />
+
+                <TextBlock Grid.Row="3" Grid.Column="0" Text="Max FPS" VerticalAlignment="Center" />
+                <TextBox Grid.Row="3" Grid.Column="1" Text="{Binding Values.MaxFps, Mode=TwoWay}" />
+
+                <TextBlock Grid.Row="4" Grid.Column="0" Text="Bitrate" VerticalAlignment="Center" />
+                <TextBox Grid.Row="4" Grid.Column="1" Text="{Binding Values.BitRate, Mode=TwoWay}" />
+              </Grid>
+
+              <CheckBox Content="Turn phone screen off" IsChecked="{Binding Values.TurnScreenOff, Mode=TwoWay}" />
+              <CheckBox Content="Stay awake" IsChecked="{Binding Values.StayAwake, Mode=TwoWay}" />
+
+              <Button Content="Reset to global defaults"
+                      Command="{Binding ResetToGlobalDefaultsCommand}"
+                      HorizontalAlignment="Left"
+                      Margin="0,8,0,0" />
+            </StackPanel>
+          </ScrollViewer>
+        </Grid>
+      </TabItem>
+
+      <!-- Slots: also null when no device is selected. Same gating pattern
+           as Display/Stream above. -->
+      <TabItem Header="Slots">
+        <Grid x:DataType="vm:SettingsViewModel">
+          <TextBlock Text="Select a device to edit its single-window slot settings."
+                     HorizontalAlignment="Center"
+                     VerticalAlignment="Center"
+                     TextAlignment="Center"
+                     TextWrapping="Wrap"
+                     Opacity="0.6"
+                     Margin="24"
+                     IsVisible="{Binding Slot, Converter={x:Static ObjectConverters.IsNull}}" />
+
+          <ScrollViewer IsVisible="{Binding Slot, Converter={x:Static ObjectConverters.IsNotNull}}">
+            <StackPanel DataContext="{Binding Slot}"
+                        x:DataType="vm:SlotSettingsViewModel"
+                        Spacing="10"
+                        Margin="16">
+
+              <TextBlock Text="{Binding ValidationMessage}"
+                         Foreground="Red"
+                         TextWrapping="Wrap"
+                         IsVisible="{Binding ValidationMessage, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+
+              <ItemsControl ItemsSource="{Binding Values.Slots}">
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate x:DataType="vm:EditableSingleWindowSlot">
+                    <Border BorderThickness="1"
+                            BorderBrush="{DynamicResource SystemControlForegroundBaseMediumLowBrush}"
+                            CornerRadius="4"
+                            Padding="12"
+                            Margin="0,0,0,8">
+                      <StackPanel Spacing="6">
+                        <StackPanel Orientation="Horizontal" Spacing="4">
+                          <TextBlock Text="Slot" FontWeight="SemiBold" />
+                          <TextBlock Text="{Binding Slot}" FontWeight="SemiBold" />
+                        </StackPanel>
+
+                        <Grid ColumnDefinitions="110,*,110,*"
+                              RowDefinitions="Auto,Auto,Auto,Auto,Auto"
+                              ColumnSpacing="8" RowSpacing="6">
+                          <TextBlock Grid.Row="0" Grid.Column="0" Text="Width" VerticalAlignment="Center" />
+                          <TextBox Grid.Row="0" Grid.Column="1" Text="{Binding Width, Mode=TwoWay}" />
+                          <TextBlock Grid.Row="0" Grid.Column="2" Text="Height" VerticalAlignment="Center" />
+                          <TextBox Grid.Row="0" Grid.Column="3" Text="{Binding Height, Mode=TwoWay}" />
+
+                          <TextBlock Grid.Row="1" Grid.Column="0" Text="DPI" VerticalAlignment="Center" />
+                          <TextBox Grid.Row="1" Grid.Column="1" Text="{Binding Dpi, Mode=TwoWay}" />
+                          <TextBlock Grid.Row="1" Grid.Column="2" Text="Max FPS" VerticalAlignment="Center" />
+                          <TextBox Grid.Row="1" Grid.Column="3" Text="{Binding MaxFps, Mode=TwoWay}" />
+
+                          <TextBlock Grid.Row="2" Grid.Column="0" Text="Bitrate" VerticalAlignment="Center" />
+                          <TextBox Grid.Row="2" Grid.Column="1" Text="{Binding BitRate, Mode=TwoWay}" />
+                          <TextBlock Grid.Row="2" Grid.Column="2" Text="Custom width" VerticalAlignment="Center" />
+                          <TextBox Grid.Row="2" Grid.Column="3" Text="{Binding CustomWidth, Mode=TwoWay}" />
+
+                          <TextBlock Grid.Row="3" Grid.Column="0" Text="Custom height" VerticalAlignment="Center" />
+                          <TextBox Grid.Row="3" Grid.Column="1" Text="{Binding CustomHeight, Mode=TwoWay}" />
+                          <TextBlock Grid.Row="3" Grid.Column="2" Text="App package" VerticalAlignment="Center" />
+                          <TextBox Grid.Row="3" Grid.Column="3" Text="{Binding StartAppPackage, Mode=TwoWay}" />
+
+                          <TextBlock Grid.Row="4" Grid.Column="0" Text="App name" VerticalAlignment="Center" />
+                          <TextBox Grid.Row="4" Grid.Column="1" Text="{Binding StartAppName, Mode=TwoWay}" />
+                          <TextBlock Grid.Row="4" Grid.Column="2" Text="Extra args" VerticalAlignment="Center" />
+                          <TextBox Grid.Row="4" Grid.Column="3" Text="{Binding AdditionalArguments, Mode=TwoWay}" />
+                        </Grid>
+
+                        <WrapPanel>
+                          <CheckBox Content="Turn screen off" IsChecked="{Binding TurnScreenOff, Mode=TwoWay}" Margin="0,0,12,4" />
+                          <CheckBox Content="Stay awake" IsChecked="{Binding StayAwake, Mode=TwoWay}" Margin="0,0,12,4" />
+                          <CheckBox Content="HID keyboard" IsChecked="{Binding UseHidKeyboard, Mode=TwoWay}" Margin="0,0,12,4" />
+                          <CheckBox Content="HID mouse" IsChecked="{Binding UseHidMouse, Mode=TwoWay}" Margin="0,0,12,4" />
+                          <CheckBox Content="Force-stop before start" IsChecked="{Binding ForceStopStartApp, Mode=TwoWay}" Margin="0,0,12,4" />
+                          <CheckBox Content="Flex display" IsChecked="{Binding FlexDisplay, Mode=TwoWay}" Margin="0,0,12,4" />
+                        </WrapPanel>
+                      </StackPanel>
+                    </Border>
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
+            </StackPanel>
+          </ScrollViewer>
+        </Grid>
+      </TabItem>
+
+      <!-- Paths: global, never null. -->
+      <TabItem Header="Paths">
+        <StackPanel DataContext="{Binding Paths}"
+                    x:DataType="vm:PathsSettingsViewModel"
+                    Spacing="12"
+                    Margin="16">
+          <TextBlock Text="Scrcpy executable path" FontWeight="SemiBold" />
+          <TextBox Text="{Binding ScrcpyPath, Mode=TwoWay}" Watermark="/usr/local/bin/scrcpy" />
+
+          <TextBlock Text="ADB executable path" FontWeight="SemiBold" Margin="0,8,0,0" />
+          <TextBox Text="{Binding AdbPath, Mode=TwoWay}" Watermark="/usr/local/bin/adb" />
+
+          <Button Content="Reset to bundled defaults"
+                  Command="{Binding ResetToBundledDefaultsCommand}"
+                  HorizontalAlignment="Left"
+                  Margin="0,8,0,0" />
+        </StackPanel>
+      </TabItem>
+
+      <!-- Appearance: global, never null. -->
+      <TabItem Header="Appearance">
+        <StackPanel DataContext="{Binding Appearance}"
+                    x:DataType="vm:AppearanceSettingsViewModel"
+                    Spacing="12"
+                    Margin="16">
+          <TextBlock Text="App theme" FontWeight="SemiBold" />
+          <ComboBox ItemsSource="{x:Static local:SettingsEnumSource.AppThemes}"
+                    SelectedItem="{Binding SelectedTheme, Mode=TwoWay}"
+                    Width="220"
+                    HorizontalAlignment="Left" />
+
+          <TextBlock Text="Display language" FontWeight="SemiBold" Margin="0,8,0,0" />
+          <ComboBox ItemsSource="{x:Static local:SettingsEnumSource.AppLanguages}"
+                    SelectedItem="{Binding SelectedLanguage, Mode=TwoWay}"
+                    Width="220"
+                    HorizontalAlignment="Left" />
+
+          <TextBlock Text="{Binding LanguageRestartNotice}"
+                     Opacity="0.7"
+                     TextWrapping="Wrap"
+                     Margin="0,4,0,0" />
+        </StackPanel>
+      </TabItem>
+
+      <!-- Interaction: global, never null. Hotkey fields are plain TwoWay
+           TextBoxes for now - Task 10 upgrades them to live key capture. -->
+      <TabItem Header="Interaction">
+        <ScrollViewer>
+          <StackPanel DataContext="{Binding Interaction}"
+                      x:DataType="vm:InteractionSettingsViewModel"
+                      Spacing="10"
+                      Margin="16">
+
+            <TextBlock Text="{Binding ValidationMessage}"
+                       Foreground="Red"
+                       TextWrapping="Wrap"
+                       IsVisible="{Binding ValidationMessage, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+
+            <TextBlock Text="Capture hotkey" FontWeight="SemiBold" />
+            <TextBox Text="{Binding CaptureHotkey, Mode=TwoWay}" />
+
+            <TextBlock Text="Exit hotkey" FontWeight="SemiBold" />
+            <TextBox Text="{Binding ExitHotkey, Mode=TwoWay}" />
+
+            <CheckBox Content="Use low-level keyboard hook for hotkeys" IsChecked="{Binding UseLowLevelHotkeys, Mode=TwoWay}" />
+            <CheckBox Content="Write keyboard diagnostic logs" IsChecked="{Binding LogKeyboardDiagnostics, Mode=TwoWay}" />
+            <CheckBox Content="Convert Korean/English key" IsChecked="{Binding ConvertKoreanEnglishKey, Mode=TwoWay}" />
+
+            <TextBlock Text="Korean/English input mode" />
+            <ComboBox ItemsSource="{x:Static local:SettingsEnumSource.KeyInputModes}"
+                      SelectedItem="{Binding KoreanEnglishInputMode, Mode=TwoWay}"
+                      Width="220"
+                      HorizontalAlignment="Left" />
+
+            <CheckBox Content="Handle right Windows key" IsChecked="{Binding HandleRightWindowsKey, Mode=TwoWay}" />
+            <CheckBox Content="Convert Enter to Shift+Enter" IsChecked="{Binding ConvertEnterToShiftEnter, Mode=TwoWay}" />
+
+            <TextBlock Text="Enter input mode" />
+            <ComboBox ItemsSource="{x:Static local:SettingsEnumSource.KeyInputModes}"
+                      SelectedItem="{Binding EnterInputMode, Mode=TwoWay}"
+                      Width="220"
+                      HorizontalAlignment="Left" />
+
+            <CheckBox Content="Ignore Shift+Space" IsChecked="{Binding IgnoreShiftSpace, Mode=TwoWay}" />
+
+            <Button Content="Reset to bundled defaults"
+                    Command="{Binding ResetToBundledDefaultsCommand}"
+                    HorizontalAlignment="Left"
+                    Margin="0,8,0,0" />
+          </StackPanel>
+        </ScrollViewer>
+      </TabItem>
+
+    </TabControl>
+
+    <Border Grid.Row="1"
+            IsVisible="{Binding IsTargetDexRunning}"
+            Margin="0,12,0,0"
+            Padding="10"
+            CornerRadius="4"
+            BorderThickness="1"
+            BorderBrush="{DynamicResource SystemControlForegroundBaseMediumLowBrush}">
+      <TextBlock Text="{x:Static local:SettingsWindowStrings.DexRunningNotice}" TextWrapping="Wrap" />
+    </Border>
+
+    <StackPanel Grid.Row="2"
+                Orientation="Horizontal"
+                Spacing="8"
+                HorizontalAlignment="Right"
+                Margin="0,12,0,0">
+      <Button Content="Cancel" Command="{Binding CancelCommand}" />
+      <Button Content="Save" Command="{Binding SaveAllCommand}" IsEnabled="{Binding HasChanges}" />
+    </StackPanel>
+
+  </Grid>
+</Window>

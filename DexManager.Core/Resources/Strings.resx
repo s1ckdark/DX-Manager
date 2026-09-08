@@ -424,6 +424,7 @@
   <data name="Settings.ThemeLight" xml:space="preserve"><value>Light</value></data>
   <data name="Settings.ThemeDark" xml:space="preserve"><value>Dark</value></data>
   <data name="Settings.ThemeRestart" xml:space="preserve"><value>Theme changes are applied immediately after saving.</value></data>
+  <data name="Settings.DexRunningNotice" xml:space="preserve"><value>Samsung DeX is currently running on this device. Changes are saved now, but only take effect the next time DeX starts.</value></data>
   <data name="Settings.GroupMiniControlBar" xml:space="preserve"><value>Mini control bar</value></data>
   <data name="Settings.MiniControlBar" xml:space="preserve"><value>Show a mini control bar next to Scrcpy windows</value></data>
   <data name="Settings.MiniControlBarSide" xml:space="preserve"><value>Attached side</value></data>

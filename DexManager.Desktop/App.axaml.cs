@@ -1,3 +1,4 @@
+using System.ComponentModel;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
@@ -20,6 +21,17 @@ public partial class App : Application
     // 인스턴스가 GC되지 않고 살아 있어야 한다. 나중에 설정 화면이 이
     // 인스턴스를 재사용한다.
     private AppearanceSettingsViewModel _appearance;
+
+    // 설정 창은 한 번에 하나만 띄운다 - ShellViewModel.OpenSettingsCommand는
+    // 호출될 때마다 새 SettingsViewModel을 만들므로, 창이 이미 열려 있으면
+    // 새로 만든 뷰모델은 즉시 Dispose하고 기존 창을 포커스한다(Task 12).
+    private SettingsWindow _settingsWindow;
+    private SettingsViewModel _openSettings;
+
+    // SettingsViewModel.Appearance는 Cancel에서 교체된다(클래스 문서 참고) -
+    // 그때마다 ThemeSaved 재구독 대상을 갱신하기 위해 현재 구독 중인
+    // 인스턴스를 별도로 기억한다.
+    private AppearanceSettingsViewModel _openSettingsAppearance;
 
     public override void Initialize() => AvaloniaXamlLoader.Load(this);
 
@@ -66,6 +78,8 @@ public partial class App : Application
             // 셸이 호스트를 넘겨받았다. 이제부터 정리는 셸의 몫이다.
             host = null;
 
+            _shell.SettingsRequested += OnSettingsRequested;
+
             var window = new MainWindow { DataContext = _shell };
 
             _shell.Start();
@@ -106,9 +120,102 @@ public partial class App : Application
         => DisposeQuietly();
 
     /// <summary>테마가 저장되면(AppearanceSettingsViewModel.SaveCommand)
-    /// 즉시 재적용한다. Avalonia 타입 매핑은 ThemeApplier가 맡는다.</summary>
+    /// 즉시 재적용한다. Avalonia 타입 매핑은 ThemeApplier가 맡는다. 시작
+    /// 시점의 _appearance와 설정 창의 SettingsViewModel.Appearance 양쪽 모두
+    /// 이 핸들러 하나를 공유한다 - 상태가 없는 순수 재적용이라 안전하다.</summary>
     private void OnThemeSaved(object sender, AppTheme theme)
         => ThemeApplier.Apply(theme);
+
+    /// <summary>
+    /// ShellViewModel.OpenSettingsCommand가 새 SettingsViewModel을 준비할
+    /// 때마다 발생한다. 이미 열린 설정 창이 있으면 방금 만들어진 뷰모델은
+    /// 화면에 쓰이지 않으므로 즉시 Dispose하고(레지스트리 구독을 새지
+    /// 않게) 기존 창을 앞으로 가져오는 데 그친다 - 창은 한 번에 하나만
+    /// 띄운다.
+    ///
+    /// 새로 여는 경우: 창을 모덜리스(Show)로 띄운다. SettingsViewModel은
+    /// 대상 기기 선택이 바뀔 때마다 DisplayStream/Slot 페이지를 스스로
+    /// 다시 로드하므로(SettingsViewModel.OnDeviceSelectionPropertyChanged),
+    /// 설정 창을 열어 둔 채로 MainWindow에서 다른 기기를 선택하면 그
+    /// 반응성을 그대로 볼 수 있어야 한다 - ShowDialog로 MainWindow를
+    /// 막으면 이 설계 의도가 무의미해진다.
+    /// </summary>
+    private void OnSettingsRequested(object sender, SettingsViewModel settings)
+    {
+        if (_settingsWindow != null)
+        {
+            settings.Dispose();
+            _settingsWindow.Activate();
+            return;
+        }
+
+        _openSettings = settings;
+        HookAppearanceThemeSaved(settings.Appearance);
+        settings.PropertyChanged += OnOpenSettingsPropertyChanged;
+
+        var window = new SettingsWindow { DataContext = settings };
+        _settingsWindow = window;
+        window.Closed += OnSettingsWindowClosed;
+
+        if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop
+            && desktop.MainWindow != null)
+        {
+            window.Show(desktop.MainWindow);
+        }
+        else
+        {
+            window.Show();
+        }
+    }
+
+    /// <summary>
+    /// SettingsViewModel.Cancel은 Appearance 인스턴스를 통째로 교체한다
+    /// (SettingsViewModel 클래스 문서 참고) - 창을 열 때 구독한 ThemeSaved는
+    /// 옛 인스턴스에 걸려 있으므로, Appearance 프로퍼티 변경 통지를 계기로
+    /// 새 인스턴스에 다시 구독한다. 기기 선택 변경은 Appearance를 건드리지
+    /// 않으므로 이 경로는 Cancel에서만 발생한다.
+    /// </summary>
+    private void OnOpenSettingsPropertyChanged(object sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName != nameof(SettingsViewModel.Appearance)) return;
+
+        UnhookAppearanceThemeSaved();
+        HookAppearanceThemeSaved(_openSettings?.Appearance);
+    }
+
+    private void HookAppearanceThemeSaved(AppearanceSettingsViewModel appearance)
+    {
+        _openSettingsAppearance = appearance;
+        if (_openSettingsAppearance != null)
+            _openSettingsAppearance.ThemeSaved += OnThemeSaved;
+    }
+
+    private void UnhookAppearanceThemeSaved()
+    {
+        if (_openSettingsAppearance != null)
+            _openSettingsAppearance.ThemeSaved -= OnThemeSaved;
+        _openSettingsAppearance = null;
+    }
+
+    /// <summary>
+    /// 설정 창이 닫힐 때(취소/저장 후 닫기 모두) 구독을 해제하고
+    /// SettingsViewModel을 Dispose한다 - IDisposable이 소유한 레지스트리
+    /// 구독이 새지 않도록.
+    /// </summary>
+    private void OnSettingsWindowClosed(object sender, EventArgs e)
+    {
+        if (sender is SettingsWindow window)
+            window.Closed -= OnSettingsWindowClosed;
+
+        if (_openSettings != null)
+            _openSettings.PropertyChanged -= OnOpenSettingsPropertyChanged;
+
+        UnhookAppearanceThemeSaved();
+
+        _openSettings?.Dispose();
+        _openSettings = null;
+        _settingsWindow = null;
+    }
 
     /// <summary>
     /// 셸을 해제한다. <see cref="ApplicationHost.Dispose"/>는 정리 실패를
@@ -122,6 +229,27 @@ public partial class App : Application
             _appearance.ThemeSaved -= OnThemeSaved;
             _appearance = null;
         }
+
+        // 설정 창이 아직 열려 있으면(예: 확인 없이 앱이 종료되는 경로)
+        // Closed 핸들러를 먼저 떼어 이중 Dispose를 피하고, 여기서 직접
+        // 한 번만 정리한다. SettingsViewModel.Dispose 자체도 _disposed
+        // 가드가 있어 이중 호출에 안전하지만, 굳이 기대지 않는다.
+        if (_settingsWindow != null)
+        {
+            _settingsWindow.Closed -= OnSettingsWindowClosed;
+            _settingsWindow = null;
+        }
+
+        if (_openSettings != null)
+        {
+            _openSettings.PropertyChanged -= OnOpenSettingsPropertyChanged;
+            UnhookAppearanceThemeSaved();
+            _openSettings.Dispose();
+            _openSettings = null;
+        }
+
+        if (_shell != null)
+            _shell.SettingsRequested -= OnSettingsRequested;
 
         try
         {
