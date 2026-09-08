@@ -180,6 +180,30 @@
     속성과 `AppSettings` 라운드트립/clamp 로직은 그대로 남아 있다 — 완전히 걷어낼지는
     후속 판단.
 
+- [ ] 신호 종료 시 overlay 회수 실기 검증 (PR #9 후속, 기기 재연결 대기)
+  - PR #9(터미널 앱 `PosixSignalRegistration`)는 리뷰어가 실제 pty로
+    종료 시간·"stopped cleanly"까지 실측했지만 기기 미연결 상태였다.
+    실기에서 확인할 것: `--dex` + Ctrl+C **부하 중**(4× CPU) →
+    `overlay_display_devices`가 `null`로 돌아오는지, `kill -TERM`/`kill -HUP`
+    도 같은지. 명령은 `.omc/research/mac-fix-report.md` 하단.
+  - GUI는 2026-09-08 SM-F971N에서 SIGTERM 회수 확인됨. 터미널 앱만 남음.
+- [ ] adb 후보 프로브 체인 테스트를 가짜 `ProcessRunner`로 전환 (PR #10 후속)
+  - 현상: `PathServiceCandidateRetryTests`의 체인 회귀 테스트가 실제
+    프로세스 타임아웃 바닥(`Math.Max(timeoutMs, 3000)`)을 타서 약 20초,
+    클래스 전체 약 30초. `ProcessRunner`에 주입 가능한 인터페이스가 없어
+    실제 `adb version`을 띄운다.
+  - 주의: 바닥 값 자체를 낮추면 안 된다 — 부하 시 멀쩡한 후보를 죽었다고
+    오판하는 원래 flake로 돌아간다. 프로세스를 가짜로 바꾸는 쪽이 맞다.
+- [ ] adb 후보 병렬 프로브 검토 (PR #10 후속, 착수 여부 미정)
+  - PR #10은 재시도 배수만 걷어냈다. 후보 N개가 모두 타임아웃하면 첫 시도
+    N×타임아웃(실제 5초 × 후보 수)은 그대로 남는다 — 첫 시도를 예산으로
+    자르면 fail-open이 깨져서 일부러 남긴 항이다. 없애려면 후보를 병렬로
+    프로브해야 하는데, 시작 경로가 동기라 구조 변경이 필요하다.
+- [ ] 레거시 Windows `DexManager/Services/PathService.cs`의 프로브 정책 동기화
+  - PR #10이 Core 쪽 `Math.Max(timeoutMs, 3000)`을 `ProbeRetryBudget`
+    헬퍼로 뽑았지만 Windows 사본(`DexManager.Mac.sln`에 없음)은 자체
+    `Math.Max`를 유지해 두 사본이 갈라졌다. 재시도 예산·EAGAIN 재시도도
+    없다. Windows 빌드를 다시 만질 때 함께 옮길 것.
 - [ ] 세션 중 기기 분리 시 overlay 잔여물 자동 회수
   - 현상: DeX 실행 중 기기가 사라지면 종료 처리가
     `Could not remove the existing virtual display`로 실패하고
