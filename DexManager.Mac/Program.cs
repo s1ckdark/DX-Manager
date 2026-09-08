@@ -133,12 +133,10 @@ internal static class Program
 
     /// <summary>
     /// SIGINT/SIGTERM/SIGHUP을 한곳에 등록한다 - 이제 세 신호 모두
-    /// HandleSignalCore 안에서 같은 정리 경로(가드+예산으로 감싼
-    /// host.Shutdown())를 탄다. 등록을 하나로 모은 이유가 "세 신호를 같게
-    /// 다룬다"였던 이전 버전과 달리, 지금은 실제로 그렇다 - 유일한 차이는
-    /// 예산 길이(SignalCleanupBudgets.For)와 SIGINT가 추가로 cts를 취소해
-    /// 협조적으로 기다리는 코드에 기회를 준다는 것뿐이다(HandleSignalCore
-    /// 참고).
+    /// HandleSignalCore 안에서 완전히 같은 정리 경로(가드+예산으로 감싼
+    /// host.Shutdown(), 셋이 같은 예산을 공유 - SignalCleanupBudgets 참고)를
+    /// 탄다. 유일한 차이는 SIGINT가 추가로 cts를 취소해 협조적으로
+    /// 기다리는 코드에 기회를 준다는 것뿐이다(HandleSignalCore 참고).
     ///
     /// <c>PosixSignalRegistration.Create</c> 각각이 던질 수 있다고 보고
     /// (예: 플랫폼 미지원) 하나씩 등록하며 이미 등록된 것들을 리스트에
@@ -204,17 +202,28 @@ internal static class Program
     /// </para>
     /// <para>
     /// 지금은 SIGINT도 SIGTERM/SIGHUP과 똑같이 신호 처리기 자신이 직접
-    /// 정리한다 - 어떤 코드가 무엇에 블로킹돼 있든 상관없다. 예산은
-    /// SignalCleanupBudgets.Interactive(5초, SIGTERM/SIGHUP의 15초보다
-    /// 짧다 - Ctrl+C는 화면 앞에 사람이 있고 "지금 멈춰라"라는 기대가
-    /// 있으므로). cts.Cancel()은 그래도 먼저 호출해 둔다 - --dex의 watch
-    /// 루프(Task.Delay(500, cts.Token))처럼 실제로 토큰을 관측할 수 있는
+    /// 정리한다 - 어떤 코드가 무엇에 블로킹돼 있든 상관없다. 예산은 세
+    /// 신호 모두 <see cref="SignalCleanupBudgets.Budget"/>으로 동일하다.
+    /// 처음 이 경로를 도입했을 때는 SIGINT에 더 짧은 별도 예산
+    /// (Interactive, 5초)을 줬었다 - "화면 앞에 사람이 있으니 짧게
+    /// 자른다"는 근거였다. 코드 리뷰가 그 근거를 반증했다: 부하가 걸린
+    /// 정리 사슬은 5초를 넘기기 쉽고(8~18초로 관측됨), <c>--dex</c> 실행
+    /// 중 Ctrl+C를 누르면 정리가 중간에 잘려 overlay가 그대로 남았다 -
+    /// 정확히 이 신호 배선 자체가 막으려던 누수가 가장 흔한 종료 신호에서
+    /// 재발한 것이다. 자세한 근거는 SignalCleanupBudgets의 문서 참고.
+    /// cts.Cancel()은 그래도 먼저 호출해 둔다 - --dex의 watch 루프
+    /// (Task.Delay(500, cts.Token))처럼 실제로 토큰을 관측할 수 있는
     /// 코드가 있다면 정리된 중단 메시지를 낼 최선의 기회를 준다는 뜻이고,
     /// 아무도 관측하지 못해도(대시보드처럼) 해가 되지 않는다 - 진짜 정리는
     /// 뒤따르는 guard 경로가 보장한다. SignalCleanupGuard가 신호 경로들
     /// 사이의 중복 실행을 막고, InteractiveHost._shutdownStarted와
     /// ApplicationHost._shutdownStarted가 신호 경로와 (드물게 실행될 수
-    /// 있는) 정상 경로 사이의 중복까지 막는다 - 3중 가드.
+    /// 있는) 정상 경로 사이의 중복까지 막는다 - 3중 가드(경쟁 자체는
+    /// 남아 있다 - --dex의 main 스레드가 cts.Cancel() 뒤 host.Shutdown()이
+    /// 아니라 host.StopDexAsync()를 부르므로 InteractiveHost._shutdownStarted의
+    /// 보호를 받지 않지만, DexOrchestrator의 단일 _operationGate 락과
+    /// ShutdownAsync의 _shutdownTask 메모이제이션이 그 경쟁에서도 안전을
+    /// 보장한다 - 이 구조는 그대로 유지한다).
     /// </para>
     /// </summary>
     private static void HandleSignal(PosixSignalContext ctx)
