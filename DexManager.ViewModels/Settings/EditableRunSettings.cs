@@ -234,14 +234,6 @@ public sealed partial class EditableSingleWindowSlot : ObservableObject
     [ObservableProperty]
     private string _additionalArguments;
 
-    /// <summary>사용자 지정 너비 (px).</summary>
-    [ObservableProperty]
-    private int _customWidth;
-
-    /// <summary>사용자 지정 높이 (px).</summary>
-    [ObservableProperty]
-    private int _customHeight;
-
     /// <summary>Flex Display(-x) 사용 여부.</summary>
     [ObservableProperty]
     private bool _flexDisplay;
@@ -281,8 +273,6 @@ public sealed partial class EditableSingleWindowSlot : ObservableObject
             editable.StartAppPackage = source.StartAppPackage ?? string.Empty;
             editable.StartAppName = source.StartAppName ?? string.Empty;
             editable.AdditionalArguments = source.AdditionalArguments ?? string.Empty;
-            editable.CustomWidth = source.CustomWidth;
-            editable.CustomHeight = source.CustomHeight;
             editable.FlexDisplay = source.FlexDisplay;
         }
         else
@@ -321,8 +311,6 @@ public sealed partial class EditableSingleWindowSlot : ObservableObject
         target.StartAppPackage = StartAppPackage ?? string.Empty;
         target.StartAppName = StartAppName ?? string.Empty;
         target.AdditionalArguments = AdditionalArguments ?? string.Empty;
-        target.CustomWidth = CustomWidth;
-        target.CustomHeight = CustomHeight;
         target.FlexDisplay = FlexDisplay;
     }
 }

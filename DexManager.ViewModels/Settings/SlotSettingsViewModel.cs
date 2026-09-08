@@ -162,8 +162,6 @@ public sealed partial class SlotSettingsViewModel : ObservableObject
         private string _startAppPackage = string.Empty;
         private string _startAppName = string.Empty;
         private string _additionalArguments = string.Empty;
-        private int _customWidth;
-        private int _customHeight;
         private bool _flexDisplay;
 
         public static SlotBaseline Capture(EditableSingleWindowSlot slot)
@@ -183,8 +181,6 @@ public sealed partial class SlotSettingsViewModel : ObservableObject
                 _startAppPackage = slot.StartAppPackage ?? string.Empty,
                 _startAppName = slot.StartAppName ?? string.Empty,
                 _additionalArguments = slot.AdditionalArguments ?? string.Empty,
-                _customWidth = slot.CustomWidth,
-                _customHeight = slot.CustomHeight,
                 _flexDisplay = slot.FlexDisplay
             };
         }
@@ -204,8 +200,6 @@ public sealed partial class SlotSettingsViewModel : ObservableObject
                 || !string.Equals(_startAppPackage, slot.StartAppPackage ?? string.Empty, StringComparison.Ordinal)
                 || !string.Equals(_startAppName, slot.StartAppName ?? string.Empty, StringComparison.Ordinal)
                 || !string.Equals(_additionalArguments, slot.AdditionalArguments ?? string.Empty, StringComparison.Ordinal)
-                || _customWidth != slot.CustomWidth
-                || _customHeight != slot.CustomHeight
                 || _flexDisplay != slot.FlexDisplay;
         }
     }
