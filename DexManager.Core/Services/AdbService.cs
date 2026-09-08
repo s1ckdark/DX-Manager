@@ -500,8 +500,15 @@ namespace DexManager.Services
         /// 화면을 깨운다(<c>KEYCODE_WAKEUP</c>). 실기(SM-F971N, One UI)에서
         /// 확인된 바로는 <c>wm dismiss-keyguard</c>만으로는 기기가 잠들어
         /// 있을 때(<c>INTERACTIVE_STATE_SLEEP</c>) 아무 효과가 없었고, 이
-        /// 키 이벤트로 깨우는 것이 선행 조건이었다 — 그 뒤엔 키가드가
-        /// (신뢰할 수 있는 기기라면) 스스로 해제됐다.
+        /// 키 이벤트로 깨우는 것이 선행 조건이었다.
+        ///
+        /// 이 호출 자체는 키가드를 해제하지 않는다 — fix round 1에서 실기
+        /// 재확인 결과, 깨우기만으로 키가드가 풀린 첫 관찰은 마침 그
+        /// 시점에 Smart Lock 신뢰가 막 재승인된 우연이었다(재현 시
+        /// <c>isKeyguardShowing</c>이 계속 <c>true</c>로 남았다). 실제
+        /// 해제는 <see cref="DismissKeyguard"/>가 담당하며, 반드시 이
+        /// 메서드 다음에 호출해야 한다(잠들어 있는 동안에는 <c>wm
+        /// dismiss-keyguard</c> 자체가 무효였다).
         ///
         /// 이름이 비슷한 <see cref="WakeUp"/>과 절대 혼동하면 안 된다 -
         /// 그건 adb 연결 자체를 복구하는 기능(KillServer/StartServer →
@@ -523,6 +530,38 @@ namespace DexManager.Services
             {
                 _logService.Warning(LocalizationService.Format(
                     "Log.Adb.WakeScreenFailed",
+                    ex.Message));
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// 키가드 해제를 시도한다(<c>wm dismiss-keyguard</c>). 실기(SM-F971N,
+        /// One UI) 재확인(fix round 1): 이 명령은 기기가 이미 깨어 있을
+        /// 때만 효과가 있다 — <see cref="WakeScreen"/> 다음에, 그리고 그
+        /// settle 대기 이후에 호출해야 한다. 신뢰할 수 있는/자격증명이
+        /// 필요 없는 기기는 이걸로 실제 키가드가 풀리고
+        /// (<c>isKeyguardShowing</c>/<c>inputRestricted</c>가 false로
+        /// 전환됨), 자격증명이 진짜 필요한 기기는 대신 자격증명 프롬프트가
+        /// 뜬다 — 그건 이 메서드가 우회해야 할 실패가 아니라 정상 동작이다.
+        /// 그 뒤 <see cref="IsDeviceLocked"/>가 <c>dumpsys trust</c>의
+        /// <c>deviceLocked=1</c>로 그 상태를 감지해 시작을 막는다.
+        ///
+        /// <see cref="WakeScreen"/>과 같은 fail-open 규율을 따른다: 어떤
+        /// 예외가 나든 잡아서 false로 접고 로그만 남긴다 - 이 보조 단계
+        /// 하나 때문에 정상적으로 될 DeX 시작이 죽어서는 안 된다.
+        /// </summary>
+        public bool DismissKeyguard(string serial)
+        {
+            try
+            {
+                var result = ShellForSerial(serial, "wm dismiss-keyguard", false);
+                return result.IsSuccess;
+            }
+            catch (Exception ex)
+            {
+                _logService.Warning(LocalizationService.Format(
+                    "Log.Adb.DismissKeyguardFailed",
                     ex.Message));
                 return false;
             }

@@ -412,6 +412,50 @@ public class AdbServiceLockStateTests
         Assert.False(result);
     }
 
+    // --- DismissKeyguard: 키가드 해제 (fix round 1 - 실기 재확인) ---
+
+    [Fact]
+    public void DismissKeyguard_SendsWmDismissKeyguardToTheCorrectDevice()
+    {
+        using var root = new TempHostRoot();
+        var adb = new FakeAdbExecutable(
+            root.Root,
+            new Dictionary<string, string> { ["phone-a"] = "HWA" });
+        var host = root.CreateHost(pathProvider: adb.CreatePathProvider());
+
+        var result = host.Adb.DismissKeyguard("phone-a");
+
+        Assert.True(result);
+        Assert.Contains(
+            adb.Invocations,
+            line => line.Contains("-s phone-a", StringComparison.Ordinal) &&
+                line.Contains("wm dismiss-keyguard", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void DismissKeyguard_WhenTheAdbProcessCannotEvenBeLaunched_ReturnsFalseInsteadOfThrowing()
+    {
+        // WakeScreen/IsDeviceLocked와 동일한 이유: 키가드 해제는 최선-노력
+        // 보조 단계일 뿐이므로, 이 예외 하나 때문에 DeX 시작 전체가
+        // 죽어서는 안 된다.
+        var logService = new LogService();
+        var processRunner = new ProcessRunner(logService);
+        var missingAdbPath = Path.Combine(
+            Path.GetTempPath(),
+            "dxm-tests-missing-adb",
+            Guid.NewGuid().ToString("N"),
+            "adb");
+        var adbService = new AdbService(
+            missingAdbPath,
+            1000,
+            processRunner,
+            logService);
+
+        var result = adbService.DismissKeyguard("phone-a");
+
+        Assert.False(result);
+    }
+
     [Fact]
     public void IsDeviceLocked_WhenTheAdbProcessCannotEvenBeLaunched_FailsOpenToUnknownInsteadOfThrowing()
     {

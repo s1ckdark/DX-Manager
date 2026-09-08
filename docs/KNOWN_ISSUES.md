@@ -203,22 +203,25 @@ Phase 2(DeX 시작/중지 + 단일창 슬롯) 종료 시점에는 실기 검증 
    항상 주 디스플레이(0)에만 렌더링되며 그 디스플레이는 미러링 대상이 아니므로, DeX
    미러에는 잠금화면이 절대 나타나지 않는다 — scrcpy 플래그 문제가 아니다.
 
-   그러나 해제 자체는 다른 얘기다: `adb shell input keyevent 224`
-   (`KEYCODE_WAKEUP`)만으로 신뢰할 수 있는/자격증명이 필요 없는 상태의 폰은 키가드가
-   스스로 해제됐다 — `wm dismiss-keyguard`만으로는 폰이 잠들어 있는 동안(`INTERACTIVE_
-   STATE_SLEEP`) 아무 효과가 없었고, 깨우는 것이 선행 조건이었다. DX Manager는 이제 DeX
-   시작 시 이 wake를 자동으로 보낸다(`AdbService.WakeScreen`,
-   `DexOrchestrator.StartCore`) — 아래 UI-2 잠금 게이트가 "깨운 뒤"의 상태를 판단하도록
-   그 앞에 배치했다. 실패해도(`WakeScreen`이 예외를 삼키고 false를 반환) 시작 자체는
-   막지 않는다.
+   그러나 해제 자체는 다른 얘기다 — 다만 실기로 확인한 결과 **두 단계가 모두
+   필요하다**: `adb shell input keyevent 224`(`KEYCODE_WAKEUP`)로 먼저 깨우고, 그
+   다음 `adb shell wm dismiss-keyguard`로 키가드를 해제한다. `wm dismiss-keyguard`
+   단독으로는 폰이 잠들어 있는 동안(`INTERACTIVE_STATE_SLEEP`) 아무 효과가 없었고,
+   반대로 깨우기만으로는 키가드가 풀리지 않았다(fix round 1) — 첫 수동 시험에서
+   깨우기만으로 풀린 것처럼 보였던 건 마침 그 시점에 Smart Lock 신뢰가 재승인된
+   우연이었다. DX Manager는 이제 DeX 시작 시 이 두 단계를 순서대로 자동으로 보낸다
+   (`AdbService.WakeScreen` → `AdbService.DismissKeyguard`,
+   `DexOrchestrator.StartCore`) — 아래 UI-2 잠금 게이트가 "깨우고 해제까지 시도한
+   뒤"의 상태를 판단하도록 그 앞에 배치했다. 둘 중 하나가 실패해도(각각 예외를
+   삼키고 false를 반환) 시작 자체는 막지 않는다.
 
    **한계**: `dumpsys trust`의 `deviceLocked=1`처럼 PIN/패턴이 실제로 요구되는
    상태에서는 깨워도 자격증명 화면이 여전히 디스플레이 0에만 뜬다 — DeX 미러(가상
    디스플레이)는 그 화면을 절대 보여줄 수 없다. 그 경우 PC에서 조작하려면
    `--display-id 0`로 여는 별도의 두 번째 scrcpy로 화면을 보면서 입력하거나,
    `input text <PIN>`을 화면 없이 그대로 보내는 수밖에 없다. 이번 Phase는 이 경로를
-   앱에 통합하지 않았다 — 자동 wake는 어디까지나 "잠금이 없거나 신뢰 에이전트로 이미
-   풀린" 가장 흔한 경우를 위한 것이다.
+   앱에 통합하지 않았다 — 자동 wake+dismiss는 어디까지나 "잠금이 없거나 신뢰
+   에이전트로 이미 풀린" 가장 흔한 경우를 위한 것이다.
 
 2. **UI-2의 잠금 감지는 `dumpsys trust`를 1순위로 쓴다 — `dumpsys window`의 secure
    필드 접근은 One UI에서 실기 확인 결과 발동하지 않는다.** 원래 구현

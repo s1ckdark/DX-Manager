@@ -202,6 +202,7 @@
   <data name="Log.Adb.WakeUpDeviceMissing" xml:space="preserve"><value>Could not detect an ADB device after scrcpy wake-up.</value></data>
   <data name="Log.Adb.LockProbeFailed" xml:space="preserve"><value>Could not determine the phone's lock state: {0}</value></data>
   <data name="Log.Adb.WakeScreenFailed" xml:space="preserve"><value>Could not wake the phone's screen: {0}</value></data>
+  <data name="Log.Adb.DismissKeyguardFailed" xml:space="preserve"><value>Could not dismiss the phone's keyguard: {0}</value></data>
   <data name="Log.Main.Shown" xml:space="preserve"><value>Displayed the main window.</value></data>
   <data name="Log.Main.DeviceStartDelay" xml:space="preserve"><value>Waiting {1} ms before starting commands for device {0}.</value></data>
   <data name="Log.Main.CaptureHotkeyRegistrationFailed" xml:space="preserve"><value>Could not register the capture hotkey.</value></data>
