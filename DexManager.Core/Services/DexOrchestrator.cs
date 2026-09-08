@@ -8,6 +8,13 @@ namespace DexManager.Services
 {
     public sealed class DexOrchestrator
     {
+        // WakeScreen 직후 잠금 프로브까지 두는 짧은 대기. 실기에서 키가드
+        // 해제가 즉시 반영되지 않는 것이 확인됐지만 정확한 소요 시간은
+        // 측정하지 못했으므로, 이 저장소의 다른 UI 안정화 대기와 같은
+        // 자릿수(150~250ms, VirtualDisplayService.cs)로 보수적이되 짧게
+        // 잡는다.
+        private const int WakeSettleDelayMs = 300;
+
         private readonly AdbService _adbService;
         private readonly VirtualDisplayService _virtualDisplayService;
         private readonly ScrcpyService _scrcpyService;
@@ -235,6 +242,23 @@ namespace DexManager.Services
                     LocalizationService.Get(
                         "Error.Dex.NoAuthorizedDevice"));
             }
+            // 실기(SM-F971N, One UI) 확인: 폰을 깨우면(KEYCODE_WAKEUP)
+            // 신뢰할 수 있는/자격증명이 필요 없는 기기는 키가드가 스스로
+            // 해제된다 - "wm dismiss-keyguard"만으로는 기기가 잠들어 있는
+            // 동안 아무 효과가 없었고, 깨우는 것이 선행 조건이었다. 아래
+            // 잠금 게이트가 "깨운 뒤"의 상태를 판단하도록 반드시 그 앞에
+            // 둔다. WakeScreen은 내부에서 모든 예외를 삼키고 false를
+            // 돌려주므로(IsDeviceLocked와 같은 fail-open 규율) 여기서
+            // 결과를 따로 검사할 필요가 없다 - 깨우기가 실패해도 시작은
+            // 계속돼야 한다.
+            _adbService.WakeScreen(serial);
+            // 키가드 해제는 즉시 일어나지 않는다(실기에서 관찰됨). 아래
+            // 잠금 프로브가 "깨우는 중" 상태를 잘못 읽지 않도록 짧게
+            // 대기한다. 값은 이 저장소의 다른 UI 안정화 대기(150~250ms,
+            // VirtualDisplayService.cs)와 같은 자릿수로 골랐다 - 사용자가
+            // 체감할 정도로 시작을 늦추지 않으면서 One UI가 키가드 해제를
+            // 반영할 여유를 준다.
+            Thread.Sleep(WakeSettleDelayMs);
             // DeX는 새 가상 디스플레이를 만들어 그것만 미러링한다. 잠금
             // 화면은 항상 기본 디스플레이(0)에만 그려지므로 DeX 미러로는
             // 잠금을 풀 수 없다 - 그 우회는 불가능하다. 그래서 시작 전에

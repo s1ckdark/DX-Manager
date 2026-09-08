@@ -29,7 +29,8 @@ public sealed class FakeAdbExecutable
     public FakeAdbExecutable(
         string root,
         IReadOnlyDictionary<string, string> hardwareSerialsByTransport,
-        IReadOnlyDictionary<string, string> dumpsysWindowOutputByTransport = null)
+        IReadOnlyDictionary<string, string> dumpsysWindowOutputByTransport = null,
+        IReadOnlyDictionary<string, string> dumpsysTrustOutputByTransport = null)
     {
         _root = root;
         var directory = Path.Combine(root, "fake-adb");
@@ -71,6 +72,26 @@ public sealed class FakeAdbExecutable
                 script.Append("  ").Append(prefix)
                     .Append("\"dumpsys window\"*) cat \"")
                     .Append(dumpFilePath).Append("\"; exit 0 ;;\n");
+            }
+        }
+        // dumpsys trust는 dumpsys window와 같은 이유로 파일에 담아
+        // cat한다 - 실제 출력은 쉼표·괄호·따옴표가 섞여 있어 셸 case
+        // 본문에 직접 넣으면 인용이 깨지기 쉽다.
+        if (dumpsysTrustOutputByTransport != null)
+        {
+            var trustIndex = 0;
+            foreach (var device in dumpsysTrustOutputByTransport)
+            {
+                var trustFilePath = Path.Combine(
+                    directory,
+                    "dumpsys-trust-" + trustIndex + ".txt");
+                File.WriteAllText(trustFilePath, device.Value ?? string.Empty);
+                trustIndex++;
+
+                var prefix = "*\"-s " + device.Key + " \"*";
+                script.Append("  ").Append(prefix)
+                    .Append("\"dumpsys trust\"*) cat \"")
+                    .Append(trustFilePath).Append("\"; exit 0 ;;\n");
             }
         }
         script.Append("esac\n");

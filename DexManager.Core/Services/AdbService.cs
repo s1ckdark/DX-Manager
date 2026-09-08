@@ -497,11 +497,56 @@ namespace DexManager.Services
         }
 
         /// <summary>
-        /// <c>dumpsys window</c>로 잠금 화면 상태를 확인한다. Android
-        /// 버전·제조사 스킨마다 노출하는 필드가 달라 절대적으로 믿을 수는
-        /// 없으므로, 알려진 필드를 하나도 찾지 못하면 <see
-        /// cref="LockState.Unknown"/>을 돌려준다 — 호출자는 이를
-        /// <see cref="LockState.Locked"/>가 아닌 값과 똑같이 취급해
+        /// 화면을 깨운다(<c>KEYCODE_WAKEUP</c>). 실기(SM-F971N, One UI)에서
+        /// 확인된 바로는 <c>wm dismiss-keyguard</c>만으로는 기기가 잠들어
+        /// 있을 때(<c>INTERACTIVE_STATE_SLEEP</c>) 아무 효과가 없었고, 이
+        /// 키 이벤트로 깨우는 것이 선행 조건이었다 — 그 뒤엔 키가드가
+        /// (신뢰할 수 있는 기기라면) 스스로 해제됐다.
+        ///
+        /// 이름이 비슷한 <see cref="WakeUp"/>과 절대 혼동하면 안 된다 -
+        /// 그건 adb 연결 자체를 복구하는 기능(KillServer/StartServer →
+        /// 인증 기기 확인 → scrcpy 폴백)이지 화면과는 무관하다.
+        ///
+        /// DeX 시작의 사전 단계로 쓰이므로 <see cref="IsDeviceLocked"/>와
+        /// 같은 fail-open 규율을 따른다: 어떤 예외가 나든 잡아서 false로
+        /// 접는다 - 화면을 깨우지 못했다고 정상적으로 될 DeX 시작 자체를
+        /// 깨뜨려서는 안 된다.
+        /// </summary>
+        public bool WakeScreen(string serial)
+        {
+            try
+            {
+                var result = ShellForSerial(serial, "input keyevent 224", false);
+                return result.IsSuccess;
+            }
+            catch (Exception ex)
+            {
+                _logService.Warning(LocalizationService.Format(
+                    "Log.Adb.WakeScreenFailed",
+                    ex.Message));
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// 기기 잠금 상태를 확인한다. 1순위 신호는 <c>dumpsys trust</c>의
+        /// <c>deviceLocked</c>다 - 실기(SM-F971N, One UI)에서 <c>dumpsys
+        /// window</c>의 tier-1 secure 필드가 하나도 없었고
+        /// <c>KeyguardServiceDelegate</c> 블록에도 바 <c>secure=</c>가
+        /// 없어 <see cref="ParseLockState"/>가 항상 <see
+        /// cref="LockState.Unknown"/>으로 빠졌기 때문이다. <c>dumpsys
+        /// trust</c>는 키가드가 "떠 있는지"가 아니라 "실제로 잠겨
+        /// 있는지"를 직접 말해주므로 Smart Lock 등 신뢰 에이전트도
+        /// 정확히 반영한다.
+        ///
+        /// <c>dumpsys trust</c>가 아무 신호도 못 주면(다른 기기/OS
+        /// 빌드에서는 이 명령 자체가 없을 수 있다) 기존 <c>dumpsys
+        /// window</c> 휴리스틱으로 폴백한다 - 그 로직은 여전히 유효한
+        /// 유일한 신호일 수 있는 기기가 있으므로 지우지 않는다.
+        ///
+        /// 두 신호 모두 알려진 필드를 하나도 찾지 못하면 <see
+        /// cref="LockState.Unknown"/>을 돌려준다 - 호출자는 이를 <see
+        /// cref="LockState.Locked"/>가 아닌 값과 똑같이 취급해
         /// (fail-open) 파싱 공백이 정상적인 DeX 시작을 막지 않게 해야
         /// 한다.
         /// </summary>
@@ -515,6 +560,12 @@ namespace DexManager.Services
             // 깨뜨리게 된다.
             try
             {
+                var trustResult = ShellForSerial(serial, "dumpsys trust", false);
+                var trustState = trustResult.IsSuccess
+                    ? ParseTrustState(trustResult.StandardOutput)
+                    : LockState.Unknown;
+                if (trustState != LockState.Unknown) return trustState;
+
                 var result = ShellForSerial(serial, "dumpsys window", false);
                 return result.IsSuccess
                     ? ParseLockState(result.StandardOutput)
@@ -527,6 +578,50 @@ namespace DexManager.Services
                     ex.Message));
                 return LockState.Unknown;
             }
+        }
+
+        /// <summary>
+        /// <c>dumpsys trust</c> 출력에서 현재 사용자의 잠금 상태를 읽는다.
+        /// 실기 출력 예:
+        /// <c>User "..." (id=0, flags=0x4c13) (current): trustState=TRUSTED,
+        /// trustManaged=1, deviceLocked=0, isActiveUnlockRunning=0,
+        /// strongAuthRequired=0x0</c>
+        ///
+        /// 다중 사용자 기기는 <c>User "..." ...</c> 줄이 여러 개일 수
+        /// 있으므로, 반드시 <c>(current)</c>가 붙은 줄만 읽는다 - 다른
+        /// 사용자의 <c>deviceLocked</c>가 현재 세션의 판단을 가로채면
+        /// 안 된다. <c>(current)</c> 줄을 찾지 못했거나 그 줄에
+        /// <c>deviceLocked</c>가 없으면 <see cref="LockState.Unknown"/>
+        /// (fail-open) - 호출자가 <c>dumpsys window</c>로 폴백한다.
+        /// </summary>
+        public static LockState ParseTrustState(string dumpsysTrustOutput)
+        {
+            if (string.IsNullOrWhiteSpace(dumpsysTrustOutput))
+                return LockState.Unknown;
+
+            var lines = dumpsysTrustOutput.Split(
+                new[] { "\r\n", "\n" },
+                StringSplitOptions.None);
+            foreach (var line in lines)
+            {
+                if (line.IndexOf(
+                        "(current)",
+                        StringComparison.OrdinalIgnoreCase) < 0)
+                {
+                    continue;
+                }
+
+                var deviceLocked = MatchNumericBooleanField(
+                    line,
+                    "deviceLocked");
+                if (deviceLocked == null) continue;
+
+                return deviceLocked == true
+                    ? LockState.Locked
+                    : LockState.Unlocked;
+            }
+
+            return LockState.Unknown;
         }
 
         /// <summary>
@@ -651,6 +746,25 @@ namespace DexManager.Services
                 match.Groups[1].Value,
                 "true",
                 StringComparison.OrdinalIgnoreCase);
+        }
+
+        /// <summary>
+        /// <c>이름=0|1</c>을 왼쪽 단어 경계와 함께 읽는다.
+        /// <c>dumpsys trust</c>의 <c>deviceLocked</c>는 불리언 리터럴이
+        /// 아니라 <c>0</c>/<c>1</c>로 찍히므로 <see
+        /// cref="MatchBooleanField"/>와 별도로 둔다.
+        /// </summary>
+        private static bool? MatchNumericBooleanField(
+            string text,
+            string fieldName)
+        {
+            var match = Regex.Match(
+                text,
+                @"(?<![A-Za-z0-9_])" + Regex.Escape(fieldName) + @"\s*=\s*(0|1)",
+                RegexOptions.IgnoreCase);
+            if (!match.Success) return null;
+
+            return match.Groups[1].Value == "1";
         }
 
         private static readonly string[] LockFieldPriority =

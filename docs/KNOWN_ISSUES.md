@@ -196,36 +196,57 @@ Phase 2(DeX 시작/중지 + 단일창 슬롯) 종료 시점에는 실기 검증 
 
 ## macOS GUI Phase 3 알려진 한계
 
-1. **폰 잠금화면은 PC에서 해제할 수 없다 — 구조적 제약이다.** DeX는
+1. **DeX 미러는 잠금화면을 "보여줄" 수 없다 — 이건 구조적 제약이다. 다만 PC에서
+   폰 잠금을 "해제"하는 것 자체는 가능하다(실기 확인, SM-F971N One UI).** DeX는
    `overlay_display_devices`로 새 가상 디스플레이를 만들고 scrcpy가
    `--display-id <가상 디스플레이>`로 그 화면만 미러링한다. Android의 keyguard(잠금화면)는
-   항상 주 디스플레이(0)에만 렌더링되며 그 디스플레이는 미러링 대상이 아니다. scrcpy
-   플래그 설정 문제가 아니다 — `StayAwake`/`TurnScreenOff`는 화면 전원 상태만 건드릴 뿐
-   keyguard 렌더링 위치와 무관하다. 이번 Phase가 제공한 대응은 앱 내 잠금 해제가 아니라
-   UI-2의 시작 전 감지 + 안내다.
+   항상 주 디스플레이(0)에만 렌더링되며 그 디스플레이는 미러링 대상이 아니므로, DeX
+   미러에는 잠금화면이 절대 나타나지 않는다 — scrcpy 플래그 문제가 아니다.
 
-2. **UI-2의 잠금 감지는 best-effort이며 실기 미검증이다.** `AdbService.ParseLockState`
-   (`DexManager.Core/Services/AdbService.cs:542`)가 `dumpsys window` 출력에서
-   `mShowingLockscreen` → `mDreamingLockscreen` → `mKeyguardShowing` →
-   `isStatusBarKeyguard` 순서로, 출력에 실제로 나타나는 첫 필드의 값을 취한다(dumpsys
-   출력 순서에 비의존적이도록 위치가 아닌 우선순위 기반). 네 필드 중 무엇도 나타나지
-   않으면(One UI 빌드에 따라 필드명이 다를 수 있다) `LockState.Unknown`으로
-   **fail-open**한다 — 즉 미인식 출력은 "잠기지 않음"으로 취급해 DeX 시작을 막지 않는다
-   (오탐으로 정상 시작을 막는 쪽이 더 나쁘다는 판단). `IsDeviceLocked` 자체가 adb 실행
-   실패까지도 `try/catch`로 감싸 `Unknown`으로 fail-open한다(UI-2 fix round 1). 다만
-   어떤 One UI 빌드에서 네 필드가 전혀 나타나지 않으면 이 게이트는 그냥 발동하지 않는다
-   — 실제 기기 스모크 테스트가 아직 없다.
+   그러나 해제 자체는 다른 얘기다: `adb shell input keyevent 224`
+   (`KEYCODE_WAKEUP`)만으로 신뢰할 수 있는/자격증명이 필요 없는 상태의 폰은 키가드가
+   스스로 해제됐다 — `wm dismiss-keyguard`만으로는 폰이 잠들어 있는 동안(`INTERACTIVE_
+   STATE_SLEEP`) 아무 효과가 없었고, 깨우는 것이 선행 조건이었다. DX Manager는 이제 DeX
+   시작 시 이 wake를 자동으로 보낸다(`AdbService.WakeScreen`,
+   `DexOrchestrator.StartCore`) — 아래 UI-2 잠금 게이트가 "깨운 뒤"의 상태를 판단하도록
+   그 앞에 배치했다. 실패해도(`WakeScreen`이 예외를 삼키고 false를 반환) 시작 자체는
+   막지 않는다.
 
-   최종 리뷰 라운드에서 한 겹 더 좁혔다(F-8): 위 네 필드는 "잠금 화면이 떠 있는가"만
-   말해줄 뿐, PIN·패턴이 하나도 없는 스와이프 전용 폰이 화면만 꺼진 채 놓여 있는
-   가장 흔한 상태에서도 `mKeyguardShowing=true`가 된다. 그래서 이제 `Locked`는
-   "잠금 화면이 떠 있고 **동시에** 그 키가드가 보안 설정돼 있다"는 적극적 증거가
-   있을 때만 나온다. 보안 신호는 이름이 명시적인 필드
-   (`isKeyguardSecure` / `mIsKeyguardSecure` / `mKeyguardSecure` / `keyguardSecure`)를
-   먼저 찾고, 없으면 AOSP `KeyguardServiceDelegate.dump()`가 찍는 맨 이름 `secure=`를
-   **그 블록 안에서만** 읽는다(`dumpsys window`에 함께 실리는 창 목록의 무관한
-   `secure=`를 줍지 않기 위해서다). 보안 신호를 찾지 못하면 다른 모든 불확실 경로와
-   같이 `Unknown`으로 fail-open한다. 이 보안 신호의 필드명 역시 실기 미검증이다.
+   **한계**: `dumpsys trust`의 `deviceLocked=1`처럼 PIN/패턴이 실제로 요구되는
+   상태에서는 깨워도 자격증명 화면이 여전히 디스플레이 0에만 뜬다 — DeX 미러(가상
+   디스플레이)는 그 화면을 절대 보여줄 수 없다. 그 경우 PC에서 조작하려면
+   `--display-id 0`로 여는 별도의 두 번째 scrcpy로 화면을 보면서 입력하거나,
+   `input text <PIN>`을 화면 없이 그대로 보내는 수밖에 없다. 이번 Phase는 이 경로를
+   앱에 통합하지 않았다 — 자동 wake는 어디까지나 "잠금이 없거나 신뢰 에이전트로 이미
+   풀린" 가장 흔한 경우를 위한 것이다.
+
+2. **UI-2의 잠금 감지는 `dumpsys trust`를 1순위로 쓴다 — `dumpsys window`의 secure
+   필드 접근은 One UI에서 실기 확인 결과 발동하지 않는다.** 원래 구현
+   (`AdbService.ParseLockState`)은 `dumpsys window` 출력에서 `mShowingLockscreen` →
+   `mDreamingLockscreen` → `mKeyguardShowing` → `isStatusBarKeyguard` 순서로 "잠금
+   화면이 떠 있는가"를 본 뒤, 그게 참이면 다시 `isKeyguardSecure` 계열 필드나
+   `KeyguardServiceDelegate` 블록의 `secure=`로 "실제로 보안 설정됐는가"를 확인했다.
+   **실기(SM-F971N, One UI) 확인 결과, 이 두 번째 단계가 이 기기에서 절대 발동하지
+   않는다** — tier-1 secure 필드가 하나도 없고, `KeyguardServiceDelegate` 블록에도 맨
+   `secure=`가 없다(그 블록의 실제 필드는 `showing`/`inputRestricted`/`occluded`/
+   `trusted`/`simSecure`/`dreaming`/… 뿐이다). 그 결과 `ParseKeyguardSecure`가 항상
+   null을 돌려주고 `ParseLockState`는 항상 `Unknown`으로 fail-open한다 — 설계상
+   안전하지만(정상 시작을 막지 않는다) 이 게이트가 이 기기에서는 그냥 무동작이었다는
+   뜻이다.
+
+   그래서 `IsDeviceLocked`는 이제 `dumpsys trust`를 먼저 본다. 실기 출력 예:
+   `User "..." (id=0, ...) (current): trustState=TRUSTED, trustManaged=1,
+   deviceLocked=0, isActiveUnlockRunning=0, strongAuthRequired=0x0`. `(current)`가
+   붙은 사용자 줄(다중 사용자 대비)의 `deviceLocked=1`이면 `Locked`, `deviceLocked=0`이면
+   `Unlocked`다 — 이 신호는 키가드가 "떠 있는지"가 아니라 "실제로 잠겨 있는지"를
+   직접 말해주므로 Smart Lock 등 신뢰 에이전트도 정확히 반영하고, F-8(스와이프 전용
+   폰의 오탐)을 애초에 만들지 않는다. `dumpsys trust`가 아무 신호도 못 주는
+   기기/빌드에서는 위 `dumpsys window` 휴리스틱으로 폴백한다 — 삭제하지 않았다. 두
+   신호 모두 알려진 필드를 찾지 못하면 여전히 `Unknown`으로 fail-open하며, `IsDeviceLocked`
+   자체는 adb 실행 실패까지 `try/catch`로 감싼다(UI-2 fix round 1). `dumpsys window`
+   경로의 F-8 좌측 단어 경계 보정(F-9)은 여전히 유효하며 실기에서 load-bearing이었다
+   (같은 `KeyguardServiceDelegate` 블록의 `simSecure=false`가 경계 없이는 `secure=false`로
+   오독됐다). 근거: `.omc/research/2026-09-08-realdevice-lock-findings.md`.
 
 3. **단축키가 macOS에서 전혀 동작하지 않는다.** `MacKeyboardService.Start`/`Stop`/
    `ReloadConfiguration`(`DexManager.Platform.Mac/Platform/MacKeyboardService.cs`)이

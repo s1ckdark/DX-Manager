@@ -234,6 +234,184 @@ public class AdbServiceLockStateTests
                 line.Contains("dumpsys window", StringComparison.Ordinal));
     }
 
+    // --- dumpsys trust: 권위 있는 신호 (실기 SM-F971N 확인) ---
+
+    [Fact]
+    public void ParseTrustState_WhenTheCurrentUserLineShowsDeviceLockedOne_ReturnsLocked()
+    {
+        const string dump = """
+             User "Owner" (id=0, flags=0x4c13) (current): trustState=TRUSTED, trustManaged=1, deviceLocked=1, isActiveUnlockRunning=0, strongAuthRequired=0x1
+            """;
+
+        Assert.Equal(LockState.Locked, AdbService.ParseTrustState(dump));
+    }
+
+    [Fact]
+    public void ParseTrustState_WhenTheCurrentUserLineShowsDeviceLockedZero_ReturnsUnlocked()
+    {
+        const string dump = """
+             User "Owner" (id=0, flags=0x4c13) (current): trustState=TRUSTED, trustManaged=1, deviceLocked=0, isActiveUnlockRunning=0, strongAuthRequired=0x0
+            """;
+
+        Assert.Equal(LockState.Unlocked, AdbService.ParseTrustState(dump));
+    }
+
+    [Fact]
+    public void ParseTrustState_WhenANonCurrentUserLineShowsDeviceLockedOne_DoesNotWinOverTheCurrentUser()
+    {
+        // 다중 사용자 기기: id=10(비-current)이 deviceLocked=1이어도,
+        // 실제로 세션을 판단해야 하는 (current) 사용자(id=0)가
+        // deviceLocked=0이면 그 값이 이겨야 한다.
+        const string dump = """
+             User "Guest" (id=10, flags=0x0): trustState=TRUSTED, trustManaged=0, deviceLocked=1, isActiveUnlockRunning=0, strongAuthRequired=0x1
+             User "Owner" (id=0, flags=0x4c13) (current): trustState=TRUSTED, trustManaged=1, deviceLocked=0, isActiveUnlockRunning=0, strongAuthRequired=0x0
+            """;
+
+        Assert.Equal(LockState.Unlocked, AdbService.ParseTrustState(dump));
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("   ")]
+    [InlineData("SOME_UNRECOGNIZED_TRUST_SHAPE")]
+    public void ParseTrustState_WhenNoCurrentUserLineWithDeviceLockedAppears_FailsOpenToUnknown(string dump)
+    {
+        Assert.Equal(LockState.Unknown, AdbService.ParseTrustState(dump));
+    }
+
+    [Fact]
+    public void ParseTrustState_WhenTheCurrentUserLineHasNoDeviceLockedField_FailsOpenToUnknown()
+    {
+        const string dump = """
+             User "Owner" (id=0, flags=0x4c13) (current): trustState=TRUSTED, trustManaged=1
+            """;
+
+        Assert.Equal(LockState.Unknown, AdbService.ParseTrustState(dump));
+    }
+
+    [Fact]
+    public void IsDeviceLocked_PrefersDumpsysTrustOverDumpsysWindow_WhenTrustGivesAnAnswer()
+    {
+        // dumpsys window 쪽은 (일부러) 반대 답을 준다 - trust가 이겨야
+        // 실기에서 window의 secure 필드가 아예 없는 기기에서도 정확한
+        // 판단이 나온다는 걸 고정한다.
+        using var root = new TempHostRoot();
+        var adb = new FakeAdbExecutable(
+            root.Root,
+            new Dictionary<string, string> { ["phone-a"] = "HWA" },
+            new Dictionary<string, string>
+            {
+                ["phone-a"] = "mShowingLockscreen=false"
+            },
+            new Dictionary<string, string>
+            {
+                ["phone-a"] =
+                    " User \"Owner\" (id=0, flags=0x4c13) (current): " +
+                    "trustState=TRUSTED, trustManaged=1, deviceLocked=1, " +
+                    "isActiveUnlockRunning=0, strongAuthRequired=0x1"
+            });
+        var host = root.CreateHost(pathProvider: adb.CreatePathProvider());
+
+        var result = host.Adb.IsDeviceLocked("phone-a");
+
+        Assert.Equal(LockState.Locked, result);
+        Assert.Contains(
+            adb.Invocations,
+            line => line.Contains("-s phone-a", StringComparison.Ordinal) &&
+                line.Contains("dumpsys trust", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void IsDeviceLocked_WhenDumpsysTrustYieldsNothing_FallsBackToDumpsysWindow()
+    {
+        using var root = new TempHostRoot();
+        var adb = new FakeAdbExecutable(
+            root.Root,
+            new Dictionary<string, string> { ["phone-a"] = "HWA" },
+            new Dictionary<string, string>
+            {
+                ["phone-a"] = "mShowingLockscreen=true isKeyguardSecure=true"
+            });
+            // dumpsysTrustOutputByTransport를 아예 넘기지 않는다 - 이
+            // 기기/빌드에는 dumpsys trust 신호가 없다고 흉내낸다.
+        var host = root.CreateHost(pathProvider: adb.CreatePathProvider());
+
+        var result = host.Adb.IsDeviceLocked("phone-a");
+
+        Assert.Equal(LockState.Locked, result);
+        Assert.Contains(
+            adb.Invocations,
+            line => line.Contains("-s phone-a", StringComparison.Ordinal) &&
+                line.Contains("dumpsys window", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void IsDeviceLocked_WhenBothDumpsysTrustAndWindowYieldNothing_FailsOpenToUnknown()
+    {
+        using var root = new TempHostRoot();
+        var adb = new FakeAdbExecutable(
+            root.Root,
+            new Dictionary<string, string> { ["phone-a"] = "HWA" },
+            new Dictionary<string, string>
+            {
+                ["phone-a"] = "SOME_UNRECOGNIZED_DUMP_SHAPE"
+            },
+            new Dictionary<string, string>
+            {
+                ["phone-a"] = "SOME_UNRECOGNIZED_TRUST_SHAPE"
+            });
+        var host = root.CreateHost(pathProvider: adb.CreatePathProvider());
+
+        var result = host.Adb.IsDeviceLocked("phone-a");
+
+        Assert.Equal(LockState.Unknown, result);
+    }
+
+    // --- WakeScreen: 화면 깨우기 ---
+
+    [Fact]
+    public void WakeScreen_SendsKeyeventWakeupToTheCorrectDevice()
+    {
+        using var root = new TempHostRoot();
+        var adb = new FakeAdbExecutable(
+            root.Root,
+            new Dictionary<string, string> { ["phone-a"] = "HWA" });
+        var host = root.CreateHost(pathProvider: adb.CreatePathProvider());
+
+        var result = host.Adb.WakeScreen("phone-a");
+
+        Assert.True(result);
+        Assert.Contains(
+            adb.Invocations,
+            line => line.Contains("-s phone-a", StringComparison.Ordinal) &&
+                line.Contains("input keyevent 224", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void WakeScreen_WhenTheAdbProcessCannotEvenBeLaunched_ReturnsFalseInsteadOfThrowing()
+    {
+        // IsDeviceLocked의 동일한 예외-던짐 사례와 같은 이유: 화면 깨우기는
+        // 최선-노력 전처리일 뿐이므로, 이 예외 하나 때문에 DeX 시작
+        // 전체가 죽어서는 안 된다.
+        var logService = new LogService();
+        var processRunner = new ProcessRunner(logService);
+        var missingAdbPath = Path.Combine(
+            Path.GetTempPath(),
+            "dxm-tests-missing-adb",
+            Guid.NewGuid().ToString("N"),
+            "adb");
+        var adbService = new AdbService(
+            missingAdbPath,
+            1000,
+            processRunner,
+            logService);
+
+        var result = adbService.WakeScreen("phone-a");
+
+        Assert.False(result);
+    }
+
     [Fact]
     public void IsDeviceLocked_WhenTheAdbProcessCannotEvenBeLaunched_FailsOpenToUnknownInsteadOfThrowing()
     {
