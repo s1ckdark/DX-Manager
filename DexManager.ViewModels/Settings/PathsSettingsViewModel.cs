@@ -53,20 +53,58 @@ public sealed partial class PathsSettingsViewModel : ObservableObject
     private bool CanSave() => true;
 
     /// <summary>
-    /// 편집값을 전역 설정에 저장한다.
+    /// 편집값을 전역 설정에 저장한다. ADB 경로를 사용자가 실제로
+    /// <b>편집했을 때만</b> 선택 모드를 바꾼다 - 채워서 편집했으면 수동
+    /// (<see cref="AdbSelectionMode.Manual"/>), 비우도록 편집했으면 자동
+    /// (<see cref="AdbSelectionMode.Auto"/>)로 전환한다.
+    ///
+    /// 왜 "값이 채워져 있으면 Manual"이 아니라 "값이 바뀌었으면"인가:
+    /// 이 필드는 <see cref="ApplicationHost.EnsureDefaultPaths"/>가 자동
+    /// 감지한 절대 경로로 시작부터 채워져 있는 경우가 흔하다(포터블
+    /// 패키지, 또는 첫 실행). 그 상태에서 사용자가 테마 등 다른 설정만
+    /// 바꾸고 저장하면 SaveAll이 이 커맨드도 무조건 실행하므로
+    /// (SaveAll → Paths.SaveCommand, CanSave는 항상 true), "비어 있지
+    /// 않으면 Manual"로는 사용자가 입력한 적 없는 자동 감지 경로에
+    /// 조용히 Manual이 박혀 버린다 - 포터블 폴더를 옮기거나 시스템 adb를
+    /// 제거하면 그 순간 시작이 막힌다. 베이스라인(<see
+    /// cref="_baselineAdbPath"/>)과 비교해 실제로 바뀐 경우에만 모드를
+    /// 건드리고, 바뀌지 않았으면 지금 저장돼 있는 모드를 그대로 둔다 -
+    /// 이미 Manual이었다면 다시 저장해도 Manual로 남는다.
     /// </summary>
     [RelayCommand(CanExecute = nameof(CanSave))]
     private void Save()
     {
+        // 붙여넣기로 흔히 섞여 들어오는 앞뒤 공백은 트림하고 나서
+        // 베이스라인과 비교한다 - 안 그러면 자동 감지값과 공백 하나 차이인
+        // 문자열이 "편집됨"으로 잡혀 Manual로 넘어가고, 그 공백 섞인
+        // 경로는 존재하지 않는 파일이라 다음 실행이 막힌다. 저장하는
+        // 값도 같은 이유로 트림한다 - 안 그러면 트림 안 된 값 자체가
+        // 그대로 실행 불가능한 Manual 경로로 남는다. AdbPath 프로퍼티에도
+        // 다시 대입해 두어야, 이번에 트림된 값이 다음 Save의 베이스라인이
+        // 되고(트림 여부로 "편집됨"이 잘못 튀지 않는다) 화면에도 트림된
+        // 값이 보인다.
+        var adbPath = (AdbPath ?? string.Empty).Trim();
+        var adbPathEdited = !string.Equals(
+            adbPath,
+            _baselineAdbPath,
+            StringComparison.Ordinal);
+
         _gateway.Update(s =>
         {
             if (s.Paths != null)
             {
                 s.Paths.ScrcpyPath = ScrcpyPath ?? string.Empty;
-                s.Paths.AdbPath = AdbPath ?? string.Empty;
+                s.Paths.AdbPath = adbPath;
+                if (adbPathEdited)
+                {
+                    s.Paths.AdbSelectionMode = string.IsNullOrWhiteSpace(adbPath)
+                        ? AdbSelectionMode.Auto
+                        : AdbSelectionMode.Manual;
+                }
             }
         });
 
+        AdbPath = adbPath;
         CaptureBaseline();
         OnPropertyChanged(nameof(HasChanges));
     }

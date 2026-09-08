@@ -12,6 +12,8 @@ public sealed class TempHostRoot : IDisposable
 {
     private readonly string _root;
 
+    public string Root => _root;
+
     public TempHostRoot()
     {
         _root = Path.Combine(
@@ -20,12 +22,20 @@ public sealed class TempHostRoot : IDisposable
             Guid.NewGuid().ToString("N"));
     }
 
-    public ApplicationHost CreateHost() => new ApplicationHost(
-        new FakePlatformService(),
-        new FakePathProvider(_root),
-        new FakeCaptureService(),
-        new FakeKeyboardService(),
-        new FakeAutoStartService());
+    /// <param name="pathProvider">
+    /// 기본값 대신 쓸 경로 제공자. 같은 <see cref="Root"/>를 가리키는
+    /// 제공자를 재사용해 "같은 설정 파일로 앱을 다시 띄운다"를
+    /// 흉내내려는 호출자를 위한 것 - 그러지 않으면 매 호출마다 새
+    /// <see cref="FakePathProvider"/>가 만들어져 자동 감지 adb 기본값이
+    /// 호출마다 달라질 수 있다.
+    /// </param>
+    public ApplicationHost CreateHost(FakePathProvider pathProvider = null) =>
+        new ApplicationHost(
+            new FakePlatformService(),
+            pathProvider ?? new FakePathProvider(_root),
+            new FakeCaptureService(),
+            new FakeKeyboardService(),
+            new FakeAutoStartService());
 
     public void Dispose()
     {

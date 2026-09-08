@@ -241,12 +241,22 @@ public sealed class ApplicationHost : IDisposable
     {
         var modified = false;
         var currentAdb = Settings.Paths.AdbPath ?? string.Empty;
-        var forcePortableAdb = _pathProvider.IsPortablePackage &&
-            Settings.Paths.AdbSelectionMode != AdbSelectionMode.Manual;
-        if (forcePortableAdb ||
+        // 수동 ADB 선택(Manual)에서는 이 자동 보정 블록을 통째로 건너뛴다.
+        // 예전에는 파일이 없으면(!File.Exists) 모드와 무관하게 기본
+        // 경로로 조용히 교체했다 - Manual은 이전까지 실제로 켜질 방법이
+        // 없어 이 상호작용이 죽어 있었지만, 이제 켜질 수 있게 되면서
+        // 사용자가 오타를 낸 경로를 여기서 자동으로 되살려 버리면
+        // PathService.SelectRequired가 절대 실패하지 않게 되고, 사용자는
+        // 자신의 설정이 무시됐다는 사실을 영영 알 수 없다. Manual일 때는
+        // 사용자가 입력한 값을 (좋든 나쁘든) 그대로 두어야 실패가 실제로
+        // 일어나고, 그 실패가 사용자에게 보여야 한다.
+        var manualAdbSelected =
+            Settings.Paths.AdbSelectionMode == AdbSelectionMode.Manual;
+        if (!manualAdbSelected &&
+            (_pathProvider.IsPortablePackage ||
             string.IsNullOrWhiteSpace(currentAdb) ||
             !File.Exists(currentAdb) ||
-            currentAdb.EndsWith(".exe", StringComparison.OrdinalIgnoreCase))
+            currentAdb.EndsWith(".exe", StringComparison.OrdinalIgnoreCase)))
         {
             var adb = _pathProvider.ResolveDefaultAdbPath();
             if (File.Exists(adb))

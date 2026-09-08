@@ -15,6 +15,16 @@ namespace DexManager.Desktop.Views;
 /// </remarks>
 internal static class StartupErrorWindow
 {
+    // Error.Path.ManualAdbUnavailable처럼 절대 경로를 두 개 담는 메시지는
+    // 예전 고정 220px 창(가운데 정렬 + 스크롤 없음)에서는 위아래로 잘려
+    // 나갔다 - 하필 복구 방법을 설명하는 마지막 문장이 잘리는 경우가
+    // 많았다. 이 창이 뜬다는 건 앱이 시작조차 못 했다는 뜻이라, 사용자가
+    // 읽을 수 있는 마지막 채널이다. 그래서 고정 Height 대신
+    // SizeToContent + MaxHeight를 쓰고, 그래도 넘치면 ScrollViewer가
+    // 받는다 - 짧은 메시지는 예전과 거의 같아 보이고, 긴 메시지는 잘리는
+    // 대신 스크롤된다.
+    private const double MaxWindowHeight = 480;
+
     public static Window Create(Exception error)
     {
         var message = error?.Message ?? "Unknown error.";
@@ -34,18 +44,24 @@ internal static class StartupErrorWindow
             TextWrapping = TextWrapping.Wrap
         };
 
+        var content = new StackPanel
+        {
+            Margin = new Avalonia.Thickness(24),
+            Spacing = 12,
+            Children = { heading, detail }
+        };
+
         return new Window
         {
             Title = "DX Manager",
             Width = 560,
-            Height = 220,
+            MinHeight = 220,
+            MaxHeight = MaxWindowHeight,
+            SizeToContent = SizeToContent.Height,
             WindowStartupLocation = WindowStartupLocation.CenterScreen,
-            Content = new StackPanel
+            Content = new ScrollViewer
             {
-                Margin = new Avalonia.Thickness(24),
-                Spacing = 12,
-                VerticalAlignment = VerticalAlignment.Center,
-                Children = { heading, detail }
+                Content = content
             }
         };
     }

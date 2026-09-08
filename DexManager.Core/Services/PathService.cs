@@ -42,11 +42,22 @@ namespace DexManager.Services
 
             if (settings.Paths.AdbSelectionMode == AdbSelectionMode.Manual)
             {
+                // Manual은 후보가 없으면 SelectRequired가 그대로 던지고,
+                // 이 실패는 사용자가 설정 화면을 열기도 전에 앱 시작을
+                // 막는다(StartupErrorWindow) - 그래서 여기서만 일반적인
+                // "Error.Path.AdbUnavailable" 대신 실제 설정된 경로와
+                // 설정 파일 위치를 담은 메시지를 만든다. 그래야 그 창에
+                // 뜨는 한 줄만 보고도 무엇을 고쳐야 하는지, 어디를
+                // 열어야 하는지 알 수 있다.
                 return SelectRequired(
                     settings.Paths.AdbPath,
                     LocalizationService.Get(
                         "Path.Description.ManualAdb"),
-                    timeoutMs);
+                    timeoutMs,
+                    resolvedPath => LocalizationService.Format(
+                        "Error.Path.ManualAdbUnavailable",
+                        resolvedPath,
+                        _settingsService.SettingsFilePath));
             }
 
             if (PlatformHelper.RequiresLegacyAdb)
@@ -101,7 +112,15 @@ namespace DexManager.Services
             AppSettings settings,
             int timeoutMs)
         {
-            var selected = GetScrcpyAdb(settings, timeoutMs);
+            // 자동 선택에서 사용자 설정과 가장 가깝게 연결된 후보다 - 사용자가
+            // 고른 scrcpy 폴더 옆의 adb를 우선 쓴다. 이게 실패해 아래로
+            // 떨어지면(GetRunnableCandidate가 이미 실패 사유를 경고로 남긴
+            // 뒤), 최종 선택 시점에 "무엇을 대신 쓰는지"를 한 줄로 분명히
+            // 남긴다 - 그렇지 않으면 사용자는 자신의 설정이 조용히
+            // 무시됐다는 사실을 알아챌 방법이 없다(개별 후보 경고를 직접
+            // 뒤져 짜맞추지 않는 한).
+            var preferred = GetScrcpyAdb(settings, timeoutMs);
+            var selected = preferred;
             if (selected == null && _pathProvider != null)
             {
                 foreach (var candidatePath in _pathProvider.GetCandidateAdbPaths())
@@ -145,6 +164,15 @@ namespace DexManager.Services
                         "Error.Path.AutomaticAdbNotFound"));
             }
 
+            if (preferred == null)
+            {
+                _logService.Warning(LocalizationService.Format(
+                    "Log.Path.PreferredAdbFallback",
+                    LocalizationService.Get("Path.Description.ScrcpyAdb"),
+                    selected.Description,
+                    selected.Path));
+            }
+
             LogSelection(
                 selected,
                 LocalizationService.Get("Path.Mode.Automatic"));
@@ -154,7 +182,8 @@ namespace DexManager.Services
         private string SelectRequired(
             string configuredPath,
             string description,
-            int timeoutMs)
+            int timeoutMs,
+            Func<string, string> describeUnavailable = null)
         {
             var candidate = GetRunnableCandidate(
                 configuredPath,
@@ -162,10 +191,13 @@ namespace DexManager.Services
                 timeoutMs);
             if (candidate == null)
             {
-                throw new FileNotFoundException(
-                    LocalizationService.Format(
+                var message = describeUnavailable != null
+                    ? describeUnavailable(
+                        _settingsService.ResolvePath(configuredPath))
+                    : LocalizationService.Format(
                         "Error.Path.AdbUnavailable",
-                        description));
+                        description);
+                throw new FileNotFoundException(message);
             }
 
             LogSelection(
@@ -217,19 +249,26 @@ namespace DexManager.Services
 
             try
             {
-                var result = _processRunner.Run(
-                    path,
-                    "version",
-                    Path.GetDirectoryName(path),
-                    Math.Max(timeoutMs, 3000),
-                    false,
-                    Encoding.Default);
+                // 부하로 인한 일시적 타임아웃 때문에 멀쩡한 후보를 죽었다고
+                // 오판하지 않도록 짧게 재시도한다(TransientProbeRetry) -
+                // 타임아웃이 아닌 실패(파일은 있지만 adb가 아니다 등)는
+                // 다시 해봤자 같은 결과이므로 그 경우는 즉시 반환된다.
+                var result = TransientProbeRetry.Run(delegate
+                {
+                    return _processRunner.Run(
+                        path,
+                        "version",
+                        Path.GetDirectoryName(path),
+                        Math.Max(timeoutMs, 3000),
+                        false,
+                        Encoding.Default);
+                });
                 if (!result.IsSuccess)
                 {
                     _logService.Warning(LocalizationService.Format(
                         "Log.Path.CandidateExecutionFailed",
                         description,
-                        result.StandardError));
+                        DescribeFailure(result)));
                     return null;
                 }
 
@@ -251,6 +290,28 @@ namespace DexManager.Services
                     ex.Message));
                 return null;
             }
+        }
+
+        /// <summary>
+        /// 후보 프로브 실패 사유를 사람이 읽을 수 있게 설명한다.
+        /// <c>result.StandardError</c>는 타임아웃(TimedOut)일 때는 항상
+        /// 비어 있다 - 프로세스가 아무 출력도 못 낸 채 강제 종료됐기
+        /// 때문이다. 거기에 빈 문자열을 그대로 로그에 박으면 "실행 실패:
+        /// (공백)"처럼 원인을 전혀 알 수 없는 메시지가 남는다.
+        /// </summary>
+        private static string DescribeFailure(ProcessResult result)
+        {
+            if (result.TimedOut)
+                return LocalizationService.Format(
+                    "Path.CandidateTimedOut",
+                    (long)result.Duration.TotalMilliseconds);
+            if (result.Canceled)
+                return LocalizationService.Get("Path.CandidateCanceled");
+            if (!string.IsNullOrWhiteSpace(result.StandardError))
+                return result.StandardError;
+            return LocalizationService.Format(
+                "Path.CandidateExitCode",
+                result.ExitCode);
         }
 
         private void LogSelection(AdbPathCandidate candidate, string settingsModeLabel)
