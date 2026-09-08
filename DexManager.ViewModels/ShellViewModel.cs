@@ -60,7 +60,7 @@ public sealed partial class ShellViewModel : ObservableObject, IDisposable
     private void OpenSettings()
     {
         var gateway = new SettingsGateway(_host);
-        var settings = new SettingsViewModel(gateway, Devices);
+        var settings = new SettingsViewModel(gateway, Devices, _host.RuntimeSessions, _dispatcher);
         SettingsRequested?.Invoke(this, settings);
     }
 

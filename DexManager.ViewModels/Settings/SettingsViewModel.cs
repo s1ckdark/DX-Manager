@@ -1,6 +1,8 @@
 using System.ComponentModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using DexManager.Models;
+using DexManager.Services;
 
 namespace DexManager.ViewModels;
 
@@ -21,15 +23,29 @@ public sealed partial class SettingsViewModel : ObservableObject, IDisposable
 {
     private readonly ISettingsGateway _gateway;
     private readonly IDeviceSelectionSource _deviceSelection;
+    private readonly DeviceRuntimeSessionRegistry _sessions;
+    private readonly IUiDispatcher _dispatcher;
     private bool _disposed;
 
     /// <param name="gateway">설정 읽기·쓰기 경계. 다섯 페이지 전부가 공유한다.</param>
     /// <param name="deviceSelection">대상 기기 선택 출처. DeviceListViewModel
     /// 전체가 아니라 이 좁은 인터페이스만 필요로 한다.</param>
-    public SettingsViewModel(ISettingsGateway gateway, IDeviceSelectionSource deviceSelection)
+    /// <param name="sessions">대상 기기의 DeX 실행 여부를 읽는 출처. Phase 2의
+    /// <see cref="DeviceViewModel"/>과 동일한 런타임 레지스트리를 공유한다 -
+    /// 실행 중 변경은 다음 시작부터 적용된다는 Global Constraint를 화면이
+    /// 정직하게 알릴 수 있도록 <see cref="IsTargetDexRunning"/>을 채운다.</param>
+    /// <param name="dispatcher">레지스트리의 <c>Changed</c>는 런타임 스레드에서
+    /// 오므로, 관측 가능한 상태를 건드리기 전에 UI 스레드로 마샬링한다.</param>
+    public SettingsViewModel(
+        ISettingsGateway gateway,
+        IDeviceSelectionSource deviceSelection,
+        DeviceRuntimeSessionRegistry sessions,
+        IUiDispatcher dispatcher)
     {
         _gateway = gateway ?? throw new ArgumentNullException(nameof(gateway));
         _deviceSelection = deviceSelection ?? throw new ArgumentNullException(nameof(deviceSelection));
+        _sessions = sessions ?? throw new ArgumentNullException(nameof(sessions));
+        _dispatcher = dispatcher ?? throw new ArgumentNullException(nameof(dispatcher));
 
         _paths = new PathsSettingsViewModel(_gateway);
         _appearance = new AppearanceSettingsViewModel(_gateway);
@@ -39,6 +55,11 @@ public sealed partial class SettingsViewModel : ObservableObject, IDisposable
         LoadDevicePages(_deviceSelection.SelectedIdentity);
 
         _deviceSelection.PropertyChanged += OnDeviceSelectionPropertyChanged;
+
+        // DeviceViewModel과 같은 순서: 슬롯/페이지를 먼저 만든 뒤 구독하고,
+        // 마지막으로 현재 스냅샷을 한 번 적용해 초기 상태를 채운다.
+        _sessions.Changed += OnSessionsChanged;
+        ApplyRuntime(_sessions.Current);
     }
 
     /// <summary>전역 경로 설정 페이지.</summary>
@@ -67,10 +88,49 @@ public sealed partial class SettingsViewModel : ObservableObject, IDisposable
     [ObservableProperty]
     private bool _hasChanges;
 
+    /// <summary>
+    /// 대상 기기(<see cref="IDeviceSelectionSource.SelectedIdentity"/>)에서
+    /// 지금 이 순간 DeX가 실행 중인지. true여도 저장은 그대로 허용된다 -
+    /// Global Constraint("실행 중 변경은 다음 시작부터")를 화면이 정직하게
+    /// 알리기 위한 안내용 플래그일 뿐이다. 실제 문구는 Task 12(뷰)의 몫이다.
+    /// 대상 기기가 없으면(identity가 비어 있으면) 항상 false다.
+    /// </summary>
+    [ObservableProperty]
+    private bool _isTargetDexRunning;
+
     private void OnDeviceSelectionPropertyChanged(object sender, PropertyChangedEventArgs e)
     {
         if (e.PropertyName != nameof(IDeviceSelectionSource.SelectedIdentity)) return;
         LoadDevicePages(_deviceSelection.SelectedIdentity);
+
+        // 대상 기기가 바뀌었으니 새 identity 기준으로 다시 계산한다. 이
+        // 핸들러는 SelectedIdentity의 setter가 직접 호출하므로 이미
+        // 호출자의 스레드(대개 UI 스레드)에서 실행된다 - 레지스트리
+        // Changed처럼 런타임 스레드에서 오는 게 아니라서 마샬링이 필요 없다.
+        ApplyRuntime(_sessions.Current);
+    }
+
+    private void OnSessionsChanged(
+        object sender,
+        DeviceRuntimeRegistryChangedEventArgs e)
+    {
+        // 런타임 스레드에서 온다. 관측 가능한 상태를 건드리기 전에
+        // UI 스레드로 넘긴다.
+        var snapshot = e?.Snapshot;
+        _dispatcher.Post(() => ApplyRuntime(snapshot));
+    }
+
+    private void ApplyRuntime(DeviceRuntimeRegistrySnapshot snapshot)
+    {
+        // Post는 비동기다. 구독을 해제해도 이미 큐에 들어간 클로저는
+        // 되돌릴 수 없으므로 실행 시점에 다시 확인해야 한다.
+        if (_disposed) return;
+
+        var identity = _deviceSelection.SelectedIdentity;
+        var session = string.IsNullOrEmpty(identity)
+            ? null
+            : snapshot?.FindByIdentity(identity);
+        IsTargetDexRunning = session?.Dex?.IsRunning == true;
     }
 
     /// <summary>
@@ -198,6 +258,7 @@ public sealed partial class SettingsViewModel : ObservableObject, IDisposable
         _disposed = true;
 
         _deviceSelection.PropertyChanged -= OnDeviceSelectionPropertyChanged;
+        _sessions.Changed -= OnSessionsChanged;
         DetachGlobalPageHandlers();
         DetachDevicePageHandlers();
     }

@@ -1,5 +1,6 @@
 using Xunit;
 using DexManager.Models;
+using DexManager.Services;
 
 namespace DexManager.ViewModels.Tests.Settings;
 
@@ -17,7 +18,7 @@ public class SettingsViewModelTests
         var gateway = new FakeSettingsGateway();
         var deviceSelection = new FakeDeviceSelectionSource();
 
-        var settings = new SettingsViewModel(gateway, deviceSelection);
+        var settings = CreateSettings(gateway, deviceSelection);
 
         Assert.Null(settings.DisplayStream);
         Assert.Null(settings.Slot);
@@ -32,7 +33,7 @@ public class SettingsViewModelTests
         var gateway = new FakeSettingsGateway();
         var deviceSelection = new FakeDeviceSelectionSource { SelectedIdentity = "device-a" };
 
-        var settings = new SettingsViewModel(gateway, deviceSelection);
+        var settings = CreateSettings(gateway, deviceSelection);
 
         Assert.NotNull(settings.DisplayStream);
         Assert.NotNull(settings.Slot);
@@ -50,7 +51,7 @@ public class SettingsViewModelTests
         var defaultWidth = AppSettings.CreateDefault().VirtualDisplay.Width;
 
         var deviceSelection = new FakeDeviceSelectionSource { SelectedIdentity = "device-a" };
-        var settings = new SettingsViewModel(gateway, deviceSelection);
+        var settings = CreateSettings(gateway, deviceSelection);
 
         Assert.Equal(1111, settings.DisplayStream.Values.Width);
         var deviceAPage = settings.DisplayStream;
@@ -66,7 +67,7 @@ public class SettingsViewModelTests
     {
         var gateway = new FakeSettingsGateway();
         var deviceSelection = new FakeDeviceSelectionSource { SelectedIdentity = "device-a" };
-        var settings = new SettingsViewModel(gateway, deviceSelection);
+        var settings = CreateSettings(gateway, deviceSelection);
 
         Assert.NotNull(settings.DisplayStream);
 
@@ -81,7 +82,7 @@ public class SettingsViewModelTests
     {
         var gateway = new FakeSettingsGateway();
         var deviceSelection = new FakeDeviceSelectionSource();
-        var settings = new SettingsViewModel(gateway, deviceSelection);
+        var settings = CreateSettings(gateway, deviceSelection);
 
         var originalScrcpyPath = gateway.Current.Paths.ScrcpyPath;
         settings.Paths.ScrcpyPath = "/edited/scrcpy";
@@ -103,7 +104,7 @@ public class SettingsViewModelTests
     {
         var gateway = new FakeSettingsGateway();
         var deviceSelection = new FakeDeviceSelectionSource { SelectedIdentity = "device-a" };
-        var settings = new SettingsViewModel(gateway, deviceSelection);
+        var settings = CreateSettings(gateway, deviceSelection);
 
         settings.Paths.ScrcpyPath = "/new/scrcpy";
         settings.DisplayStream.Values.Width = 1280;
@@ -129,7 +130,7 @@ public class SettingsViewModelTests
         var gateway = new FakeSettingsGateway();
         var originalCaptureHotkey = gateway.Current.KeyMappings.CaptureHotkey;
         var deviceSelection = new FakeDeviceSelectionSource();
-        var settings = new SettingsViewModel(gateway, deviceSelection);
+        var settings = CreateSettings(gateway, deviceSelection);
 
         settings.Interaction.CaptureHotkey = "F1";
         settings.Interaction.ExitHotkey = "F1";
@@ -155,7 +156,7 @@ public class SettingsViewModelTests
     {
         var gateway = new FakeSettingsGateway();
         var deviceSelection = new FakeDeviceSelectionSource { SelectedIdentity = "device-a" };
-        var settings = new SettingsViewModel(gateway, deviceSelection);
+        var settings = CreateSettings(gateway, deviceSelection);
 
         Assert.False(settings.HasChanges);
 
@@ -185,5 +186,183 @@ public class SettingsViewModelTests
         settings.Paths.ScrcpyPath = "/isolated/paths/only";
         Assert.True(settings.Paths.HasChanges);
         Assert.True(settings.HasChanges);
+    }
+
+    // --- 실행 중 기기 경고 (task-5) ---
+
+    [Fact]
+    public void Constructor_TargetDeviceHasDexRunning_IsTargetDexRunningIsTrue()
+    {
+        var sessions = CreateRuntimeRegistryWithDexRunning("device-a", "USB-A");
+        var gateway = new FakeSettingsGateway();
+        var deviceSelection = new FakeDeviceSelectionSource { SelectedIdentity = "device-a" };
+
+        var settings = CreateSettings(gateway, deviceSelection, sessions);
+
+        Assert.True(settings.IsTargetDexRunning);
+    }
+
+    [Fact]
+    public void Constructor_ADifferentDeviceHasDexRunning_IsTargetDexRunningIsFalse()
+    {
+        // device-b의 DeX가 도는 동안, 대상은 device-a다 - 플래그는 대상
+        // identity만 봐야 하며 레지스트리 전역 상태에 휘둘리면 안 된다.
+        var sessions = CreateRuntimeRegistryWithDexRunning("device-b", "USB-B");
+        var gateway = new FakeSettingsGateway();
+        var deviceSelection = new FakeDeviceSelectionSource { SelectedIdentity = "device-a" };
+
+        var settings = CreateSettings(gateway, deviceSelection, sessions);
+
+        Assert.False(settings.IsTargetDexRunning);
+    }
+
+    [Fact]
+    public void RegistryChangedWhileSettingsOpen_FlipsTheFlagLiveThroughTheDispatcher()
+    {
+        var sessions = CreateRuntimeRegistry("device-a", "USB-A");
+        var gateway = new FakeSettingsGateway();
+        var deviceSelection = new FakeDeviceSelectionSource { SelectedIdentity = "device-a" };
+        var dispatcher = new QueueingUiDispatcher();
+
+        var settings = CreateSettings(gateway, deviceSelection, sessions, dispatcher);
+        Assert.False(settings.IsTargetDexRunning);
+
+        sessions.SetDexSession("USB-A", new ManagedDisplaySession
+        {
+            Serial = "USB-A",
+            DeviceIdentity = "device-a"
+        });
+
+        // Post는 비동기다 - 큐를 비우기 전까지는 아직 반영되지 않는다.
+        Assert.False(settings.IsTargetDexRunning);
+        dispatcher.Drain();
+        Assert.True(settings.IsTargetDexRunning);
+
+        sessions.SetDexSession("USB-A", null);
+        dispatcher.Drain();
+        Assert.False(settings.IsTargetDexRunning);
+    }
+
+    [Fact]
+    public void SelectedIdentityChangedToADeviceWithDexRunning_FlipsTheFlagTrue()
+    {
+        var sessions = CreateRuntimeRegistryWithDexRunning("device-b", "USB-B");
+        // device-a도 레지스트리에 등록해 둔다 - identity가 존재해야 전환이
+        // "알 수 없는 기기"가 아니라 실제 device-a 세션을 찾는 경로를 탄다.
+        var physical = new PhysicalDeviceRegistry();
+        physical.Reconcile(new[] { Discovered("device-a", "Galaxy A", "USB-A") });
+        sessions.Reconcile(physical.Current);
+
+        var gateway = new FakeSettingsGateway();
+        var deviceSelection = new FakeDeviceSelectionSource { SelectedIdentity = "device-a" };
+        var settings = CreateSettings(gateway, deviceSelection, sessions);
+        Assert.False(settings.IsTargetDexRunning);
+
+        deviceSelection.SelectedIdentity = "device-b";
+
+        Assert.True(settings.IsTargetDexRunning);
+    }
+
+    [Fact]
+    public void SelectedIdentityChangedToADeviceWithoutDexRunning_FlipsTheFlagFalse()
+    {
+        var sessions = CreateRuntimeRegistryWithDexRunning("device-a", "USB-A");
+        var physical = new PhysicalDeviceRegistry();
+        physical.Reconcile(new[] { Discovered("device-b", "Galaxy B", "USB-B") });
+        sessions.Reconcile(physical.Current);
+
+        var gateway = new FakeSettingsGateway();
+        var deviceSelection = new FakeDeviceSelectionSource { SelectedIdentity = "device-a" };
+        var settings = CreateSettings(gateway, deviceSelection, sessions);
+        Assert.True(settings.IsTargetDexRunning);
+
+        deviceSelection.SelectedIdentity = "device-b";
+
+        Assert.False(settings.IsTargetDexRunning);
+    }
+
+    [Fact]
+    public void AfterDispose_ASubsequentRegistryChanged_DoesNotTouchTheFlag()
+    {
+        // Post는 비동기다: 이벤트가 디스패처 큐까지 들어간 뒤에 Dispose가
+        // 끼어드는 경합을 재현해야 한다 - Dispose를 먼저 부르면 구독이
+        // 곧장 해제되어 OnSessionsChanged 자체가 걸리지 않으므로,
+        // ApplyRuntime의 실행 시점 _disposed 재확인은 전혀 검증되지 않는다.
+        // 그래서 여기서는 DeviceViewModelTests.DisposedRowStopsFollowingTheRegistry와
+        // 같은 순서로 만든다: 먼저 Changed를 큐에 넣고(SetDexSession),
+        // 그 다음 Dispose, 마지막에 Drain해서 이미 큐에 들어간 클로저가
+        // 실행 시점에 스스로를 막는지 본다.
+        var sessions = CreateRuntimeRegistry("device-a", "USB-A");
+        var gateway = new FakeSettingsGateway();
+        var deviceSelection = new FakeDeviceSelectionSource { SelectedIdentity = "device-a" };
+        var dispatcher = new QueueingUiDispatcher();
+        var settings = CreateSettings(gateway, deviceSelection, sessions, dispatcher);
+
+        sessions.SetDexSession("USB-A", new ManagedDisplaySession
+        {
+            Serial = "USB-A",
+            DeviceIdentity = "device-a"
+        });
+        Assert.Equal(1, dispatcher.PendingCount);
+
+        settings.Dispose();
+        dispatcher.Drain();
+
+        Assert.False(settings.IsTargetDexRunning);
+    }
+
+    private static SettingsViewModel CreateSettings(
+        ISettingsGateway gateway,
+        IDeviceSelectionSource deviceSelection,
+        DeviceRuntimeSessionRegistry sessions = null,
+        IUiDispatcher dispatcher = null)
+    {
+        return new SettingsViewModel(
+            gateway,
+            deviceSelection,
+            sessions ?? new DeviceRuntimeSessionRegistry(),
+            dispatcher ?? new ImmediateUiDispatcher());
+    }
+
+    private static DeviceRuntimeSessionRegistry CreateRuntimeRegistry(
+        string identity,
+        string serial)
+    {
+        var physical = new PhysicalDeviceRegistry();
+        physical.Reconcile(new[] { Discovered(identity, "Galaxy", serial) });
+        var sessions = new DeviceRuntimeSessionRegistry();
+        sessions.Reconcile(physical.Current);
+        return sessions;
+    }
+
+    private static DeviceRuntimeSessionRegistry CreateRuntimeRegistryWithDexRunning(
+        string identity,
+        string serial)
+    {
+        var sessions = CreateRuntimeRegistry(identity, serial);
+        sessions.SetDexSession(serial, new ManagedDisplaySession
+        {
+            Serial = serial,
+            DeviceIdentity = identity
+        });
+        return sessions;
+    }
+
+    private static DiscoveredDeviceTransport Discovered(
+        string identity,
+        string name,
+        string serial,
+        DeviceTransportKind kind = DeviceTransportKind.Usb,
+        AdbDeviceStatus status = AdbDeviceStatus.Device)
+    {
+        return new DiscoveredDeviceTransport
+        {
+            DeviceIdentity = identity,
+            DisplayName = name,
+            Serial = serial,
+            Kind = kind,
+            Status = status,
+            RawStatus = status.ToString().ToLowerInvariant()
+        };
     }
 }
