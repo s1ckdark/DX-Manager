@@ -1,6 +1,7 @@
 using System;
 using System.Runtime.InteropServices;
 using DexManager.Desktop;
+using DexManager.Models;
 using Xunit;
 
 namespace DexManager.Desktop.Tests;
@@ -50,12 +51,15 @@ public class SignalCleanupBudgetsTests
     [Fact]
     public void NonInteractiveBudget_IsAtLeastAsLongAsASingleAdbCallIsAllowedToTake()
     {
-        // AppSettings.cs의 기본 ProcessTimeoutMs(15000ms)가 "이 앱이 단일
-        // adb 호출 하나를 기다릴 가치가 있다고 보는" 상한이다. 비대화형
-        // 예산이 이보다 짧으면, 신호 처리기가 이 앱의 다른 어떤 코드보다도
-        // 더 성급하게 정상적인 단일 호출을 잘라버리는 셈이 된다.
-        Assert.True(
-            SignalCleanupBudgets.NonInteractive >= TimeSpan.FromSeconds(15));
+        // AppSettings.Timing.ProcessTimeoutMs가 "이 앱이 단일 adb 호출 하나를
+        // 기다릴 가치가 있다고 보는" 상한이다. 여기서 그 상수를 하드코딩된
+        // 15초로 베껴 적으면, 누군가 ProcessTimeoutMs를 나중에 올려도 이
+        // 테스트는 그 사실을 모른 채 계속 통과한다 - 이름이 주장하는 관계를
+        // 실제로는 지키지 못하게 된다. 그래서 상수를 직접 읽는다.
+        var singleAdbCall = TimeSpan.FromMilliseconds(
+            AppSettings.CreateDefault().Timing.ProcessTimeoutMs);
+
+        Assert.True(SignalCleanupBudgets.NonInteractive >= singleAdbCall);
     }
 
     [Fact]
