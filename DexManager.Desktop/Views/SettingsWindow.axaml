@@ -86,6 +86,10 @@
                         Spacing="10"
                         Margin="16">
 
+              <TextBlock Text="{x:Static local:SettingsWindowStrings.SlotsHeader}"
+                         TextWrapping="Wrap"
+                         Opacity="0.8" />
+
               <TextBlock Text="{Binding ValidationMessage}"
                          Foreground="Red"
                          TextWrapping="Wrap"
@@ -105,42 +109,78 @@
                           <TextBlock Text="{Binding Slot}" FontWeight="SemiBold" />
                         </StackPanel>
 
+                        <!-- Custom width/Custom height were removed here (Ruling 7):
+                             SingleWindowService.BuildArguments only ever reads
+                             Width, Height and Dpi to build the new-display
+                             argument; CustomWidth/CustomHeight round-trip
+                             through the model but are never consumed, so they
+                             were dead UI. The remaining real fields below were
+                             re-flowed to fill the grid with no gaps; the model
+                             properties themselves are untouched. -->
                         <Grid ColumnDefinitions="110,*,110,*"
-                              RowDefinitions="Auto,Auto,Auto,Auto,Auto"
+                              RowDefinitions="Auto,Auto,Auto,Auto"
                               ColumnSpacing="8" RowSpacing="6">
-                          <TextBlock Grid.Row="0" Grid.Column="0" Text="Width" VerticalAlignment="Center" />
-                          <TextBox Grid.Row="0" Grid.Column="1" Text="{Binding Width, Mode=TwoWay}" />
-                          <TextBlock Grid.Row="0" Grid.Column="2" Text="Height" VerticalAlignment="Center" />
-                          <TextBox Grid.Row="0" Grid.Column="3" Text="{Binding Height, Mode=TwoWay}" />
+                          <TextBlock Grid.Row="0" Grid.Column="0" Text="Width" VerticalAlignment="Center"
+                                     ToolTip.Tip="{x:Static local:SettingsWindowStrings.SlotsWidthTip}" />
+                          <TextBox Grid.Row="0" Grid.Column="1" Text="{Binding Width, Mode=TwoWay}"
+                                    Watermark="1280"
+                                    ToolTip.Tip="{x:Static local:SettingsWindowStrings.SlotsWidthTip}" />
+                          <TextBlock Grid.Row="0" Grid.Column="2" Text="Height" VerticalAlignment="Center"
+                                     ToolTip.Tip="{x:Static local:SettingsWindowStrings.SlotsHeightTip}" />
+                          <TextBox Grid.Row="0" Grid.Column="3" Text="{Binding Height, Mode=TwoWay}"
+                                    Watermark="720"
+                                    ToolTip.Tip="{x:Static local:SettingsWindowStrings.SlotsHeightTip}" />
 
-                          <TextBlock Grid.Row="1" Grid.Column="0" Text="DPI" VerticalAlignment="Center" />
-                          <TextBox Grid.Row="1" Grid.Column="1" Text="{Binding Dpi, Mode=TwoWay}" />
-                          <TextBlock Grid.Row="1" Grid.Column="2" Text="Max FPS" VerticalAlignment="Center" />
-                          <TextBox Grid.Row="1" Grid.Column="3" Text="{Binding MaxFps, Mode=TwoWay}" />
+                          <TextBlock Grid.Row="1" Grid.Column="0" Text="DPI" VerticalAlignment="Center"
+                                     ToolTip.Tip="{x:Static local:SettingsWindowStrings.SlotsDpiTip}" />
+                          <TextBox Grid.Row="1" Grid.Column="1" Text="{Binding Dpi, Mode=TwoWay}"
+                                    Watermark="320"
+                                    ToolTip.Tip="{x:Static local:SettingsWindowStrings.SlotsDpiTip}" />
+                          <TextBlock Grid.Row="1" Grid.Column="2" Text="Max FPS" VerticalAlignment="Center"
+                                     ToolTip.Tip="{x:Static local:SettingsWindowStrings.SlotsMaxFpsTip}" />
+                          <TextBox Grid.Row="1" Grid.Column="3" Text="{Binding MaxFps, Mode=TwoWay}"
+                                    Watermark="60"
+                                    ToolTip.Tip="{x:Static local:SettingsWindowStrings.SlotsMaxFpsTip}" />
 
-                          <TextBlock Grid.Row="2" Grid.Column="0" Text="Bitrate" VerticalAlignment="Center" />
-                          <TextBox Grid.Row="2" Grid.Column="1" Text="{Binding BitRate, Mode=TwoWay}" />
-                          <TextBlock Grid.Row="2" Grid.Column="2" Text="Custom width" VerticalAlignment="Center" />
-                          <TextBox Grid.Row="2" Grid.Column="3" Text="{Binding CustomWidth, Mode=TwoWay}" />
+                          <!-- App package is the key field (required to start
+                               the slot) - moved up here, ahead of Bitrate, so
+                               it reads earlier than the other secondary
+                               fields. -->
+                          <TextBlock Grid.Row="2" Grid.Column="0" Text="App package" FontWeight="SemiBold" VerticalAlignment="Center"
+                                     ToolTip.Tip="{x:Static local:SettingsWindowStrings.SlotsAppPackageTip}" />
+                          <TextBox Grid.Row="2" Grid.Column="1" Text="{Binding StartAppPackage, Mode=TwoWay}"
+                                    Watermark="com.kakao.talk"
+                                    ToolTip.Tip="{x:Static local:SettingsWindowStrings.SlotsAppPackageTip}" />
+                          <TextBlock Grid.Row="2" Grid.Column="2" Text="Bitrate" VerticalAlignment="Center"
+                                     ToolTip.Tip="{x:Static local:SettingsWindowStrings.SlotsBitRateTip}" />
+                          <TextBox Grid.Row="2" Grid.Column="3" Text="{Binding BitRate, Mode=TwoWay}"
+                                    Watermark="8M"
+                                    ToolTip.Tip="{x:Static local:SettingsWindowStrings.SlotsBitRateTip}" />
 
-                          <TextBlock Grid.Row="3" Grid.Column="0" Text="Custom height" VerticalAlignment="Center" />
-                          <TextBox Grid.Row="3" Grid.Column="1" Text="{Binding CustomHeight, Mode=TwoWay}" />
-                          <TextBlock Grid.Row="3" Grid.Column="2" Text="App package" VerticalAlignment="Center" />
-                          <TextBox Grid.Row="3" Grid.Column="3" Text="{Binding StartAppPackage, Mode=TwoWay}" />
-
-                          <TextBlock Grid.Row="4" Grid.Column="0" Text="App name" VerticalAlignment="Center" />
-                          <TextBox Grid.Row="4" Grid.Column="1" Text="{Binding StartAppName, Mode=TwoWay}" />
-                          <TextBlock Grid.Row="4" Grid.Column="2" Text="Extra args" VerticalAlignment="Center" />
-                          <TextBox Grid.Row="4" Grid.Column="3" Text="{Binding AdditionalArguments, Mode=TwoWay}" />
+                          <TextBlock Grid.Row="3" Grid.Column="0" Text="App name" VerticalAlignment="Center"
+                                     ToolTip.Tip="{x:Static local:SettingsWindowStrings.SlotsAppNameTip}" />
+                          <TextBox Grid.Row="3" Grid.Column="1" Text="{Binding StartAppName, Mode=TwoWay}"
+                                    Watermark="KakaoTalk"
+                                    ToolTip.Tip="{x:Static local:SettingsWindowStrings.SlotsAppNameTip}" />
+                          <TextBlock Grid.Row="3" Grid.Column="2" Text="Extra args" VerticalAlignment="Center"
+                                     ToolTip.Tip="{x:Static local:SettingsWindowStrings.SlotsExtraArgsTip}" />
+                          <TextBox Grid.Row="3" Grid.Column="3" Text="{Binding AdditionalArguments, Mode=TwoWay}"
+                                    ToolTip.Tip="{x:Static local:SettingsWindowStrings.SlotsExtraArgsTip}" />
                         </Grid>
 
                         <WrapPanel>
-                          <CheckBox Content="Turn screen off" IsChecked="{Binding TurnScreenOff, Mode=TwoWay}" Margin="0,0,12,4" />
-                          <CheckBox Content="Stay awake" IsChecked="{Binding StayAwake, Mode=TwoWay}" Margin="0,0,12,4" />
-                          <CheckBox Content="HID keyboard" IsChecked="{Binding UseHidKeyboard, Mode=TwoWay}" Margin="0,0,12,4" />
-                          <CheckBox Content="HID mouse" IsChecked="{Binding UseHidMouse, Mode=TwoWay}" Margin="0,0,12,4" />
-                          <CheckBox Content="Force-stop before start" IsChecked="{Binding ForceStopStartApp, Mode=TwoWay}" Margin="0,0,12,4" />
-                          <CheckBox Content="Flex display" IsChecked="{Binding FlexDisplay, Mode=TwoWay}" Margin="0,0,12,4" />
+                          <CheckBox Content="Turn screen off" IsChecked="{Binding TurnScreenOff, Mode=TwoWay}" Margin="0,0,12,4"
+                                    ToolTip.Tip="{x:Static local:SettingsWindowStrings.SlotsTurnScreenOffTip}" />
+                          <CheckBox Content="Stay awake" IsChecked="{Binding StayAwake, Mode=TwoWay}" Margin="0,0,12,4"
+                                    ToolTip.Tip="{x:Static local:SettingsWindowStrings.SlotsStayAwakeTip}" />
+                          <CheckBox Content="HID keyboard" IsChecked="{Binding UseHidKeyboard, Mode=TwoWay}" Margin="0,0,12,4"
+                                    ToolTip.Tip="{x:Static local:SettingsWindowStrings.SlotsHidKeyboardTip}" />
+                          <CheckBox Content="HID mouse" IsChecked="{Binding UseHidMouse, Mode=TwoWay}" Margin="0,0,12,4"
+                                    ToolTip.Tip="{x:Static local:SettingsWindowStrings.SlotsHidMouseTip}" />
+                          <CheckBox Content="Force-stop before start" IsChecked="{Binding ForceStopStartApp, Mode=TwoWay}" Margin="0,0,12,4"
+                                    ToolTip.Tip="{x:Static local:SettingsWindowStrings.SlotsForceStopTip}" />
+                          <CheckBox Content="Flex display" IsChecked="{Binding FlexDisplay, Mode=TwoWay}" Margin="0,0,12,4"
+                                    ToolTip.Tip="{x:Static local:SettingsWindowStrings.SlotsFlexDisplayTip}" />
                         </WrapPanel>
                       </StackPanel>
                     </Border>

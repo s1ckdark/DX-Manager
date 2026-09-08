@@ -743,4 +743,19 @@
   <data name="MiniBar.Collapse" xml:space="preserve"><value>Collapse the control bar</value></data>
   <data name="MiniBar.Expand" xml:space="preserve"><value>Expand the control bar</value></data>
   <data name="Log.MiniBar.CommandFailed" xml:space="preserve"><value>The mini control bar command could not be sent.</value></data>
+  <data name="Settings.Slots.Header" xml:space="preserve"><value>Each slot launches one Android app in its own scrcpy window on a separate virtual display. Set the app's package name and window size below, then start it from the main window.</value></data>
+  <data name="Settings.Slots.WidthTip" xml:space="preserve"><value>Width of this slot's virtual display, in pixels.</value></data>
+  <data name="Settings.Slots.HeightTip" xml:space="preserve"><value>Height of this slot's virtual display, in pixels.</value></data>
+  <data name="Settings.Slots.DpiTip" xml:space="preserve"><value>Screen density (DPI) for the virtual display. Higher values make on-screen elements appear smaller and sharper; 160-420 is a typical range.</value></data>
+  <data name="Settings.Slots.MaxFpsTip" xml:space="preserve"><value>Maximum frames per second captured from the device.</value></data>
+  <data name="Settings.Slots.BitRateTip" xml:space="preserve"><value>Video bitrate for the stream, e.g. 8M for 8 Mbps.</value></data>
+  <data name="Settings.Slots.AppPackageTip" xml:space="preserve"><value>Android package name to launch in this slot, e.g. com.kakao.talk. Required to start the slot.</value></data>
+  <data name="Settings.Slots.AppNameTip" xml:space="preserve"><value>Optional friendly name shown in the window's title bar only. It does not affect which app launches.</value></data>
+  <data name="Settings.Slots.ExtraArgsTip" xml:space="preserve"><value>Extra scrcpy command-line arguments appended as-is. Leave blank unless you need a specific scrcpy option.</value></data>
+  <data name="Settings.Slots.TurnScreenOffTip" xml:space="preserve"><value>Turns the phone's physical screen off while this slot is running.</value></data>
+  <data name="Settings.Slots.StayAwakeTip" xml:space="preserve"><value>Keeps the device awake (screen won't sleep) while this slot is running.</value></data>
+  <data name="Settings.Slots.HidKeyboardTip" xml:space="preserve"><value>Routes keyboard input via HID instead of the default method. Windows only - has no effect on macOS.</value></data>
+  <data name="Settings.Slots.HidMouseTip" xml:space="preserve"><value>Routes mouse input via HID instead of the default method. Windows only - has no effect on macOS.</value></data>
+  <data name="Settings.Slots.ForceStopTip" xml:space="preserve"><value>Force-stops the app before launching it, so it always starts fresh instead of resuming its last state.</value></data>
+  <data name="Settings.Slots.FlexDisplayTip" xml:space="preserve"><value>Lets you resize the virtual display by dragging the scrcpy window's edges. Requires scrcpy 4.0 or newer; ignored on older versions.</value></data>
 </root>

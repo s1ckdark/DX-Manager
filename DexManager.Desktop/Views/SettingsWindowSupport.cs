@@ -37,4 +37,41 @@ public static class SettingsWindowStrings
     /// 완전한 스텁) - 캡처/표시/저장은 되지만 앱이 그 값을 실제로 감지해
     /// 반응하지는 않는다.</summary>
     public static string HotkeyMacNotice => LocalizationService.Get("Settings.HotkeyMacNotice");
+
+    /// <summary>UI-3: Slots 탭 상단에 표시하는 설명 - 슬롯 하나가 실제로
+    /// 무엇을 하는지(별도 가상 디스플레이 위 scrcpy 창 하나에서 안드로이드
+    /// 앱 하나를 실행) 한두 문장으로 요약한다. 필드 하나하나의 툴팁만으로는
+    /// "슬롯"이라는 개념 자체가 불명확하다는 사용자 피드백에 대응한다.</summary>
+    public static string SlotsHeader => LocalizationService.Get("Settings.Slots.Header");
+
+    public static string SlotsWidthTip => LocalizationService.Get("Settings.Slots.WidthTip");
+
+    public static string SlotsHeightTip => LocalizationService.Get("Settings.Slots.HeightTip");
+
+    public static string SlotsDpiTip => LocalizationService.Get("Settings.Slots.DpiTip");
+
+    public static string SlotsMaxFpsTip => LocalizationService.Get("Settings.Slots.MaxFpsTip");
+
+    public static string SlotsBitRateTip => LocalizationService.Get("Settings.Slots.BitRateTip");
+
+    public static string SlotsAppPackageTip => LocalizationService.Get("Settings.Slots.AppPackageTip");
+
+    public static string SlotsAppNameTip => LocalizationService.Get("Settings.Slots.AppNameTip");
+
+    public static string SlotsExtraArgsTip => LocalizationService.Get("Settings.Slots.ExtraArgsTip");
+
+    public static string SlotsTurnScreenOffTip => LocalizationService.Get("Settings.Slots.TurnScreenOffTip");
+
+    public static string SlotsStayAwakeTip => LocalizationService.Get("Settings.Slots.StayAwakeTip");
+
+    /// <summary>HID 키보드/마우스는 ScrcpyService/SingleWindowService에서
+    /// `OperatingSystem.IsWindows()`로 게이트되어 macOS에서는 -K/-M 인자가
+    /// 아예 추가되지 않는다 - 이 툴팁은 그 사실을 정직하게 밝힌다.</summary>
+    public static string SlotsHidKeyboardTip => LocalizationService.Get("Settings.Slots.HidKeyboardTip");
+
+    public static string SlotsHidMouseTip => LocalizationService.Get("Settings.Slots.HidMouseTip");
+
+    public static string SlotsForceStopTip => LocalizationService.Get("Settings.Slots.ForceStopTip");
+
+    public static string SlotsFlexDisplayTip => LocalizationService.Get("Settings.Slots.FlexDisplayTip");
 }
