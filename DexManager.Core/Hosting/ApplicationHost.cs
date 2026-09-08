@@ -78,6 +78,13 @@ public sealed class ApplicationHost : IDisposable
         DeviceRegistry = new PhysicalDeviceRegistry();
         RuntimeSessions = new DeviceRuntimeSessionRegistry();
 
+        // 세션 레지스트리는 물리 identity를 기기 감시에서만 배운다.
+        // 이 배선이 없으면 DeX·단일창 세션이 serial에서 파생한 임시
+        // identity로 기록되어, GUI 행의 FindByIdentity(실제 identity) 조회와
+        // 어긋나고 IsDexRunning이 켜지지 않는다. TUI는 세션 레지스트리를
+        // 쓰지 않고 _activeRuntime을 직접 읽으므로 이 배선이 필요 없었다.
+        DeviceRegistry.SnapshotChanged += OnDeviceRegistrySnapshotChanged;
+
         DeviceMonitor = new DeviceMonitorService(
             Adb,
             WirelessAdb,
@@ -170,6 +177,18 @@ public sealed class ApplicationHost : IDisposable
         if (IsDisposed)
             throw new ObjectDisposedException(nameof(ApplicationHost));
         DeviceMonitor.Start();
+    }
+
+    /// <summary>
+    /// 기기 감시 스냅샷이 바뀌면 세션 레지스트리에 실제 물리 identity를
+    /// 가르친다. 감시 스레드에서 호출되나 <see cref="RuntimeSessions"/>는
+    /// 내부적으로 잠금을 잡으므로 안전하다.
+    /// </summary>
+    private void OnDeviceRegistrySnapshotChanged(
+        object sender,
+        DeviceRegistrySnapshotChangedEventArgs e)
+    {
+        RuntimeSessions.Reconcile(e?.Current);
     }
 
     /// <summary>
@@ -343,6 +362,10 @@ public sealed class ApplicationHost : IDisposable
             return Array.Empty<Exception>();
 
         var errors = new List<Exception>();
+
+        // 감시 이벤트를 먼저 끊어, 정리 중 도착하는 스냅샷이 세션
+        // 레지스트리를 다시 건드리지 않게 한다.
+        DeviceRegistry.SnapshotChanged -= OnDeviceRegistrySnapshotChanged;
 
         // 원래 InteractiveHost.ShutdownAsync의 순서를 그대로 유지한다:
         // 감시 중지 → 감시자·키보드 해제 → 런타임 정리. 관례상 더 나은
