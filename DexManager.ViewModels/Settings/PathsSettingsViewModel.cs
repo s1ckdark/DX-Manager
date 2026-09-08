@@ -53,25 +53,45 @@ public sealed partial class PathsSettingsViewModel : ObservableObject
     private bool CanSave() => true;
 
     /// <summary>
-    /// 편집값을 전역 설정에 저장한다. ADB 경로를 채우면 수동 선택
-    /// (<see cref="AdbSelectionMode.Manual"/>)로 전환해 그 값이 실제로
-    /// 쓰이게 하고, 비우면 자동 감지(<see cref="AdbSelectionMode.Auto"/>)로
-    /// 되돌린다 - 그러지 않으면 이 필드는 저장만 될 뿐 아무것도 읽지
-    /// 않는 장식으로 남는다.
+    /// 편집값을 전역 설정에 저장한다. ADB 경로를 사용자가 실제로
+    /// <b>편집했을 때만</b> 선택 모드를 바꾼다 - 채워서 편집했으면 수동
+    /// (<see cref="AdbSelectionMode.Manual"/>), 비우도록 편집했으면 자동
+    /// (<see cref="AdbSelectionMode.Auto"/>)로 전환한다.
+    ///
+    /// 왜 "값이 채워져 있으면 Manual"이 아니라 "값이 바뀌었으면"인가:
+    /// 이 필드는 <see cref="ApplicationHost.EnsureDefaultPaths"/>가 자동
+    /// 감지한 절대 경로로 시작부터 채워져 있는 경우가 흔하다(포터블
+    /// 패키지, 또는 첫 실행). 그 상태에서 사용자가 테마 등 다른 설정만
+    /// 바꾸고 저장하면 SaveAll이 이 커맨드도 무조건 실행하므로
+    /// (SaveAll → Paths.SaveCommand, CanSave는 항상 true), "비어 있지
+    /// 않으면 Manual"로는 사용자가 입력한 적 없는 자동 감지 경로에
+    /// 조용히 Manual이 박혀 버린다 - 포터블 폴더를 옮기거나 시스템 adb를
+    /// 제거하면 그 순간 시작이 막힌다. 베이스라인(<see
+    /// cref="_baselineAdbPath"/>)과 비교해 실제로 바뀐 경우에만 모드를
+    /// 건드리고, 바뀌지 않았으면 지금 저장돼 있는 모드를 그대로 둔다 -
+    /// 이미 Manual이었다면 다시 저장해도 Manual로 남는다.
     /// </summary>
     [RelayCommand(CanExecute = nameof(CanSave))]
     private void Save()
     {
+        var adbPath = AdbPath ?? string.Empty;
+        var adbPathEdited = !string.Equals(
+            adbPath,
+            _baselineAdbPath,
+            StringComparison.Ordinal);
+
         _gateway.Update(s =>
         {
             if (s.Paths != null)
             {
                 s.Paths.ScrcpyPath = ScrcpyPath ?? string.Empty;
-                var adbPath = AdbPath ?? string.Empty;
                 s.Paths.AdbPath = adbPath;
-                s.Paths.AdbSelectionMode = string.IsNullOrWhiteSpace(adbPath)
-                    ? AdbSelectionMode.Auto
-                    : AdbSelectionMode.Manual;
+                if (adbPathEdited)
+                {
+                    s.Paths.AdbSelectionMode = string.IsNullOrWhiteSpace(adbPath)
+                        ? AdbSelectionMode.Auto
+                        : AdbSelectionMode.Manual;
+                }
             }
         });
 

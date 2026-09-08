@@ -68,6 +68,60 @@ public class PathsSettingsViewModelTests
     }
 
     [Fact]
+    public void Save_WhenAdbPathUntouched_LeavesSelectionModeUnchanged()
+    {
+        // 리뷰가 짚은 크리티컬 시나리오: ApplicationHost.EnsureDefaultPaths가
+        // 자동 감지한 절대 경로로 이 필드가 이미 채워져 있는(Auto 모드)
+        // 흔한 상태에서, 사용자가 이 필드는 건드리지 않고 다른 설정만
+        // 바꾼 뒤 저장해도(SettingsViewModel.SaveAll은 Paths.SaveCommand를
+        // 무조건 실행한다) Manual로 넘어가면 안 된다 - 넘어가면 포터블
+        // 패키지를 옮기거나 시스템 adb를 지웠을 때 다음 실행이 막힌다.
+        var gateway = new FakeSettingsGateway();
+        gateway.Update(s =>
+        {
+            // EnsureDefaultPaths가 채웠을 법한, 사용자가 입력한 적 없는 값.
+            s.Paths.AdbPath = "/opt/homebrew/bin/adb";
+            s.Paths.AdbSelectionMode = AdbSelectionMode.Auto;
+        });
+
+        var viewModel = new PathsSettingsViewModel(gateway);
+        Assert.Equal("/opt/homebrew/bin/adb", viewModel.AdbPath);
+
+        // ADB 필드는 건드리지 않고 저장만 한다.
+        viewModel.SaveCommand.Execute(null);
+
+        Assert.Equal(
+            AdbSelectionMode.Auto,
+            gateway.Current.Paths.AdbSelectionMode);
+        Assert.Equal(
+            "/opt/homebrew/bin/adb",
+            gateway.Current.Paths.AdbPath);
+    }
+
+    [Fact]
+    public void Save_WhenAlreadyManualAndUntouched_StaysManual()
+    {
+        // 반대 방향의 함정: "비어 있지 않으면 Manual"이 아니라 "편집됐으면"
+        // 으로 고쳤다고 해서, 이미 Manual인 값을 편집 없이 다시 저장했을 때
+        // Auto로 되돌아가면 안 된다.
+        var gateway = new FakeSettingsGateway();
+        gateway.Update(s =>
+        {
+            s.Paths.AdbPath = "/usr/local/bin/adb";
+            s.Paths.AdbSelectionMode = AdbSelectionMode.Manual;
+        });
+
+        var viewModel = new PathsSettingsViewModel(gateway);
+
+        // 편집 없이 다시 저장(예: 다른 탭에서 뭔가 바꾸고 SaveAll).
+        viewModel.SaveCommand.Execute(null);
+
+        Assert.Equal(
+            AdbSelectionMode.Manual,
+            gateway.Current.Paths.AdbSelectionMode);
+    }
+
+    [Fact]
     public void ResetToBundledDefaults_RepopulatesPathsFromDefaults()
     {
         // 재설정하면 번들 기본값에서 로드된다. 게이트웨이의 현재값이 아니라.
