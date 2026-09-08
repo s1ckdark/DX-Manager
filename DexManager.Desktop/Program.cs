@@ -1,16 +1,96 @@
+using System;
+using System.Runtime.InteropServices;
 using Avalonia;
 
 namespace DexManager.Desktop;
 
 internal static class Program
 {
+    // 실기기(SM-F971N)로 확인한 값: overlay 회수 + scrcpy 종료는 정상
+    // 상황에서 1~2초 안에 끝난다(.omc/research/2026-09-08-realdevice-lock-findings.md
+    // 7절). 5초는 그 여유분이다 - 이보다 오래 걸린다는 건 adb/scrcpy가
+    // 이미 응답 불능이라는 뜻이라 신호 처리기를 더 붙잡고 있어도 회수가
+    // 되지 않는다. 오히려 launchd 등 상위 프로세스 관리자가 SIGKILL로
+    // 더 거칠게 끊어버릴 위험만 커지므로, 예산을 넘기면 정리를 포기하고
+    // 기본 종료로 넘긴다(HandleTerminationSignal 참고).
+    private static readonly TimeSpan SignalCleanupBudget = TimeSpan.FromSeconds(5);
+
+    private static PosixSignalRegistration[] _signalRegistrations;
+
     [STAThread]
-    public static void Main(string[] args) => BuildAvaloniaApp()
-        .StartWithClassicDesktopLifetime(args);
+    public static void Main(string[] args)
+    {
+        // StartWithClassicDesktopLifetime 이전에 등록해야, 앱 초기화
+        // 도중(App 생성자~OnFrameworkInitializationCompleted 사이)에
+        // 신호가 와도 처리기가 이미 걸려 있다.
+        RegisterTerminationSignalHandlers();
+        try
+        {
+            BuildAvaloniaApp().StartWithClassicDesktopLifetime(args);
+        }
+        finally
+        {
+            DisposeTerminationSignalHandlers();
+        }
+    }
 
     // Avalonia 디자이너와 헤드리스 테스트가 이 메서드를 이름으로 찾는다.
     public static AppBuilder BuildAvaloniaApp()
         => AppBuilder.Configure<App>()
             .UsePlatformDetect()
             .LogToTrace();
+
+    /// <summary>
+    /// SIGTERM/SIGINT/SIGHUP으로 죽을 때 Avalonia의 Exit 이벤트는 발생하지
+    /// 않는다 - App.axaml.cs:45의 desktop.Exit은 정상 종료(Stop DeX,
+    /// 창 닫기)에서만 올라온다. 이 신호들을 그대로 두면 App.OnExit ->
+    /// DisposeQuietly가 실행되지 않아 overlay_display_devices 회수와
+    /// scrcpy 종료가 통째로 샌다 - 오늘 실기기(SM-F971N)에서
+    /// `pkill -TERM`으로 확인한 버그다.
+    ///
+    /// SIGINT도 같은 부류다: 터미널에서 `dotnet run`으로 띄운 경우
+    /// Ctrl+C가 SIGINT를 보내는데, 지금까지 Console.CancelKeyPress 등
+    /// 아무 것도 걸려 있지 않아 SIGTERM과 동일하게 샌다. SIGHUP은
+    /// 제어 터미널이 닫힐 때(예: nohup 없이 백그라운드로 띄운 세션이
+    /// 끊길 때) 오는데, 발생 빈도는 낮지만 같은 정리를 걸어 두는 비용이
+    /// 거의 없어 함께 등록한다.
+    /// </summary>
+    private static void RegisterTerminationSignalHandlers()
+    {
+        _signalRegistrations = new[]
+        {
+            PosixSignalRegistration.Create(PosixSignal.SIGTERM, HandleTerminationSignal),
+            PosixSignalRegistration.Create(PosixSignal.SIGINT, HandleTerminationSignal),
+            PosixSignalRegistration.Create(PosixSignal.SIGHUP, HandleTerminationSignal),
+        };
+    }
+
+    private static void DisposeTerminationSignalHandlers()
+    {
+        if (_signalRegistrations == null) return;
+        foreach (var registration in _signalRegistrations)
+        {
+            registration.Dispose();
+        }
+        _signalRegistrations = null;
+    }
+
+    /// <summary>
+    /// 기본 종료 동작을 취소하지 않는다(<c>ctx.Cancel = true</c>를 하지
+    /// 않는다). 정리를 예산 안에서 동기적으로 기다린 뒤 그대로 반환하면,
+    /// 이 메서드가 마지막으로 등록된 처리기라 런타임이 이어서 해당 신호의
+    /// 기본 동작(프로세스 종료)을 수행한다 - 예산을 넘겨도 이 메서드는
+    /// 결국 반환하므로 정리가 끝났든 아니든 프로세스는 죽는다. 직접
+    /// Environment.Exit을 부르지 않는 이유도 이것이다 - 그럴 필요가 없고,
+    /// 우리가 직접 종료 코드를 고르는 것보다 신호별 기본 동작에 맡기는
+    /// 편이 더 예측 가능하다.
+    /// </summary>
+    private static void HandleTerminationSignal(PosixSignalContext ctx)
+    {
+        if (Application.Current is not App app) return;
+
+        BoundedExecutor.RunWithBudget(
+            () => app.TryRunShutdownCleanup(),
+            SignalCleanupBudget);
+    }
 }

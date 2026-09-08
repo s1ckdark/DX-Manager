@@ -33,6 +33,12 @@ public partial class App : Application
     // 인스턴스를 별도로 기억한다.
     private AppearanceSettingsViewModel _openSettingsAppearance;
 
+    // Exit 이벤트 경로와 신호(SIGTERM/SIGINT/SIGHUP) 경로가 DisposeQuietly를
+    // 정확히 한 번만 실행하도록 공유하는 가드. Program.cs의
+    // HandleTerminationSignal이 TryRunShutdownCleanup을 통해 이 가드를
+    // 함께 쓴다 - 신호가 먼저 오든 Exit이 먼저 오든 이중 정리가 없다.
+    private readonly ShutdownCleanupGuard _cleanupGuard = new();
+
     public override void Initialize() => AvaloniaXamlLoader.Load(this);
 
     public override void OnFrameworkInitializationCompleted()
@@ -117,7 +123,18 @@ public partial class App : Application
     }
 
     private void OnExit(object sender, ControlledApplicationLifetimeExitEventArgs e)
-        => DisposeQuietly();
+        => _cleanupGuard.TryRunOnce(DisposeQuietly);
+
+    /// <summary>
+    /// Program.cs의 PosixSignalRegistration 콜백이 부른다. SIGTERM 등으로
+    /// 죽을 때는 Avalonia가 Exit을 발생시키지 않으므로(desktop.Exit은
+    /// 정상 종료 경로에서만 올라온다) OnExit이 실행되지 않는다 - 이
+    /// 메서드가 같은 정리를 대신 트리거한다. 같은 <see cref="_cleanupGuard"/>를
+    /// 쓰므로 OnExit과 경쟁해도 정리는 한 번만 실행된다. 시간 예산을 두는
+    /// 책임은 호출자(Program.cs)에게 있다 - 이 메서드 자체는 예산 없이
+    /// 동기 실행만 한다.
+    /// </summary>
+    internal bool TryRunShutdownCleanup() => _cleanupGuard.TryRunOnce(DisposeQuietly);
 
     /// <summary>테마가 저장되면(AppearanceSettingsViewModel.SaveCommand)
     /// 즉시 재적용한다. Avalonia 타입 매핑은 ThemeApplier가 맡는다. 시작
