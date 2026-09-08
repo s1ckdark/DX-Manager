@@ -12,6 +12,25 @@ namespace DexManager.Utils
     /// 곱셈을 끊는 것이 이 예산의 유일한 목적이다.
     ///
     /// <para>
+    /// 총액은 <b>이 선택 호출이 후보 프로브 하나에 실제로 허용하는 시간</b>
+    /// (<see cref="EffectiveProbeTimeout"/>)과 같다. 프로브를 거는 쪽과
+    /// 예산을 만드는 쪽이 같은 함수를 쓰므로 둘이 갈라질 수 없다. 예전에는
+    /// 예산을 <c>AppSettings.Timing.ProcessTimeoutMs</c>(15초)에 고정했는데,
+    /// 정작 시작 경로인 <c>ApplicationHost</c>는 5초를 넘긴다 - 재시도 한
+    /// 번이 5.3초만 깎으니 15초 예산은 재시도 세 번을 허용했고, 후보 셋짜리
+    /// 체인에서는 예산이 아예 걸리지 않아 고친 것이 아무 효과가 없었다.
+    /// 그래서 값을 고정하지 않고 <b>넘어온 timeoutMs와의 관계</b>로 정한다.
+    /// </para>
+    /// <para>
+    /// 여기서 보장하는 것: <b>체인 전체의 재시도가 쓰는 시간은 프로브
+    /// 타임아웃 하나 + 마지막 재시도 하나를 넘지 않는다.</b> 예산이 ε만
+    /// 남았을 때도 재시도 하나는 시작되고 그것이 프로브 타임아웃을 꽉 채울
+    /// 수 있으므로 최악은 <c>2 × 예산 − ε</c>이다. 남은 예산이 이번 재시도를
+    /// 끝까지 감당할지는 프로브 소요를 미리 아는 것과 같아 알 수 없다 -
+    /// 초과가 O(1)로(재시도 하나만큼) 묶인다는 것이 보장의 전부이고,
+    /// "다 합쳐도 프로브 하나보다 덜 기다린다"는 더 센 주장은 하지 않는다.
+    /// </para>
+    /// <para>
     /// 예산은 <b>재시도만</b> 제한한다. 각 후보의 <b>첫 시도는 예산과
     /// 무관하게 항상 실행</b>한다 - 첫 시도를 예산으로 자르면 "앞 후보가
     /// 느려서 예산을 다 썼다"는 이유로 정말 살아 있는 뒤쪽 후보를 아예
@@ -32,18 +51,43 @@ namespace DexManager.Utils
     public sealed class ProbeRetryBudget
     {
         /// <summary>
-        /// 체인 하나가 재시도에 쓸 수 있는 기본 예산. 값은 이 앱이 단일
-        /// adb 호출 하나를 기다릴 가치가 있다고 이미 인정한 상한
-        /// (<c>AppSettings.Timing.ProcessTimeoutMs</c>, 기본 15000ms)과
-        /// 맞춘다 - 즉 "체인 전체의 재시도를 다 합쳐도 adb 호출 한 번보다
-        /// 더 기다리지는 않는다"가 여기서 주장하는 성질이다.
-        /// <c>ProcessTimeoutMs</c>를 직접 읽지 않고 값을 적어 두는 것은
-        /// SignalCleanupBudgets.Budget과 같은 이유다: 그래야 누가
-        /// <c>ProcessTimeoutMs</c>를 바꿨을 때 관계를 고정한 테스트가
-        /// 깨지면서 이 예산도 함께 다시 판단하게 된다(자동으로 따라가면
-        /// 아무도 모르게 시작 지연 상한이 같이 늘어난다).
+        /// 후보 프로브 하나에 허용하는 최소 시간. 호출자가 이보다 짧은
+        /// 타임아웃을 넘겨도 부하가 걸린 기기에서 adb가 뜨는 시간조차
+        /// 안 되므로 여기까지 올려 잡는다.
         /// </summary>
-        public static readonly TimeSpan Default = TimeSpan.FromSeconds(15);
+        public const int MinimumProbeTimeoutMs = 3000;
+
+        /// <summary>
+        /// 이 선택 호출에서 후보 프로브 하나가 실제로 쓸 수 있는 시간.
+        /// <b>프로브를 거는 쪽(PathService.GetRunnableCandidate)과 예산을
+        /// 만드는 쪽이 반드시 이 함수 하나만 쓴다</b> - 두 값이 갈라지면
+        /// 예산이 실제 프로브보다 커져 재시도를 여러 번 허용하고, 그러면
+        /// 예산이 아무것도 막지 못한다(정확히 그 일이 예산을 15초로
+        /// 고정했을 때 일어났다).
+        /// </summary>
+        public static int EffectiveProbeTimeoutMs(int timeoutMs)
+        {
+            return Math.Max(timeoutMs, MinimumProbeTimeoutMs);
+        }
+
+        /// <inheritdoc cref="EffectiveProbeTimeoutMs"/>
+        public static TimeSpan EffectiveProbeTimeout(int timeoutMs)
+        {
+            return TimeSpan.FromMilliseconds(EffectiveProbeTimeoutMs(timeoutMs));
+        }
+
+        /// <summary>
+        /// 후보 체인 하나가 재시도에 쓸 예산을 만든다. 총액은 그 체인의
+        /// 프로브 타임아웃 하나와 같다 - 호출자가 어떤 timeoutMs를 넘기든
+        /// 이 관계는 유지되므로, 시작 경로가 넘기는 값이 바뀌어도 예산은
+        /// 저절로 따라간다.
+        /// </summary>
+        public static ProbeRetryBudget For(
+            int timeoutMs,
+            Func<DateTime> utcNow = null)
+        {
+            return new ProbeRetryBudget(EffectiveProbeTimeout(timeoutMs), utcNow);
+        }
 
         private readonly Func<DateTime> _utcNow;
         private readonly TimeSpan _total;
@@ -53,11 +97,6 @@ namespace DexManager.Utils
         {
             _total = total > TimeSpan.Zero ? total : TimeSpan.Zero;
             _utcNow = utcNow ?? (() => DateTime.UtcNow);
-        }
-
-        public ProbeRetryBudget(Func<DateTime> utcNow = null)
-            : this(Default, utcNow)
-        {
         }
 
         public TimeSpan Total { get { return _total; } }
@@ -78,7 +117,7 @@ namespace DexManager.Utils
         /// 끝까지 감당하는지는 묻지 않는다 - 그건 프로브가 얼마나 걸릴지
         /// 미리 아는 것과 같아서 알 수 없다. 대신 "예산이 남아 있으면 한
         /// 번 더 해본다, 그 대가는 다음 후보가 치른다"로 단순화한다.
-        /// 그래서 실제 초과분은 마지막 재시도 하나만큼이다.
+        /// 클래스 주석이 말하는 <c>2 × 예산 − ε</c> 상한이 여기서 나온다.
         /// </summary>
         public bool HasRemaining { get { return Remaining > TimeSpan.Zero; } }
 

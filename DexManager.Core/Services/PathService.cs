@@ -130,7 +130,7 @@ namespace DexManager.Services
             // 자기 몫을 온전히 받아) 예산을 둔 의미가 사라진다. 각 후보의
             // 첫 시도는 예산과 무관하게 항상 실행되므로, 예산이 소진돼도
             // 뒤쪽 후보를 못 찾게 되지는 않는다.
-            var retryBudget = new ProbeRetryBudget(_utcNow);
+            var retryBudget = ProbeRetryBudget.For(timeoutMs, _utcNow);
 
             var preferred = GetScrcpyAdb(settings, timeoutMs, retryBudget);
             var selected = preferred;
@@ -207,7 +207,7 @@ namespace DexManager.Services
                 configuredPath,
                 description,
                 timeoutMs,
-                new ProbeRetryBudget(_utcNow));
+                ProbeRetryBudget.For(timeoutMs, _utcNow));
             if (candidate == null)
             {
                 var message = describeUnavailable != null
@@ -287,7 +287,7 @@ namespace DexManager.Services
                             path,
                             "version",
                             Path.GetDirectoryName(path),
-                            Math.Max(timeoutMs, 3000),
+                            ProbeRetryBudget.EffectiveProbeTimeoutMs(timeoutMs),
                             false,
                             Encoding.Default);
                     },

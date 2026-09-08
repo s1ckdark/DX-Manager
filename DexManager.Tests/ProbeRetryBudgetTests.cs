@@ -1,5 +1,5 @@
 using System;
-using DexManager.Models;
+using DexManager.Hosting;
 using DexManager.Utils;
 using Xunit;
 
@@ -9,7 +9,7 @@ namespace DexManager.Tests
     /// 후보 프로브 재시도가 체인 전체에서 쓸 수 있는 시간 예산
     /// (<see cref="ProbeRetryBudget"/>)의 성질만 고정한다. "누가 언제
     /// 재시도하는가"는 TransientProbeRetryTests가, "PathService가 체인
-    /// 하나당 예산 하나를 쓰는가"는 PathServiceProbeBudgetTests가 맡는다.
+    /// 하나당 예산 하나를 쓰는가"는 PathServiceCandidateRetryTests가 맡는다.
     ///
     /// 시간은 <see cref="ManualClock"/>으로만 흘린다 - 실제로 기다리는
     /// 테스트는 느린 데다 부하가 걸린 CI에서 그 자체가 새 flake가 된다
@@ -18,19 +18,56 @@ namespace DexManager.Tests
     /// </summary>
     public class ProbeRetryBudgetTests
     {
-        [Fact]
-        public void Default_IsExactlyWhatASingleAdbCallIsAllowedToTake()
+        [Theory]
+        [InlineData(5000, 5000)]   // ApplicationHost가 실제로 넘기는 값
+        [InlineData(15000, 15000)] // AppSettings.Timing.ProcessTimeoutMs
+        [InlineData(3000, 3000)]
+        [InlineData(1000, 3000)]   // 바닥에 걸린다
+        [InlineData(0, 3000)]
+        public void EffectiveProbeTimeout_IsTheCallersTimeoutRaisedToTheFloor(
+            int timeoutMs,
+            int expectedMs)
         {
-            // 이 예산이 주장하는 성질은 "체인 전체의 재시도를 다 합쳐도
-            // adb 호출 한 번보다 더 기다리지는 않는다"이다. 여기서
-            // 15초를 그대로 베껴 적으면 누가 ProcessTimeoutMs를 올려도
-            // 이 테스트는 그 사실을 모른 채 계속 통과하고, 이름이
-            // 주장하는 관계만 조용히 깨진다 - 그래서 값이 아니라 상수를
-            // 읽어 관계를 고정한다(SignalCleanupBudgetsTests와 같은 이유).
-            var singleAdbCall = TimeSpan.FromMilliseconds(
-                AppSettings.CreateDefault().Timing.ProcessTimeoutMs);
+            Assert.Equal(
+                expectedMs,
+                ProbeRetryBudget.EffectiveProbeTimeoutMs(timeoutMs));
+            Assert.Equal(
+                TimeSpan.FromMilliseconds(expectedMs),
+                ProbeRetryBudget.EffectiveProbeTimeout(timeoutMs));
+        }
 
-            Assert.Equal(singleAdbCall, ProbeRetryBudget.Default);
+        [Theory]
+        [InlineData(5000, 5000)]
+        [InlineData(15000, 15000)]
+        [InlineData(1000, 3000)]
+        public void For_TotalIsExactlyOneProbeTimeoutOfTheChainThatAsksForIt(
+            int timeoutMs,
+            int expectedTotalMs)
+        {
+            // 이 예산이 고정하는 관계는 "총액 = 이 체인이 프로브 하나에
+            // 실제로 허용하는 시간"이다. 예전에는 총액을
+            // AppSettings.Timing.ProcessTimeoutMs(15초)에 못 박아 뒀는데,
+            // 정작 시작 경로는 5초를 넘기므로 예산이 재시도를 세 번이나
+            // 허용해 아무것도 막지 못했다. 그래서 값을 다른 상수에 다시
+            // 못 박으면(예: ProcessTimeoutMs) 이 [InlineData(5000, 5000)]이
+            // 즉시 깨진다.
+            var budget = ProbeRetryBudget.For(timeoutMs);
+
+            Assert.Equal(TimeSpan.FromMilliseconds(expectedTotalMs), budget.Total);
+            Assert.Equal(TimeSpan.Zero, budget.Spent);
+            Assert.True(budget.HasRemaining);
+        }
+
+        [Fact]
+        public void For_TotalTracksTheTimeoutTheStartupPathActuallyPasses()
+        {
+            // ApplicationHost가 넘기는 값이 바뀌면 예산도 따라가야 한다 -
+            // 그 연결이 끊기는 순간(예산을 상수에 다시 못 박는 순간)이
+            // 바로 리뷰가 잡아낸 결함이다.
+            Assert.Equal(
+                ProbeRetryBudget.EffectiveProbeTimeout(
+                    ApplicationHost.AdbSelectionTimeoutMs),
+                ProbeRetryBudget.For(ApplicationHost.AdbSelectionTimeoutMs).Total);
         }
 
         [Fact]

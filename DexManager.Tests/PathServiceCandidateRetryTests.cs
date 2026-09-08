@@ -1,7 +1,9 @@
 using System;
 using System.IO;
 using System.Linq;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
+using DexManager.Hosting;
 using DexManager.Models;
 using DexManager.Services;
 using DexManager.Tests.FakePlatform;
@@ -129,22 +131,46 @@ namespace DexManager.Tests
 
             // 결과(성공/예외)는 신경 쓰지 않는다 - PATH에서 진짜 시스템
             // adb를 찾을 수도, 못 찾을 수도 있어 이 개발 머신/CI마다
-            // 다르다. 여기서 고정하는 건 오직 "타임아웃을 빈 문자열이
-            // 아니라 사람이 읽을 수 있게 남기는가" 하나뿐이다.
+            // 다르다. 여기서 고정하는 건 "타임아웃을 빈 문자열이 아니라
+            // 사람이 읽을 수 있게 남기는가"와, 아래의 바닥 적용 여부다.
+            // 일부러 바닥(3000ms)보다 짧은 값을 넘긴다 - 그래야 프로브가
+            // 예산과 <b>같은</b> 함수로 타임아웃을 올려 잡는지 관측된다.
+            const int belowFloorTimeoutMs = 1000;
             try
             {
-                await Task.Run(() => pathService.SelectAdbPath(settings, 3000));
+                await Task.Run(
+                    () => pathService.SelectAdbPath(settings, belowFloorTimeoutMs));
             }
             catch (FileNotFoundException)
             {
             }
 
-            Assert.Contains(
+            var timeoutLine = Assert.Single(
                 logService.GetSessionEntries(),
                 line =>
                     line.Contains("ADB from the selected scrcpy folder", StringComparison.Ordinal) &&
                     line.Contains("timed out after", StringComparison.Ordinal));
+
+            // 프로브가 실제로 기다린 시간은 넘긴 1000ms가 아니라 바닥까지
+            // 올린 값이어야 한다. 프로브와 예산이 서로 다른 타임아웃을 쓰기
+            // 시작하면(드리프트) 예산이 실제 프로브보다 커지거나 작아져
+            // 상한이 무너지므로, 그 계산이 한 함수에서만 나오는지 여기서
+            // 관측한다.
+            var waitedMs = int.Parse(
+                Regex.Match(timeoutLine, @"timed out after (\d+)ms").Groups[1].Value);
+            Assert.True(
+                waitedMs >= ProbeRetryBudget.EffectiveProbeTimeoutMs(belowFloorTimeoutMs),
+                "probe waited " + waitedMs + "ms, expected at least " +
+                ProbeRetryBudget.EffectiveProbeTimeoutMs(belowFloorTimeoutMs) + "ms");
         }
+
+        /// <summary>
+        /// 실제로 배송되는 선택 타임아웃. 상수를 베끼지 않고
+        /// <see cref="ApplicationHost"/>가 넘기는 바로 그 값을 참조한다 -
+        /// 예산이 이 값에서 유도되므로, 여기가 바뀌면 예산도 테스트도
+        /// 함께 따라가야 의미가 유지된다.
+        /// </summary>
+        private const int TimeoutMs = ApplicationHost.AdbSelectionTimeoutMs;
 
         [Fact]
         public async Task SelectAdbPath_EveryCandidateTimesOut_TheSharedBudgetStopsRetryingAfterTheFirstCandidate()
@@ -167,10 +193,13 @@ namespace DexManager.Tests
                 root.Path,
                 candidateAdbPaths: candidates);
             // 프로브 하나가 타임아웃 상한을 꽉 채우는 상황을 흉내 낸다.
-            // 실제로 15초를 기다리지 않고 시계만 앞당기므로(예산은
-            // wall-clock을 보되 그 시계를 주입받는다) 이 테스트가 걸리는
-            // 시간은 후보들의 실제 프로브 타임아웃(3초 바닥)뿐이다.
-            var clock = new AdvancingClock(TimeSpan.FromSeconds(15));
+            // step을 숫자로 적지 않고 예산이 쓰는 것과 <b>같은</b> 함수에서
+            // 유도한다 - 그러지 않으면 이 테스트는 실제 경로에 존재하지도
+            // 않는 프로브 타임아웃을 가정하게 되고, 예산이 실경로에서
+            // 아무것도 막지 못하는 상태를 초록으로 가려 준다(리뷰가 잡아낸
+            // 결함이 정확히 그것이다).
+            var clock = new AdvancingClock(
+                ProbeRetryBudget.EffectiveProbeTimeout(TimeoutMs));
             var pathService = new PathService(
                 settingsService,
                 logService,
@@ -184,7 +213,7 @@ namespace DexManager.Tests
 
             try
             {
-                await Task.Run(() => pathService.SelectAdbPath(settings, 3000));
+                await Task.Run(() => pathService.SelectAdbPath(settings, TimeoutMs));
             }
             catch (FileNotFoundException)
             {
