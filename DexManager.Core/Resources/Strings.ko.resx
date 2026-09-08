@@ -195,11 +195,6 @@
   <data name="Log.Adb.PairResult" xml:space="preserve"><value>ADB pair 결과</value></data>
   <data name="Log.Adb.DevicesResult" xml:space="preserve"><value>ADB devices 결과</value></data>
   <data name="Log.Adb.DeviceCount" xml:space="preserve"><value>ADB 장치 조회 결과: {0}개</value></data>
-  <data name="Log.Adb.WakeUpStarting" xml:space="preserve"><value>ADB Wake-up을 시작합니다.</value></data>
-  <data name="Log.Adb.WakeUpScrcpyUnavailable" xml:space="preserve"><value>ADB Wake-up 실패: Scrcpy Wake-up이 구성되지 않았습니다.</value></data>
-  <data name="Log.Adb.WakeUpFallback" xml:space="preserve"><value>기본 ADB Wake-up 실패. Scrcpy Wake-up을 실행합니다.</value></data>
-  <data name="Log.Adb.WakeUpDeviceFound" xml:space="preserve"><value>Scrcpy Wake-up 후 ADB 장치를 확인했습니다.</value></data>
-  <data name="Log.Adb.WakeUpDeviceMissing" xml:space="preserve"><value>Scrcpy Wake-up 후에도 ADB 장치를 확인하지 못했습니다.</value></data>
   <data name="Log.Adb.LockProbeFailed" xml:space="preserve"><value>휴대폰의 잠금 상태를 확인하지 못했습니다: {0}</value></data>
   <data name="Log.Adb.WakeScreenFailed" xml:space="preserve"><value>휴대폰 화면을 깨우지 못했습니다: {0}</value></data>
   <data name="Log.Adb.DismissKeyguardFailed" xml:space="preserve"><value>휴대폰 잠금화면을 해제하지 못했습니다: {0}</value></data>
@@ -366,9 +361,6 @@
   <data name="Log.Scrcpy.AlreadyRunning" xml:space="preserve"><value>Scrcpy가 이미 실행 중이므로 중복 실행을 건너뜁니다.</value></data>
   <data name="Log.Scrcpy.Start" xml:space="preserve"><value>Scrcpy 실행: {0}</value></data>
   <data name="Log.Scrcpy.Stopped" xml:space="preserve"><value>Scrcpy를 중지했습니다.</value></data>
-  <data name="Log.Scrcpy.WakeUpFileMissing" xml:space="preserve"><value>Scrcpy Wake-up 파일이 없습니다: {0}</value></data>
-  <data name="Log.Scrcpy.WakeUpStarting" xml:space="preserve"><value>Scrcpy Wake-up을 실행합니다.</value></data>
-  <data name="Log.Scrcpy.WakeUpFailed" xml:space="preserve"><value>Scrcpy Wake-up 실행에 실패했습니다.</value></data>
   <data name="Log.Scrcpy.ProcessExited" xml:space="preserve"><value>Scrcpy 프로세스가 종료되었습니다.</value></data>
   <data name="Error.Scrcpy.ExitedBeforeWindow" xml:space="preserve"><value>Scrcpy가 창을 준비하기 전에 종료되었습니다.</value></data>
   <data name="Log.Scrcpy.WindowReady" xml:space="preserve"><value>Scrcpy 창 준비 완료: PID={0}</value></data>
