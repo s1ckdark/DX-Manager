@@ -16,11 +16,20 @@ namespace DexManager.ViewModels;
 /// SettingsForm.Values.cs)가 10개 전부를 편집 가능한 값으로 노출한다 —
 /// 그래서 이 골격은 10개 필드 전부를 다룬다.
 ///
-/// 이 Task(9)는 골격만 구현한다: 편집 대상 10개 필드의 로드/저장 왕복과
-/// 최소 구조적 검증("캡처/종료 단축키가 비어 있지 않고 서로 달라야 함")만
-/// 다룬다. 실제 단축키 문법 파싱과 저수준 후크 충돌 감지(WinForms의
-/// HotkeyService.IsValidShortcut/ShortcutsConflict에 해당하는 로직,
-/// Win32 RegisterHotKey 기반이라 이식 대상이 아니다)는 Task 10의 몫이다.
+/// 검증 범위는 최소 구조적 검증뿐이다: "캡처/종료 단축키가 비어 있지
+/// 않고 서로 (서수 비교로) 달라야 함". 그 이상은 이 브랜치 어디에도
+/// 없다 - Task 10은 캡처한 키를 저장 문자열로 바꾸는 포매터
+/// (DexManager.Desktop의 HotkeyFormatter)만 냈고, 문법 파서나 충돌
+/// 검출기를 내지 않았다. 즉 다음 두 가지는 여기서도, 다른 어디서도
+/// 검사하지 않는다:
+///   - 단축키 문법 자체의 유효성(WinForms의
+///     HotkeyService.IsValidShortcut에 해당). 캡처 UI로 입력하면 항상
+///     유효한 형식이 나오지만, 이전 버전이 남긴 값이나 손으로 고친
+///     settings.json은 그대로 통과한다.
+///   - 의미론적 충돌(WinForms의 HotkeyService.ShortcutsConflict에 해당).
+///     "Alt+F8"과 "LeftAlt+F8"은 서수 비교로는 서로 다르지만
+///     KeyShortcut.Matches에게는 같은 단축키다.
+/// 둘 다 후속 과제다.
 /// </summary>
 public sealed partial class InteractionSettingsViewModel : ObservableObject
 {
@@ -136,8 +145,10 @@ public sealed partial class InteractionSettingsViewModel : ObservableObject
     partial void OnExitHotkeyChanged(string value) => Revalidate();
 
     /// <summary>
-    /// 캡처/종료 단축키에 대한 최소 구조적 검증. 실제 단축키 문법 파싱과
-    /// 저수준 후크 충돌 감지는 Task 10의 몫이라 여기서는 다루지 않는다.
+    /// 캡처/종료 단축키에 대한 최소 구조적 검증 - 비어 있지 않을 것,
+    /// 그리고 서로 서수 비교로 다를 것. 이게 전부다. 단축키 문법 파싱과
+    /// 의미론적 충돌 감지는 이 브랜치의 어디에도 구현돼 있지 않다
+    /// (클래스 문서 참고).
     ///
     /// 비어 있음을 막는 이유는 취향이 아니라 안전장치다:
     /// AppSettings.EnsureDefaults()는 빈 CaptureHotkey/ExitHotkey를 조용히

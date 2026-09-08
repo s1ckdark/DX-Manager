@@ -24,7 +24,7 @@ public class DexOrchestratorStartLockGateTests
         FakeAdbExecutable.IdentityOf(Hardware);
 
     [Fact]
-    public async Task StartAsync_WhenTheDumpsysOutputConfidentlyShowsLocked_AbortsWithTheLocalizedMessage()
+    public async Task StartAsync_WhenTheDumpsysOutputConfidentlyShowsASecuredLock_AbortsWithTheLocalizedMessage()
     {
         using var root = new TempHostRoot();
         var adb = new FakeAdbExecutable(
@@ -32,7 +32,7 @@ public class DexOrchestratorStartLockGateTests
             new Dictionary<string, string> { [Serial] = Hardware },
             new Dictionary<string, string>
             {
-                [Serial] = "mShowingLockscreen=true"
+                [Serial] = "mShowingLockscreen=true isKeyguardSecure=true"
             });
         var host = root.CreateHost(pathProvider: adb.CreatePathProvider());
         try
@@ -75,6 +75,73 @@ public class DexOrchestratorStartLockGateTests
         // scrcpy와 실제 디스플레이 생성은 이 테스트 환경에 없으므로 이후
         // 단계는 결국 실패한다. 다만 그 실패는 잠금 검사와 무관한 실패여야
         // 한다 - 짧은 타임아웃으로 그 실패를 빠르게 받아낸다.
+        host.UpdateSettings(settings =>
+            settings.Timing.VirtualDisplayDetectionTimeoutMs = 50);
+        try
+        {
+            var runtime = host.RuntimeCoordinator.GetOrCreate(Identity, Serial);
+
+            var ex = await Record.ExceptionAsync(
+                () => runtime.Dex.StartAsync(Serial, Identity, CancellationToken.None));
+
+            Assert.NotNull(ex);
+            Assert.NotEqual(
+                LocalizationService.Get("Error.Dex.DeviceLocked"),
+                ex.Message);
+        }
+        finally
+        {
+            host.Dispose();
+        }
+    }
+
+    [Fact]
+    public async Task StartAsync_WhenTheKeyguardIsShowingButNotSecured_ProceedsPastTheLockGate()
+    {
+        // F-8: PIN이 없는(스와이프 전용) 폰이 화면만 꺼진 채 놓여 있는,
+        // 가장 흔한 첫 시작 상태다. 잠금 화면은 "떠 있지만" 해제할 잠금이
+        // 없으므로 시작을 막아서는 안 된다.
+        using var root = new TempHostRoot();
+        var adb = new FakeAdbExecutable(
+            root.Root,
+            new Dictionary<string, string> { [Serial] = Hardware },
+            new Dictionary<string, string>
+            {
+                [Serial] = "mKeyguardShowing=true isKeyguardSecure=false"
+            });
+        var host = root.CreateHost(pathProvider: adb.CreatePathProvider());
+        host.UpdateSettings(settings =>
+            settings.Timing.VirtualDisplayDetectionTimeoutMs = 50);
+        try
+        {
+            var runtime = host.RuntimeCoordinator.GetOrCreate(Identity, Serial);
+
+            var ex = await Record.ExceptionAsync(
+                () => runtime.Dex.StartAsync(Serial, Identity, CancellationToken.None));
+
+            Assert.NotNull(ex);
+            Assert.NotEqual(
+                LocalizationService.Get("Error.Dex.DeviceLocked"),
+                ex.Message);
+        }
+        finally
+        {
+            host.Dispose();
+        }
+    }
+
+    [Fact]
+    public async Task StartAsync_WhenTheKeyguardIsShowingWithNoSecureSignal_FailsOpenAndProceedsPastTheLockGate()
+    {
+        using var root = new TempHostRoot();
+        var adb = new FakeAdbExecutable(
+            root.Root,
+            new Dictionary<string, string> { [Serial] = Hardware },
+            new Dictionary<string, string>
+            {
+                [Serial] = "mKeyguardShowing=true"
+            });
+        var host = root.CreateHost(pathProvider: adb.CreatePathProvider());
         host.UpdateSettings(settings =>
             settings.Timing.VirtualDisplayDetectionTimeoutMs = 50);
         try

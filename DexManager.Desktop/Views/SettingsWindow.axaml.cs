@@ -33,13 +33,19 @@ public partial class SettingsWindow : Window
         => HandleHotkeyKeyDown(e, isCapture: false);
 
     /// <summary>
-    /// 두 단축키 입력란이 공유하는 캡처 로직. 항상 e.Handled = true를
-    /// 먼저 세팅해 원문 텍스트가 절대 삽입되지 않게 한 뒤,
-    /// HotkeyFormatter가 유효한 조합으로 판단한 경우에만(수정자 단독
-    /// 입력이나 Key.None이 아닌 경우) 바인딩된 값을 갱신한다.
+    /// 두 단축키 입력란이 공유하는 캡처 로직. 포커스 이동·창 닫기 키
+    /// (Tab / Shift+Tab / Escape)는 건드리지 않고 그대로 흘려보낸 뒤,
+    /// 나머지 키는 항상 e.Handled = true를 먼저 세팅해 원문 텍스트가
+    /// 절대 삽입되지 않게 하고, HotkeyFormatter가 유효한 조합으로 판단한
+    /// 경우에만(수정자 단독 입력이나 Key.None이 아닌 경우) 바인딩된
+    /// 값을 갱신한다.
     /// </summary>
     private void HandleHotkeyKeyDown(KeyEventArgs e, bool isCapture)
     {
+        // 이 키들은 캡처하지도, 삼키지도 않는다 - 삼키면 키보드만으로는
+        // 이 입력란에서 나갈 수도 창을 닫을 수도 없게 된다.
+        if (HotkeyFormatter.ShouldPassThroughForNavigation(e.Key)) return;
+
         e.Handled = true;
 
         var formatted = HotkeyFormatter.Format(e.Key, e.KeyModifiers);

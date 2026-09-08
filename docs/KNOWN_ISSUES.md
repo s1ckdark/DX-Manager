@@ -216,6 +216,17 @@ Phase 2(DeX 시작/중지 + 단일창 슬롯) 종료 시점에는 실기 검증 
    어떤 One UI 빌드에서 네 필드가 전혀 나타나지 않으면 이 게이트는 그냥 발동하지 않는다
    — 실제 기기 스모크 테스트가 아직 없다.
 
+   최종 리뷰 라운드에서 한 겹 더 좁혔다(F-8): 위 네 필드는 "잠금 화면이 떠 있는가"만
+   말해줄 뿐, PIN·패턴이 하나도 없는 스와이프 전용 폰이 화면만 꺼진 채 놓여 있는
+   가장 흔한 상태에서도 `mKeyguardShowing=true`가 된다. 그래서 이제 `Locked`는
+   "잠금 화면이 떠 있고 **동시에** 그 키가드가 보안 설정돼 있다"는 적극적 증거가
+   있을 때만 나온다. 보안 신호는 이름이 명시적인 필드
+   (`isKeyguardSecure` / `mIsKeyguardSecure` / `mKeyguardSecure` / `keyguardSecure`)를
+   먼저 찾고, 없으면 AOSP `KeyguardServiceDelegate.dump()`가 찍는 맨 이름 `secure=`를
+   **그 블록 안에서만** 읽는다(`dumpsys window`에 함께 실리는 창 목록의 무관한
+   `secure=`를 줍지 않기 위해서다). 보안 신호를 찾지 못하면 다른 모든 불확실 경로와
+   같이 `Unknown`으로 fail-open한다. 이 보안 신호의 필드명 역시 실기 미검증이다.
+
 3. **단축키가 macOS에서 전혀 동작하지 않는다.** `MacKeyboardService.Start`/`Stop`/
    `ReloadConfiguration`(`DexManager.Platform.Mac/Platform/MacKeyboardService.cs`)이
    모두 빈 no-op이고, `ApplicationHost`도 이 서비스의 `Start()`를 호출하지 않는다.
@@ -231,8 +242,10 @@ Phase 2(DeX 시작/중지 + 단일창 슬롯) 종료 시점에는 실기 검증 
    `UseHidMouse` 체크박스를 켜도 scrcpy 인자에 반영되지 않는다. Slot 탭 툴팁(UI-3)에
    이 사실을 명시했다.
 
-5. **설정 창은 대부분 지역화되지 않았다.** 문자열 약 40개 중 약 38개가 하드코딩
-   영어다(Ruling 6). MainWindow도 원래 전부 하드코딩 영어였으므로 이번 Phase의 회귀는
+5. **설정 창은 대부분 지역화되지 않았다.** 창의 사용자 노출 문자열 가운데 라벨·헤더·
+   버튼 텍스트는 대부분 하드코딩 영어이고(Ruling 6), 지역화(resx)를 거치는 것은 UI-3이
+   추가한 슬롯 툴팁 계층과 몇 개의 안내 문구뿐이다. 정확한 비율은 UI 변경마다 달라지므로
+   숫자로 고정하지 않는다. MainWindow도 원래 전부 하드코딩 영어였으므로 이번 Phase의 회귀는
    아니며, Phase 3 Task 8의 범위는 "언어 설정 저장 + 신규 문자열 런타임 적용"으로
    한정됐다. 지역화 완성은 후속 과제다(`docs/TODO.md`의 Phase 3 지연 항목 참조).
 
@@ -240,9 +253,9 @@ Phase 2(DeX 시작/중지 + 단일창 슬롯) 종료 시점에는 실기 검증 
    `docs/TODO.md`의 "macOS GUI Phase 3 리뷰에서 지연된 정리 항목" 참조):**
    - `SettingsViewModel`의 `SelectedIdentity` 재계산(Task 5)이 `IDeviceSelectionSource`에
      문서화되지 않은 암묵적 UI-스레드 불변식에 의존한다.
-   - 단축키 캡처 필드(Task 10)가 포커스 상태에서 Tab/Shift+Tab/Escape를 삼킨다.
-   - UI-1(Save/Cancel 창 닫기) 이후, Save가 무효 페이지를 조용히 건너뛰고도 창을
-     닫아 — 수정 전에는 창이 열려 있어 사용자가 보고 고칠 수 있었던 안전망이 사라졌다.
+   (전체 브랜치 리뷰의 최종 수정 라운드에서 아래 두 항목은 해결되어 목록에서 빠졌다:
+   단축키 캡처 필드의 Tab/Shift+Tab/Escape 삼킴 → 이제 통과시킨다. Save가 무효 페이지를
+   건너뛴 채 창을 닫던 문제 → Save 버튼이 HasChanges와 전 페이지 유효성을 함께 본다.)
 
 ## macOS GUI Phase 3 실기 검증 범위
 

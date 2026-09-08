@@ -1,3 +1,4 @@
+using System.IO;
 using Xunit;
 using DexManager.Models;
 using DexManager.Services;
@@ -381,6 +382,208 @@ public class SettingsViewModelTests
         dispatcher.Drain();
 
         Assert.False(settings.IsTargetDexRunning);
+    }
+
+    // --- F-1: 같은 폰의 행 인스턴스 교체는 편집을 버리면 안 된다 ---
+
+    [Fact]
+    public void SelectedIdentityNotificationForTheSameIdentity_KeepsThePagesAndTheUnsavedEdits()
+    {
+        // DeviceListViewModel.Apply는 스냅샷에 없는 행을 Dispose+제거하고,
+        // 같은 폰이 돌아오면 "새 DeviceViewModel 인스턴스"를 만들어 다시
+        // 선택한다. SelectedIdentity 통지는 그 참조 변경에서 올라오므로
+        // identity 문자열은 그대로인데도 통지가 뜬다 - USB 흔들림이나
+        // 전송 방식 전환 한 번에 사용자의 미저장 편집이 조용히 사라졌다.
+        var gateway = new FakeSettingsGateway();
+        var deviceSelection = new FakeDeviceSelectionSource { SelectedIdentity = "device-a" };
+        var settings = CreateSettings(gateway, deviceSelection);
+
+        var displayStreamBefore = settings.DisplayStream;
+        var slotBefore = settings.Slot;
+        settings.DisplayStream.Values.Width = 1920;
+        settings.Slot.Values.Slots[0].Width = 1600;
+        Assert.True(settings.HasChanges);
+
+        deviceSelection.RaiseSelectedIdentityChangedWithoutChangingValue();
+
+        Assert.Same(displayStreamBefore, settings.DisplayStream);
+        Assert.Same(slotBefore, settings.Slot);
+        Assert.Equal(1920, settings.DisplayStream.Values.Width);
+        Assert.Equal(1600, settings.Slot.Values.Slots[0].Width);
+        Assert.True(settings.HasChanges);
+    }
+
+    [Fact]
+    public void SelectedIdentityNotificationForTheSameIdentity_StillRecomputesTheRunningFlag()
+    {
+        // identity 가드는 기기별 페이지 재생성만 막는다 - 런타임 플래그
+        // 재계산까지 막아서는 안 된다.
+        // 큐잉 디스패처를 쓰는 이유: 즉시 실행 디스패처라면 SetDexSession의
+        // Changed가 그 자리에서 ApplyRuntime을 돌려 플래그를 이미 뒤집어
+        // 놓으므로, 통지 핸들러가 재계산을 하든 말든 검증이 통과해버린다.
+        // 큐에 넣어두고 비우지 않으면 "통지 핸들러가 스스로 다시 계산하는가"
+        // 만 남는다.
+        var sessions = CreateRuntimeRegistry("device-a", "USB-A");
+        var gateway = new FakeSettingsGateway();
+        var deviceSelection = new FakeDeviceSelectionSource { SelectedIdentity = "device-a" };
+        var dispatcher = new QueueingUiDispatcher();
+        var settings = CreateSettings(gateway, deviceSelection, sessions, dispatcher);
+        Assert.False(settings.IsTargetDexRunning);
+
+        sessions.SetDexSession("USB-A", new ManagedDisplaySession
+        {
+            Serial = "USB-A",
+            DeviceIdentity = "device-a"
+        });
+        Assert.Equal(1, dispatcher.PendingCount);
+        Assert.False(settings.IsTargetDexRunning);
+
+        deviceSelection.RaiseSelectedIdentityChangedWithoutChangingValue();
+
+        Assert.True(settings.IsTargetDexRunning);
+    }
+
+    [Fact]
+    public void Cancel_StillRebuildsThePerDevicePagesEvenThoughTheIdentityDidNotChange()
+    {
+        // F-1의 identity 가드가 Cancel의 "편집 버리기"까지 무력화하면
+        // 안 된다 - Cancel은 같은 identity로도 강제 재로드해야 한다.
+        var gateway = new FakeSettingsGateway();
+        var deviceSelection = new FakeDeviceSelectionSource { SelectedIdentity = "device-a" };
+        var settings = CreateSettings(gateway, deviceSelection);
+
+        var originalWidth = settings.DisplayStream.Values.Width;
+        var pageBefore = settings.DisplayStream;
+        settings.DisplayStream.Values.Width = 1920;
+        Assert.True(settings.HasChanges);
+
+        settings.CancelCommand.Execute(null);
+
+        Assert.NotSame(pageBefore, settings.DisplayStream);
+        Assert.Equal(originalWidth, settings.DisplayStream.Values.Width);
+        Assert.False(settings.HasChanges);
+    }
+
+    // --- F-2: SaveAll은 예외를 커맨드 밖으로 흘리지 않는다 ---
+
+    [Fact]
+    public void SaveAll_WhenAPageSaveThrows_DoesNotEscapeTheCommandAndKeepsTheWindowOpen()
+    {
+        // SettingsService.SaveCore는 디스크 가득참·저장 잠금 타임아웃·
+        // 상위 버전 설정 파일에서 예외를 던진다. 그 예외가 RelayCommand를
+        // 뚫고 나가면 Avalonia UI 스레드에 처리기가 없어 앱이 죽는다.
+        var gateway = new FakeSettingsGateway
+        {
+            UpdateExceptionToThrow = new IOException("There is not enough space on the disk."),
+            UpdateExceptionOnCall = 2
+        };
+        var deviceSelection = new FakeDeviceSelectionSource();
+        var settings = CreateSettings(gateway, deviceSelection);
+
+        settings.Paths.ScrcpyPath = "/new/scrcpy";
+
+        var closeRequestedCount = 0;
+        settings.CloseRequested += (_, _) => closeRequestedCount++;
+
+        var thrown = Record.Exception(() => settings.SaveAllCommand.Execute(null));
+
+        Assert.Null(thrown);
+        // 저장이 실패했으니 창은 열려 있어야 한다.
+        Assert.Equal(0, closeRequestedCount);
+        Assert.False(string.IsNullOrEmpty(settings.SaveErrorMessage));
+        Assert.Contains("There is not enough space on the disk.", settings.SaveErrorMessage);
+    }
+
+    [Fact]
+    public void SaveAll_WhenEverySaveSucceeds_ClearsAPreviousErrorMessageAndCloses()
+    {
+        var gateway = new FakeSettingsGateway
+        {
+            UpdateExceptionToThrow = new IOException("boom"),
+            UpdateExceptionOnCall = 1
+        };
+        var deviceSelection = new FakeDeviceSelectionSource();
+        var settings = CreateSettings(gateway, deviceSelection);
+
+        settings.Paths.ScrcpyPath = "/new/scrcpy";
+        settings.SaveAllCommand.Execute(null);
+        Assert.False(string.IsNullOrEmpty(settings.SaveErrorMessage));
+
+        // 이제 게이트웨이가 정상이다 - 다시 저장하면 메시지가 지워지고
+        // 창이 닫혀야 한다.
+        gateway.UpdateExceptionToThrow = null;
+
+        var closeRequestedCount = 0;
+        settings.CloseRequested += (_, _) => closeRequestedCount++;
+
+        settings.SaveAllCommand.Execute(null);
+
+        Assert.Equal(string.Empty, settings.SaveErrorMessage);
+        Assert.Equal(1, closeRequestedCount);
+        Assert.Equal("/new/scrcpy", gateway.Current.Paths.ScrcpyPath);
+    }
+
+    // --- F-5: 무효 페이지 위에서 Save가 닫히지 않게 하는 집계 유효성 ---
+
+    [Fact]
+    public void AreAllPagesValid_GoesFalseWhileAPageIsInvalidAndBackTrueOnceFixed()
+    {
+        var gateway = new FakeSettingsGateway();
+        var deviceSelection = new FakeDeviceSelectionSource { SelectedIdentity = "device-a" };
+        var settings = CreateSettings(gateway, deviceSelection);
+
+        Assert.True(settings.AreAllPagesValid);
+
+        // 참고: 리뷰 보고서의 예시("8"은 M/K 접미사가 없어 무효)는 실제
+        // 규칙과 다르다 - 두 페이지의 패턴 ^\d+[MK]?$ 모두 접미사를
+        // 선택으로 두므로 "8"은 유효하다. 무효 사례로는 접미사가 아닌
+        // 꼬리표가 붙은 값을 쓴다.
+        settings.Slot.Values.Slots[0].BitRate = "8Mbps";
+        Assert.False(settings.Slot.IsValid);
+        Assert.True(settings.HasChanges);
+        // HasChanges만 보고 Save를 열어두면 이 슬롯 편집이 조용히 버려진 채
+        // 창이 닫힌다 - Save 게이트는 유효성도 함께 봐야 한다.
+        Assert.False(settings.AreAllPagesValid);
+
+        settings.Slot.Values.Slots[0].BitRate = "8M";
+        Assert.True(settings.Slot.IsValid);
+        Assert.True(settings.AreAllPagesValid);
+    }
+
+    [Fact]
+    public void AreAllPagesValid_TracksTheDisplayStreamAndInteractionPagesToo()
+    {
+        var gateway = new FakeSettingsGateway();
+        var deviceSelection = new FakeDeviceSelectionSource { SelectedIdentity = "device-a" };
+        var settings = CreateSettings(gateway, deviceSelection);
+
+        settings.DisplayStream.Values.Width = 0;
+        Assert.False(settings.DisplayStream.IsValid);
+        Assert.False(settings.AreAllPagesValid);
+
+        settings.DisplayStream.Values.Width = 1920;
+        Assert.True(settings.AreAllPagesValid);
+
+        settings.Interaction.ExitHotkey = settings.Interaction.CaptureHotkey;
+        Assert.False(settings.Interaction.IsValid);
+        Assert.False(settings.AreAllPagesValid);
+    }
+
+    [Fact]
+    public void AreAllPagesValid_RecomputesWhenThePerDevicePagesAreReplaced()
+    {
+        // 무효한 기기별 페이지를 놔둔 채 다른 기기로 옮기면, 새 페이지는
+        // 게이트웨이에서 새로 읽어 유효하다 - 집계도 따라와야 한다.
+        var gateway = new FakeSettingsGateway();
+        var deviceSelection = new FakeDeviceSelectionSource { SelectedIdentity = "device-a" };
+        var settings = CreateSettings(gateway, deviceSelection);
+
+        settings.DisplayStream.Values.Height = -1;
+        Assert.False(settings.AreAllPagesValid);
+
+        deviceSelection.SelectedIdentity = "device-b";
+
+        Assert.True(settings.AreAllPagesValid);
     }
 
     private static SettingsViewModel CreateSettings(

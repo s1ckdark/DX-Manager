@@ -27,6 +27,11 @@ public sealed partial class SettingsViewModel : ObservableObject, IDisposable
     private readonly IUiDispatcher _dispatcher;
     private bool _disposed;
 
+    // 지금 화면에 올라와 있는 기기별 페이지 2개가 "어느 identity로"
+    // 만들어졌는지. LoadDevicePages의 재생성 가드 기준이다(F-1).
+    private string _devicePagesIdentity;
+    private bool _devicePagesLoaded;
+
     /// <param name="gateway">설정 읽기·쓰기 경계. 다섯 페이지 전부가 공유한다.</param>
     /// <param name="deviceSelection">대상 기기 선택 출처. DeviceListViewModel
     /// 전체가 아니라 이 좁은 인터페이스만 필요로 한다.</param>
@@ -107,6 +112,28 @@ public sealed partial class SettingsViewModel : ObservableObject, IDisposable
     [ObservableProperty]
     private bool _isTargetDexRunning;
 
+    /// <summary>
+    /// 다섯 페이지가 모두 저장 가능한(유효한) 상태인지. 검증이 없는
+    /// 페이지(Paths/Appearance)는 항상 유효한 것으로 본다.
+    ///
+    /// Save 버튼은 <see cref="HasChanges"/>와 이 값을 함께 본다. HasChanges만
+    /// 보고 열어두면, 유효하지 않은 페이지는 <see cref="SaveAll"/>이 조용히
+    /// 건너뛴 채로 창이 닫혀 그 페이지의 편집이 아무 안내 없이 사라진다 -
+    /// 인라인 검증 배너는 창과 함께 사라지므로 사용자는 무엇이 잘못됐는지
+    /// 볼 기회조차 없다. 비활성화된 Save가 사용자를 그 자리에 붙잡아 둔다.
+    /// </summary>
+    [ObservableProperty]
+    private bool _areAllPagesValid = true;
+
+    /// <summary>
+    /// 마지막 <see cref="SaveAll"/> 시도가 실패했을 때의 사용자 안내 문구.
+    /// 성공하면 빈 문자열이다. Phase 2의
+    /// <see cref="DeviceViewModel.LastCommandMessage"/>와 같은 패턴 -
+    /// 뷰가 이 문자열을 TextBlock에 바인딩해 보여준다.
+    /// </summary>
+    [ObservableProperty]
+    private string _saveErrorMessage = string.Empty;
+
     private void OnDeviceSelectionPropertyChanged(object sender, PropertyChangedEventArgs e)
     {
         if (e.PropertyName != nameof(IDeviceSelectionSource.SelectedIdentity)) return;
@@ -145,9 +172,35 @@ public sealed partial class SettingsViewModel : ObservableObject, IDisposable
     /// <summary>
     /// 기기별 페이지 2개를 주어진 identity로 (재)생성한다. identity가
     /// 비어 있으면(선택된 기기 없음) 두 페이지 모두 null로 만든다.
+    ///
+    /// 지금 올라와 있는 페이지가 이미 같은 identity로 만들어져 있으면
+    /// 아무 것도 하지 않는다(재생성도, 재계산도 없다). SelectedIdentity
+    /// 변경 통지는 identity "문자열"이 아니라 DeviceViewModel "참조"가
+    /// 바뀔 때 올라오기 때문이다 - USB가 한 번 흔들리거나 전송 방식이
+    /// 바뀌어 DeviceListViewModel.Apply가 "같은 폰"의 행을 새로 만들어
+    /// 다시 선택하기만 해도 통지가 뜨고, 가드가 없으면 그때마다 사용자의
+    /// 미저장 편집이 아무 안내 없이 디스크 값으로 되돌아간다(F-1).
+    ///
+    /// 의도적으로 남겨둔 범위: 사용자가 "정말로 다른 기기를" 고른 경우는
+    /// 지금도 그대로 재로드하며, 그 탭의 미저장 편집은 버려진다. 그때
+    /// 확인을 묻거나 편집을 identity별로 보관하려면 다이얼로그 이음새가
+    /// 필요해 이번 라운드의 범위 밖으로 미뤘다.
     /// </summary>
-    private void LoadDevicePages(string identity)
+    /// <param name="force">identity가 같아도 강제로 다시 만든다.
+    /// Cancel이 "편집 버리기"를 페이지 재생성으로 구현하므로 그 경로는
+    /// 가드를 우회해야 한다.</param>
+    private void LoadDevicePages(string identity, bool force = false)
     {
+        if (!force &&
+            _devicePagesLoaded &&
+            string.Equals(
+                _devicePagesIdentity ?? string.Empty,
+                identity ?? string.Empty,
+                StringComparison.Ordinal))
+        {
+            return;
+        }
+
         DetachDevicePageHandlers();
 
         DisplayStream = string.IsNullOrEmpty(identity)
@@ -156,6 +209,9 @@ public sealed partial class SettingsViewModel : ObservableObject, IDisposable
         Slot = string.IsNullOrEmpty(identity)
             ? null
             : new SlotSettingsViewModel(identity, _gateway);
+
+        _devicePagesIdentity = identity;
+        _devicePagesLoaded = true;
 
         AttachDevicePageHandlers();
         RecomputeHasChanges();
@@ -208,6 +264,15 @@ public sealed partial class SettingsViewModel : ObservableObject, IDisposable
             || Interaction.HasChanges
             || (DisplayStream?.HasChanges ?? false)
             || (Slot?.HasChanges ?? false);
+
+        // 유효성 집계는 HasChanges와 정확히 같은 계기로 다시 계산한다 -
+        // Save 게이트가 두 값을 함께 보기 때문에, 둘의 갱신 시점이
+        // 어긋나면 버튼이 한 박자 늦게 열리거나 닫힌다.
+        // Paths/Appearance는 검증이 없는 페이지라 항상 유효로 본다.
+        AreAllPagesValid =
+            Interaction.IsValid
+            && (DisplayStream?.IsValid ?? true)
+            && (Slot?.IsValid ?? true);
     }
 
     /// <summary>
@@ -218,19 +283,43 @@ public sealed partial class SettingsViewModel : ObservableObject, IDisposable
     /// 저장되지 않도록 여기서도 같은 조건을 존중한다.
     ///
     /// 모든 저장과 재계산이 끝난 뒤 <see cref="CloseRequested"/>를 올려
-    /// Desktop 레이어가 설정 창을 닫게 한다 - 유효하지 않아 건너뛴 페이지가
-    /// 있어도 나머지 페이지가 저장됐다면 창은 닫힌다(그 페이지의 편집은
-    /// 조용히 버려진다; 표준 다이얼로그 관례를 따른 선택이다).
+    /// Desktop 레이어가 설정 창을 닫게 한다. Save 버튼 자체가
+    /// <see cref="HasChanges"/>와 <see cref="AreAllPagesValid"/>를 함께 보므로
+    /// 유효하지 않은 페이지를 남긴 채로는 여기까지 올 수 없다.
+    ///
+    /// 페이지별 Save는 각각 게이트웨이를 통해 디스크까지 내려간다 -
+    /// SettingsService.SaveCore는 디스크 가득참, 저장 잠금 타임아웃,
+    /// 상위 버전 설정 파일에서 예외를 던진다. 그 예외가 RelayCommand를
+    /// 뚫고 나가면 Avalonia UI 스레드에 처리기가 없어 앱이 그대로 죽으므로
+    /// 여기서 반드시 붙잡는다. 실패하면 <see cref="CloseRequested"/>를
+    /// 올리지 않는다 - 창은 열린 채로 남아야 하고(부분 저장 상태를 사용자가
+    /// 볼 수 있어야 한다), 실패 사유는
+    /// <see cref="SaveErrorMessage"/>로 화면에 드러낸다.
     /// </summary>
     [RelayCommand]
     private void SaveAll()
     {
-        TrySave(Paths.SaveCommand);
-        TrySave(Appearance.SaveCommand);
-        TrySave(Interaction.SaveCommand);
-        if (DisplayStream != null) TrySave(DisplayStream.SaveCommand);
-        if (Slot != null) TrySave(Slot.SaveCommand);
+        try
+        {
+            TrySave(Paths.SaveCommand);
+            TrySave(Appearance.SaveCommand);
+            TrySave(Interaction.SaveCommand);
+            if (DisplayStream != null) TrySave(DisplayStream.SaveCommand);
+            if (Slot != null) TrySave(Slot.SaveCommand);
+        }
+        catch (Exception ex)
+        {
+            // 중간에 끊겼으므로 일부 페이지는 이미 디스크에 반영됐다.
+            // 남은 편집이 그대로 dirty로 보이도록 집계를 다시 계산한 뒤,
+            // 창을 닫지 않고 사유만 알린다.
+            RecomputeHasChanges();
+            SaveErrorMessage = LocalizationService.Format(
+                "Settings.SaveAllFailed",
+                ex.Message);
+            return;
+        }
 
+        SaveErrorMessage = string.Empty;
         RecomputeHasChanges();
 
         CloseRequested?.Invoke(this, EventArgs.Empty);
@@ -269,7 +358,11 @@ public sealed partial class SettingsViewModel : ObservableObject, IDisposable
 
         AttachGlobalPageHandlers();
 
-        LoadDevicePages(_deviceSelection.SelectedIdentity);
+        // Cancel의 "편집 버리기"는 페이지 재생성으로 구현돼 있다 -
+        // identity가 그대로여도 반드시 다시 만들어야 한다(F-1 가드 우회).
+        LoadDevicePages(_deviceSelection.SelectedIdentity, force: true);
+
+        SaveErrorMessage = string.Empty;
 
         CloseRequested?.Invoke(this, EventArgs.Empty);
     }

@@ -241,6 +241,17 @@ namespace DexManager.Services
             // 잠겨 있음을 확신할 때만 막고, 판단이 애매하면(Unknown) 통과
             // 시킨다 - 파싱 공백이 정상적으로 될 시작을 막는 것이 더 나쁜
             // 실패 방향이기 때문이다(fail-open).
+            //
+            // 위치에 따른 부수 효과(의도적, 불변식 위반 아님): 이 게이트는
+            // 아래의 CleanupStaleSession보다 먼저 중단하므로, 지연된
+            // overlay 정리(CleanupNaturallyEndedSession이 해제에 실패해
+            // DeferDisplayCleanup으로 미뤄둔 경우)를 이번 시작에 얹어
+            // 처리하지 못한다. 그런 고아 overlay는 잠금 해제 후의 다음
+            // 시작이나 앱 종료 시
+            // (ShellViewModel.Dispose -> ApplicationHost.Dispose가
+            // RuntimeFactory.CreatedInstances를 각자의 identity로 순회하며
+            // 종료) 반드시 회수되므로 불변식 자체는 유지된다 - 다만
+            // 고아가 남아 있는 시간 창은 이 게이트만큼 넓어졌다.
             if (_adbService.IsDeviceLocked(serial) == LockState.Locked)
             {
                 throw new InvalidOperationException(

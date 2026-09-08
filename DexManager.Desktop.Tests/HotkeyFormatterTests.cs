@@ -42,10 +42,52 @@ public class HotkeyFormatterTests
     }
 
     [Fact]
-    public void Format_AllFourModifiers_IncludesMetaLast()
+    public void Format_AllFourModifiers_EmitsTheCommandModifierAsWinLast()
     {
         var all = KeyModifiers.Control | KeyModifiers.Alt | KeyModifiers.Shift | KeyModifiers.Meta;
-        Assert.Equal("Control+Alt+Shift+Meta+F8", HotkeyFormatter.Format(Key.F8, all));
+        Assert.Equal("Control+Alt+Shift+Win+F8", HotkeyFormatter.Format(Key.F8, all));
+    }
+
+    [Fact]
+    public void Format_CommandKeyAlone_EmitsWinNotMeta()
+    {
+        // KeyShortcut.TryParse(DexManager/Services/HotkeyService.cs)가 받는
+        // 수정자 어휘에 "Meta"는 없다 - Meta 토큰 하나가 단축키 "전체"의
+        // 파싱을 실패시키고, HotkeyService.ParseShortcuts는 조용히 시드
+        // 기본값으로 되돌아간다. macOS의 Command 키는 그 파서가 아는
+        // Meta/Super 계열 이름인 "Win"으로 써야 왕복이 성립한다.
+        Assert.Equal("Win+F8", HotkeyFormatter.Format(Key.F8, KeyModifiers.Meta));
+    }
+
+    [Fact]
+    public void Format_NeverEmitsTheMetaTokenTheParserRejects()
+    {
+        var all = KeyModifiers.Control | KeyModifiers.Alt | KeyModifiers.Shift | KeyModifiers.Meta;
+        Assert.DoesNotContain("Meta", HotkeyFormatter.Format(Key.F8, all), System.StringComparison.Ordinal);
+    }
+
+    // --- F-6: 단축키 입력란에서 키보드로 빠져나갈 수 있어야 한다 ---
+
+    [Theory]
+    [InlineData(Key.Tab)]
+    [InlineData(Key.Escape)]
+    public void ShouldPassThroughForNavigation_LetsFocusAndDismissKeysOut(Key key)
+    {
+        // Tunnel 핸들러가 모든 키를 e.Handled = true로 삼키면 키보드
+        // 사용자는 이 입력란에서 나갈 수도, 창을 닫을 수도 없다
+        // (Shift+Tab도 Key.Tab으로 온다).
+        Assert.True(HotkeyFormatter.ShouldPassThroughForNavigation(key));
+    }
+
+    [Theory]
+    [InlineData(Key.F8)]
+    [InlineData(Key.A)]
+    [InlineData(Key.Enter)]
+    [InlineData(Key.Space)]
+    [InlineData(Key.Back)]
+    public void ShouldPassThroughForNavigation_StillCapturesEveryOtherKey(Key key)
+    {
+        Assert.False(HotkeyFormatter.ShouldPassThroughForNavigation(key));
     }
 
     [Fact]

@@ -427,6 +427,7 @@
   <data name="Settings.ThemeDark" xml:space="preserve"><value>다크</value></data>
   <data name="Settings.ThemeRestart" xml:space="preserve"><value>테마 변경은 저장 즉시 적용됩니다.</value></data>
   <data name="Settings.DexRunningNotice" xml:space="preserve"><value>이 기기에서 삼성 DeX가 실행 중입니다. 지금 저장은 되지만, 변경 사항은 다음 DeX 시작부터 적용됩니다.</value></data>
+  <data name="Settings.SaveAllFailed" xml:space="preserve"><value>설정을 저장하지 못했습니다: {0}</value></data>
   <data name="Settings.GroupMiniControlBar" xml:space="preserve"><value>미니 컨트롤바</value></data>
   <data name="Settings.MiniControlBar" xml:space="preserve"><value>Scrcpy 창 옆에 미니 컨트롤바 표시</value></data>
   <data name="Settings.MiniControlBarSide" xml:space="preserve"><value>부착 위치</value></data>

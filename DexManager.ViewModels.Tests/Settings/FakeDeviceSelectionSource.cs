@@ -22,5 +22,17 @@ public sealed class FakeDeviceSelectionSource : IDeviceSelectionSource, INotifyP
         }
     }
 
+    /// <summary>
+    /// SelectedIdentity 문자열은 그대로 둔 채 변경 통지만 올린다.
+    /// DeviceListViewModel.Apply가 같은 폰의 행 인스턴스를 새로 만들어
+    /// 다시 선택할 때(USB 흔들림, 전송 방식 전환) 실제로 일어나는 일이다 -
+    /// SelectedIdentity 통지는 문자열이 아니라 DeviceViewModel "참조"가
+    /// 바뀔 때 올라오기 때문이다.
+    /// </summary>
+    public void RaiseSelectedIdentityChangedWithoutChangingValue()
+    {
+        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(SelectedIdentity)));
+    }
+
     public event PropertyChangedEventHandler PropertyChanged;
 }

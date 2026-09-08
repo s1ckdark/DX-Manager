@@ -16,7 +16,7 @@ namespace DexManager.Tests;
 public class AdbServiceLockStateTests
 {
     [Fact]
-    public void ParseLockState_WhenShowingLockscreenIsTrue_ReturnsLocked()
+    public void ParseLockState_WhenShowingLockscreenIsTrueAndTheKeyguardIsSecured_ReturnsLocked()
     {
         const string dump = """
             WINDOW MANAGER POLICY STATE (dumpsys window policy)
@@ -25,6 +25,10 @@ public class AdbServiceLockStateTests
               mDreamingLockscreen=false
               mShowingLockscreen=true
               isStatusBarKeyguard=true
+              KeyguardServiceDelegate
+                showing=true
+                occluded=false
+                secure=true
             """;
 
         Assert.Equal(LockState.Locked, AdbService.ParseLockState(dump));
@@ -78,9 +82,130 @@ public class AdbServiceLockStateTests
     [Fact]
     public void ParseLockState_WhenOnlyALowerPriorityFieldAppears_UsesIt()
     {
-        const string dump = "isStatusBarKeyguard=true";
+        const string dump = """
+            isStatusBarKeyguard=true
+            KeyguardServiceDelegate
+              secure=true
+            """;
 
         Assert.Equal(LockState.Locked, AdbService.ParseLockState(dump));
+    }
+
+    // --- F-8: 잠금 화면이 "떠 있음"만으로는 Locked가 아니다 ---
+
+    [Fact]
+    public void ParseLockState_WhenTheKeyguardIsShowingButNotSecured_DoesNotReportLocked()
+    {
+        // 이게 가장 흔한 첫 시작 상태다: PIN/패턴이 없는(스와이프 전용)
+        // 폰이 책상 위에서 화면만 꺼진 채 꽂혀 있으면 mKeyguardShowing은
+        // true다. 여기서 Locked를 돌려주면 "먼저 폰 잠금을 해제하세요"로
+        // 시작을 막게 되는데, 그 폰에는 해제할 잠금 자체가 없다 -
+        // 원래는 되던 시작을 막는, 이 기능이 절대 해선 안 되는 실패
+        // 방향이다.
+        const string dump = """
+            WINDOW MANAGER POLICY STATE (dumpsys window policy)
+              mKeyguardShowing=true
+              KeyguardServiceDelegate
+                showing=true
+                occluded=false
+                secure=false
+            """;
+
+        Assert.NotEqual(LockState.Locked, AdbService.ParseLockState(dump));
+    }
+
+    [Fact]
+    public void ParseLockState_WhenTheKeyguardIsShowingButNoSecureSignalIsAvailable_FailsOpenToUnknown()
+    {
+        // secure 신호를 전혀 찾지 못하면 "잠겨 있다"고 확신할 수 없다.
+        // 다른 모든 불확실 경로와 똑같이 fail-open이어야 한다.
+        const string dump = """
+            WINDOW MANAGER POLICY STATE (dumpsys window policy)
+              mKeyguardShowing=true
+              isStatusBarKeyguard=true
+            """;
+
+        Assert.Equal(LockState.Unknown, AdbService.ParseLockState(dump));
+    }
+
+    [Fact]
+    public void ParseLockState_WhenTheKeyguardIsNotShowing_StaysUnlockedEvenOnASecuredPhone()
+    {
+        // PIN이 걸린 폰이라도 잠금 화면이 떠 있지 않으면 잠겨 있지 않다 -
+        // secure=true가 단독으로 Locked를 만들어서는 안 된다.
+        const string dump = """
+            mShowingLockscreen=false
+            KeyguardServiceDelegate
+              secure=true
+            """;
+
+        Assert.Equal(LockState.Unlocked, AdbService.ParseLockState(dump));
+    }
+
+    [Fact]
+    public void ParseLockState_AcceptsAnExplicitlyKeyguardNamedSecureFieldOutsideTheDelegateBlock()
+    {
+        // 스킨에 따라 KeyguardServiceDelegate 블록 대신 이름 자체에
+        // keyguard가 박힌 필드로 노출되기도 한다. 이름이 명시적이면
+        // 블록 안이 아니어도 신뢰할 수 있다.
+        const string dump = """
+            mKeyguardShowing=true
+            isKeyguardSecure=true
+            """;
+
+        Assert.Equal(LockState.Locked, AdbService.ParseLockState(dump));
+    }
+
+    [Fact]
+    public void ParseLockState_IgnoresABareSecureFieldOutsideTheKeyguardDelegateBlock()
+    {
+        // dumpsys window에는 창(WindowState) 목록도 함께 실린다. 이름
+        // 없는 secure= 하나를 아무 데서나 주워 오면 엉뚱한 창의 플래그로
+        // 잠금을 확신하게 된다 - 그 방향의 오탐이 곧 시작 차단이다.
+        //
+        // 여기서 KeyguardServiceDelegate 블록은 "존재하되 secure를 찍지
+        // 않는" 모양이고, 무관한 secure=true는 그 블록보다 앞에 있다.
+        // 블록 범위로 잘라 읽지 않고 출력 전체에서 secure=를 찾으면 이
+        // 값을 주워 Locked로 단정하게 된다.
+        const string dump = """
+            mKeyguardShowing=true
+            Window #3 Window{abc u0 com.example/.Main}:
+              secure=true
+            KeyguardServiceDelegate
+              showing=true
+              occluded=false
+            """;
+
+        Assert.Equal(LockState.Unknown, AdbService.ParseLockState(dump));
+    }
+
+    // --- F-9: 좌측 단어 경계 ---
+
+    [Fact]
+    public void ParseLockState_DoesNotMatchAFieldThatMerelyEndsWithAKnownName()
+    {
+        // 오른쪽 경계는 이미 있었지만(mShowingLockscreenFoo는 거부됨)
+        // 왼쪽에는 없어서, 이름이 알려진 필드로 "끝나는" 필드가 우선순위
+        // 스캔을 가로챌 수 있었다.
+        const string dump = """
+            XmKeyguardShowing=true
+            KeyguardServiceDelegate
+              secure=true
+            """;
+
+        Assert.Equal(LockState.Unknown, AdbService.ParseLockState(dump));
+    }
+
+    [Fact]
+    public void ParseLockState_DoesNotMatchASecureFieldThatMerelyEndsWithSecure()
+    {
+        const string dump = """
+            mKeyguardShowing=true
+            KeyguardServiceDelegate
+              mIsDeviceSecure=true
+            """;
+
+        Assert.Equal(LockState.Unknown, AdbService.ParseLockState(dump));
     }
 
     [Fact]
@@ -96,7 +221,7 @@ public class AdbServiceLockStateTests
             new Dictionary<string, string> { ["phone-a"] = "HWA" },
             new Dictionary<string, string>
             {
-                ["phone-a"] = "mShowingLockscreen=true"
+                ["phone-a"] = "mShowingLockscreen=true isKeyguardSecure=true"
             });
         var host = root.CreateHost(pathProvider: adb.CreatePathProvider());
 
