@@ -321,3 +321,52 @@ Scrcpy를 따로 내려받으므로 영향을 받지 않는다.
 시각이 기존 빌드 산출물보다 과거이면 `CopyToOutputDirectory=PreserveNewest`가
 복사를 건너뛰어 이전 실행 파일이 그대로 남는다. 교체 뒤
 `touch tools/scrcpy/*` 또는 `dotnet clean`으로 산출물을 갱신한다.
+
+## 테스트: fake-adb 프로브의 CPU 경합 flake
+
+실제 `ApplicationHost`를 생성하는 테스트는 시작·종료 과정에서 fake-adb 셸
+스크립트(`FakeAdbExecutable`)를 실제 서브프로세스로 띄운다. 이 flake는 두
+증상 중 하나로 나타난다:
+
+1. `PathServiceCandidateRetryTests.SelectAdbPath_PreferredCandidateUnavailable_LogsWhichReplacementWasUsed`가
+   예상한 fake adb 경로 대신 실제 시스템 adb(예: `/opt/homebrew/bin/adb`)를
+   assert해 실패한다.
+2. 테스트 `finally`의 `ApplicationHost.Dispose()` overlay 회수 경로에서
+   `AggregateException: ... Could not remove the existing virtual display`가
+   터진다.
+
+영향받는 클래스: `DexOrchestratorWakeTests`, `DexOrchestratorShutdownTests`,
+`DexOrchestratorStartLockGateTests`, `DexOrchestratorDismissKeyguardPollTests`,
+`PathServiceCandidateRetryTests`, `AdbServiceLockStateTests`,
+`ApplicationHostTests` — 즉 `FakeAdbExecutable`을 실제로 띄우는 모든 테스트.
+
+**메커니즘.** `PathService`의 `adb version` 프로브는 5초 타임아웃에 2회
+재시도(300ms 간격, `TransientProbeRetry`, 타임아웃일 때만 재시도)를 두는데,
+CPU 경합 아래서는 이 사소한 셸 스크립트조차 스케줄링이 밀려 두 시도 모두
+타임아웃할 수 있다. 그러면 그 세션 동안 실제 시스템 adb로 fail-open하고,
+이후 fake serial을 넘기는 모든 호출이 "device not found"로 실패한다. 전체
+진단은 `.omc/research/settle-poll-report.md`, 재현·측정 근거는
+`.omc/research/flake-fix-report.md` 참조.
+
+**트리거 조건(정확히 표현할 것).** `dotnet test` 자체가 아니라 **외부 CPU
+경합**(동시에 도는 빌드, 다른 테스트 실행, 리소스를 공유하는 CI 러너)이
+조건이다. 유휴 머신에서 `dotnet test DexManager.Mac.sln`을 10회 반복하면
+**0/10** — 전혀 재현되지 않는다. 같은 커밋에서 4개의 `dotnet test` 프로세스를
+동시에 돌리는 경합 아래서는 **3/12(25%)** 실패, 실패는 모두 위 증상 1번과
+같은 신호(fail-open된 실제 adb 경로)였다. 즉 이 flake는 "합성 스트레스에서만"
+일어나는 게 아니라 실제 CPU 경합 상황(빌드와 테스트가 겹치는 로컬 개발, 여러
+잡이 리소스를 공유하는 CI 러너)에서도 재현되는 문제이며, 4× 병렬 스트레스는
+그 조건을 증폭해 관측한 것뿐이다.
+
+**증상을 보면 할 일.** 조용한(유휴) 머신에서 다시 돌린다. 경합 없이도
+재현되면 이건 다른 버그이니 별도로 조사한다. 프로덕션 코드에 재시도나
+타임아웃을 더 추가해서 "고치려" 하지 말 것 — 현재 재시도 정책(2회, 타임아웃일
+때만)과 fail-open 시맨틱은 의도된 설계이고 리뷰를 거쳤다(PR #5). 잔존
+실패율은 이미 문서화된 한계다.
+
+**왜 고치지 않았는가.** 서브프로세스를 띄우는 22개 테스트를 하나의 xUnit
+컬렉션으로 묶어 직렬화하거나, `ApplicationHost`의 하드코딩된
+`AdbSelectionTimeoutMs`(5000ms, `private const`)를 테스트에서만 늘리도록
+프로덕션에 seam을 추가하는 방법을 모두 검토했다. 두 방법 다 유휴 머신 기준
+0/10인 조건을 고치는 데 비해 비용(직렬화는 실행 시간 증가, seam 추가는
+프로덕션 코드 변경)이 더 크다고 판단해 보류했다.
