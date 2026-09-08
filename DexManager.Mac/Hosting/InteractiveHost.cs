@@ -749,48 +749,115 @@ public sealed class InteractiveHost : IDisposable
             // 입력을 먼저 받아 mutation으로 포장한다. UpdateSettings는
             // 잠금을 잡으므로 그 안에서 사용자 입력을 기다리면 다른
             // 소비자가 프롬프트가 닫힐 때까지 막힌다.
+            //
+            // mutate는 실제로 값이 바뀔 때만 설정한다 - 취소(빈 입력),
+            // 잘못된 입력, 인식되지 않은 항목, 기존과 같은 값 재입력은
+            // 모두 "바뀐 것 없음"으로 취급해 아래에서 저장하지도, 저장했다고
+            // 말하지도 않는다. 이전에는 8/9가 아예 처리되지 않아(switch에
+            // 없는 항목) mutate가 항상 null로 남았는데도 무조건 저장하고
+            // "Settings updated and saved."를 출력해, 하지도 않은 편집을
+            // 저장했다고 거짓 보고했다 - 1~7도 유효하지 않은 입력에서 같은
+            // 거짓을 보고했다(실기 조사 §12).
             Action<AppSettings> mutate = null;
             switch (opt)
             {
                 case "1":
                     Console.Write("Enter Width (e.g. 1920, 2560): ");
-                    if (int.TryParse(Console.ReadLine(), out var w))
+                    if (int.TryParse(Console.ReadLine(), out var w) &&
+                        w != _settings.VirtualDisplay.Width)
                         mutate = s => s.VirtualDisplay.Width = w;
                     break;
                 case "2":
                     Console.Write("Enter Height (e.g. 1080, 1440): ");
-                    if (int.TryParse(Console.ReadLine(), out var h))
+                    if (int.TryParse(Console.ReadLine(), out var h) &&
+                        h != _settings.VirtualDisplay.Height)
                         mutate = s => s.VirtualDisplay.Height = h;
                     break;
                 case "3":
                     Console.Write("Enter DPI (e.g. 160, 200, 240): ");
-                    if (int.TryParse(Console.ReadLine(), out var dpi))
+                    if (int.TryParse(Console.ReadLine(), out var dpi) &&
+                        dpi != _settings.VirtualDisplay.Dpi)
                         mutate = s => s.VirtualDisplay.Dpi = dpi;
                     break;
                 case "4":
                     Console.Write("Enter Bitrate (e.g. 16M, 24M, 32M): ");
                     var br = Console.ReadLine()?.Trim();
-                    if (!string.IsNullOrWhiteSpace(br))
+                    if (!string.IsNullOrWhiteSpace(br) &&
+                        !string.Equals(br, _settings.Scrcpy.BitRate, StringComparison.Ordinal))
                         mutate = s => s.Scrcpy.BitRate = br;
                     break;
                 case "5":
                     Console.Write("Enter Max FPS (e.g. 60, 120): ");
-                    if (int.TryParse(Console.ReadLine(), out var fps))
+                    if (int.TryParse(Console.ReadLine(), out var fps) &&
+                        fps != _settings.Scrcpy.MaxFps)
                         mutate = s => s.Scrcpy.MaxFps = fps;
                     break;
                 case "6":
+                    // 토글이므로 선택하는 순간 항상 값이 바뀐다.
                     mutate = s => s.Scrcpy.TurnScreenOff = !s.Scrcpy.TurnScreenOff;
                     break;
                 case "7":
                     mutate = s => s.Scrcpy.StayAwake = !s.Scrcpy.StayAwake;
                     break;
+                case "8":
+                {
+                    // 그냥 Enter는 절대 파괴적이지 않다 - 유지다. 지우려면
+                    // "-"를 명시적으로 입력해야 한다(PathPromptInput 참고).
+                    // 콘솔 입력은 GUI 텍스트 상자와 달리 항상 빈 줄에서
+                    // 시작하므로, 빈 입력을 "비움"으로 해석하면 값을 보러
+                    // 들어왔다가 취소하려는 사용자의 설정을 조용히 지우게
+                    // 된다(코드 리뷰 지적).
+                    var currentScrcpy = _settings.Paths.ScrcpyPath ?? string.Empty;
+                    var currentScrcpyDisplay = string.IsNullOrEmpty(currentScrcpy)
+                        ? "(auto)"
+                        : currentScrcpy;
+                    Console.Write(
+                        $"Enter Scrcpy Path [{currentScrcpyDisplay}] (Enter to keep, '-' to clear): ");
+                    var scrcpyResult = PathPromptInput.Resolve(currentScrcpy, Console.ReadLine());
+                    if (scrcpyResult.Changed)
+                        mutate = s => s.Paths.ScrcpyPath = scrcpyResult.Value;
+                    break;
+                }
+                case "9":
+                {
+                    // ADB Path는 값만 쓰지 않는다 - PathService는
+                    // AdbSelectionMode == Manual일 때만 Paths.AdbPath를
+                    // 읽으므로(PathService.cs:43), 경로만 써 넣고 모드를
+                    // 안 바꾸면 GUI PR #5가 고친 것과 같은 무동작 칸이
+                    // 된다. GUI의 PathsSettingsViewModel.Save()와 같은
+                    // 규칙(AdbPathEditRule)을 그대로 따른다: 트림 후
+                    // 채워서 편집 -> Manual, 비워서 편집("-") -> Auto,
+                    // 바뀌지 않았으면(Enter만 누름 포함) 모드를 건드리지
+                    // 않는다. 그냥 Enter가 Manual 경로를 지우던 문제도
+                    // PathPromptInput의 "빈 입력=유지" 규칙으로 함께 막혔다.
+                    var currentAdb = _settings.Paths.AdbPath ?? string.Empty;
+                    var currentAdbDisplay = string.IsNullOrEmpty(currentAdb) ? "(auto)" : currentAdb;
+                    Console.Write(
+                        $"Enter ADB Path [{currentAdbDisplay}] (Enter to keep, '-' to clear): ");
+                    var adbInput = Console.ReadLine();
+                    var adbResult = AdbPathEditRule.Apply(currentAdb, adbInput);
+                    if (adbResult.Changed)
+                    {
+                        mutate = s =>
+                        {
+                            s.Paths.AdbPath = adbResult.TrimmedPath;
+                            if (adbResult.NewMode.HasValue)
+                                s.Paths.AdbSelectionMode = adbResult.NewMode.Value;
+                        };
+                    }
+                    break;
+                }
             }
 
-            // 기존 동작 보존: 인식되지 않은 항목이나 잘못된 입력에도
-            // 저장이 일어나고 같은 문구가 나왔다. 정규화 부작용을 위해
-            // 저장 자체는 유지한다.
-            _host.UpdateSettings(mutate ?? (_ => { }));
-            AnsiConsole.Success("Settings updated and saved.");
+            if (mutate != null)
+            {
+                _host.UpdateSettings(mutate);
+                AnsiConsole.Success("Settings updated and saved.");
+            }
+            else
+            {
+                AnsiConsole.Warning("No changes were made.");
+            }
             Thread.Sleep(800);
         }
 

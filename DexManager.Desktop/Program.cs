@@ -1,6 +1,7 @@
 using System;
 using System.Runtime.InteropServices;
 using Avalonia;
+using DexManager.Utils;
 
 namespace DexManager.Desktop;
 
@@ -76,9 +77,12 @@ internal static class Program
     /// 우리가 직접 종료 코드를 고르는 것보다 신호별 기본 동작에 맡기는
     /// 편이 더 예측 가능하다.
     ///
-    /// 예산은 신호 종류에 따라 다르다(<see cref="SignalCleanupBudgets"/>) -
-    /// SIGINT(대화형 Ctrl+C)는 짧게, SIGTERM/SIGHUP(비대화형)은 실제 adb
-    /// 정리 사슬이 필요로 하는 시간에 맞춰 더 길게 잡는다.
+    /// 예산은 세 신호 모두 같다(<see cref="SignalCleanupBudgets"/>) - 실제
+    /// adb 정리 사슬이 필요로 하는 시간(단일 adb 호출 상한인
+    /// AppSettings.Timing.ProcessTimeoutMs와 정렬)에 맞춘다. SIGINT라고
+    /// 짧게 자르지 않는 이유는 SignalCleanupBudgets의 문서 참고 - 화면
+    /// 앞에 사용자가 있다는 사실이 정리 사슬이 실제로 걸리는 시간을
+    /// 줄여주지는 않는다.
     /// </summary>
     private static void HandleTerminationSignal(PosixSignalContext ctx)
     {

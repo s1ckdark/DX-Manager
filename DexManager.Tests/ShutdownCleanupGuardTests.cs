@@ -1,14 +1,14 @@
 using System.Threading;
 using System.Threading.Tasks;
-using DexManager.Desktop;
+using DexManager.Utils;
 using Xunit;
 
-namespace DexManager.Desktop.Tests;
+namespace DexManager.Tests;
 
 /// <summary>
-/// ShutdownCleanupGuard는 App.axaml.cs의 OnExit(정상 종료)과
-/// Program.cs의 HandleTerminationSignal(SIGTERM/SIGINT/SIGHUP)이 같은
-/// DisposeQuietly를 정확히 한 번만 실행하도록 공유하는 가드다. 실제
+/// ShutdownCleanupGuard는 GUI(DexManager.Desktop.App.OnExit/HandleTerminationSignal)와
+/// TUI(DexManager.Mac.Program) 양쪽에서, 정상 종료 경로와 신호(SIGTERM/SIGINT/SIGHUP)
+/// 경로가 같은 정리 로직을 정확히 한 번만 실행하도록 공유하는 가드다. 실제
 /// 신호 전달 자체는 이 테스트로 검증할 수 없다 - 여기서는 그 신호가
 /// 오든 안 오든 상관없이 참이어야 하는 성질(최대 한 번 실행, 동시
 /// 호출에도 안전)만 고정한다.
