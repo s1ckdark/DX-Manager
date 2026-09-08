@@ -8,6 +8,7 @@ using DexManager.Hosting;
 using DexManager.Mac.Platform;
 using DexManager.Models;
 using DexManager.Services;
+using DexManager.Utils;
 using DexManager.ViewModels;
 
 namespace DexManager.Desktop;

@@ -1,16 +1,17 @@
 using System;
 using System.Runtime.InteropServices;
-using DexManager.Desktop;
 using DexManager.Models;
+using DexManager.Utils;
 using Xunit;
 
-namespace DexManager.Desktop.Tests;
+namespace DexManager.Tests;
 
 /// <summary>
-/// Program.cs의 신호 처리기가 SIGINT/SIGTERM/SIGHUP에 각각 얼마나 기다릴지
-/// 고르는 규칙만 고정한다. 실제 신호 전달이나 정리 자체는 다루지 않는다 -
-/// 그건 BoundedExecutor/ShutdownCleanupGuard의 몫이고, 배선 검증은 실기
-/// (.omc/research/2026-09-08-realdevice-lock-findings.md 11절)로 한다.
+/// 각 프론트엔드 Program.cs의 신호 처리기가 SIGINT/SIGTERM/SIGHUP에 각각
+/// 얼마나 기다릴지 고르는 규칙만 고정한다. 실제 신호 전달이나 정리 자체는
+/// 다루지 않는다 - 그건 BoundedExecutor/ShutdownCleanupGuard의 몫이고,
+/// 배선 검증은 실기(.omc/research/2026-09-08-realdevice-lock-findings.md
+/// 11절, 12절)로 한다.
 ///
 /// SIGINT는 터미널에서 Ctrl+C로 오는 대화형 신호다 - 사용자가 화면을 보고
 /// "지금 멈춰라"라고 기대하므로 짧게 유지한다. SIGTERM/SIGHUP은 launchd,
