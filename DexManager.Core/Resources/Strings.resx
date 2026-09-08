@@ -339,6 +339,7 @@
   <data name="Log.Path.SystemPathRegistered" xml:space="preserve"><value>Registered the ADB folder in the system PATH: {0}</value></data>
   <data name="Error.Path.AutomaticAdbNotFound" xml:space="preserve"><value>No runnable adb.exe was found beside scrcpy or in the legacy fallback folder.</value></data>
   <data name="Error.Path.AdbUnavailable" xml:space="preserve"><value>{0}: adb.exe could not be executed. Check the path.</value></data>
+  <data name="Error.Path.ManualAdbUnavailable" xml:space="preserve"><value>The ADB path configured in Settings ("{0}") could not be run, so DX Manager cannot start. To recover: open {1}, clear the "AdbPath" value, then restart - this switches back to automatic ADB detection.</value></data>
   <data name="Log.Path.CandidateMissing" xml:space="preserve"><value>{0} file is missing: {1}</value></data>
   <data name="Log.Path.CandidateExecutionFailed" xml:space="preserve"><value>{0} execution failed: {1}</value></data>
   <data name="Log.Path.CandidateUnavailable" xml:space="preserve"><value>{0} cannot be executed: {1}</value></data>

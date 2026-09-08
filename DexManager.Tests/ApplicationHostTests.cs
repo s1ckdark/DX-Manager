@@ -179,6 +179,64 @@ public class ApplicationHostTests : IDisposable
     }
 
     [Fact]
+    public void ManualAdbSelection_UsesConfiguredAdbPath_NotAutoDetectedDefault()
+    {
+        // Manual 모드에서는 설정된 ADB 경로가 실제로 "선택"되어야 한다 -
+        // 그저 저장되는 것과는 다르다. 오늘 고친 버그는 정확히 그
+        // 차이였다: PathsSettingsViewModel.Save()가 AdbPath는 쓰면서
+        // AdbSelectionMode는 절대 Manual로 바꾸지 않아, 이 값을 읽는
+        // 코드가 어디에도 없었다.
+        //
+        // 자동 감지 기본값을 수동 경로와 다른 실행 파일(/bin/echo)로
+        // 일부러 둔다 - 둘이 같으면 Manual이 통째로 무시되고 자동 경로가
+        // 선택돼도 이 테스트는 (우연히) 통과해 버린다.
+        var seedLog = new LogService();
+        var seedSettingsService = new SettingsService(seedLog, _tempRoot.Root);
+        var seededSettings = seedSettingsService.Load();
+        var fakeAdb = new FakeAdbExecutable(
+            _tempRoot.Root,
+            new Dictionary<string, string>());
+        seededSettings.Paths.AdbPath = fakeAdb.ExecutablePath;
+        seededSettings.Paths.AdbSelectionMode = AdbSelectionMode.Manual;
+        seedSettingsService.Save(seededSettings);
+
+        var pathProvider = new FakePathProvider(
+            _tempRoot.Root,
+            adbPath: "/bin/echo");
+        using var host = _tempRoot.CreateHost(pathProvider: pathProvider);
+
+        Assert.Equal(fakeAdb.ExecutablePath, host.Adb.AdbPath);
+    }
+
+    [Fact]
+    public void ManualAdbSelection_WithUnusablePath_ThrowsActionableError()
+    {
+        // Manual 모드에서 설정된 경로가 실행될 수 없으면(오타 등) 앱은
+        // 조용히 다른 adb로 넘어가지 않고 시작을 포기해야 한다 - 그리고
+        // App.axaml.cs의 CreateMainWindow가 이 예외를 잡아 StartupErrorWindow에
+        // Message를 그대로 보여주므로, 그 한 줄만 보고도 사용자가 무엇을
+        // 어디서 고쳐야 하는지 알 수 있어야 한다: 실패한 경로 자체와,
+        // 되돌리려면 열어야 할 설정 파일 경로.
+        var seedLog = new LogService();
+        var seedSettingsService = new SettingsService(seedLog, _tempRoot.Root);
+        var seededSettings = seedSettingsService.Load();
+        var badPath = Path.Combine(_tempRoot.Root, "does-not-exist-adb");
+        seededSettings.Paths.AdbPath = badPath;
+        seededSettings.Paths.AdbSelectionMode = AdbSelectionMode.Manual;
+        seedSettingsService.Save(seededSettings);
+
+        var pathProvider = new FakePathProvider(_tempRoot.Root);
+
+        var ex = Assert.Throws<FileNotFoundException>(
+            () => _tempRoot.CreateHost(pathProvider: pathProvider));
+
+        Assert.Contains(badPath, ex.Message);
+        Assert.Contains(
+            Path.Combine(_tempRoot.Root, "config", "settings.json"),
+            ex.Message);
+    }
+
+    [Fact]
     public void Start_ThenStop_LeavesHostRestartable()
     {
         using var host = CreateHost();

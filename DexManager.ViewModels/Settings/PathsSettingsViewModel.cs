@@ -53,7 +53,11 @@ public sealed partial class PathsSettingsViewModel : ObservableObject
     private bool CanSave() => true;
 
     /// <summary>
-    /// 편집값을 전역 설정에 저장한다.
+    /// 편집값을 전역 설정에 저장한다. ADB 경로를 채우면 수동 선택
+    /// (<see cref="AdbSelectionMode.Manual"/>)로 전환해 그 값이 실제로
+    /// 쓰이게 하고, 비우면 자동 감지(<see cref="AdbSelectionMode.Auto"/>)로
+    /// 되돌린다 - 그러지 않으면 이 필드는 저장만 될 뿐 아무것도 읽지
+    /// 않는 장식으로 남는다.
     /// </summary>
     [RelayCommand(CanExecute = nameof(CanSave))]
     private void Save()
@@ -63,7 +67,11 @@ public sealed partial class PathsSettingsViewModel : ObservableObject
             if (s.Paths != null)
             {
                 s.Paths.ScrcpyPath = ScrcpyPath ?? string.Empty;
-                s.Paths.AdbPath = AdbPath ?? string.Empty;
+                var adbPath = AdbPath ?? string.Empty;
+                s.Paths.AdbPath = adbPath;
+                s.Paths.AdbSelectionMode = string.IsNullOrWhiteSpace(adbPath)
+                    ? AdbSelectionMode.Auto
+                    : AdbSelectionMode.Manual;
             }
         });
 

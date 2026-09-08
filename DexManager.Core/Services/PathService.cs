@@ -42,11 +42,22 @@ namespace DexManager.Services
 
             if (settings.Paths.AdbSelectionMode == AdbSelectionMode.Manual)
             {
+                // Manual은 후보가 없으면 SelectRequired가 그대로 던지고,
+                // 이 실패는 사용자가 설정 화면을 열기도 전에 앱 시작을
+                // 막는다(StartupErrorWindow) - 그래서 여기서만 일반적인
+                // "Error.Path.AdbUnavailable" 대신 실제 설정된 경로와
+                // 설정 파일 위치를 담은 메시지를 만든다. 그래야 그 창에
+                // 뜨는 한 줄만 보고도 무엇을 고쳐야 하는지, 어디를
+                // 열어야 하는지 알 수 있다.
                 return SelectRequired(
                     settings.Paths.AdbPath,
                     LocalizationService.Get(
                         "Path.Description.ManualAdb"),
-                    timeoutMs);
+                    timeoutMs,
+                    resolvedPath => LocalizationService.Format(
+                        "Error.Path.ManualAdbUnavailable",
+                        resolvedPath,
+                        _settingsService.SettingsFilePath));
             }
 
             if (PlatformHelper.RequiresLegacyAdb)
@@ -171,7 +182,8 @@ namespace DexManager.Services
         private string SelectRequired(
             string configuredPath,
             string description,
-            int timeoutMs)
+            int timeoutMs,
+            Func<string, string> describeUnavailable = null)
         {
             var candidate = GetRunnableCandidate(
                 configuredPath,
@@ -179,10 +191,13 @@ namespace DexManager.Services
                 timeoutMs);
             if (candidate == null)
             {
-                throw new FileNotFoundException(
-                    LocalizationService.Format(
+                var message = describeUnavailable != null
+                    ? describeUnavailable(
+                        _settingsService.ResolvePath(configuredPath))
+                    : LocalizationService.Format(
                         "Error.Path.AdbUnavailable",
-                        description));
+                        description);
+                throw new FileNotFoundException(message);
             }
 
             LogSelection(

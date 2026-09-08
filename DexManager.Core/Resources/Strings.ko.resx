@@ -339,6 +339,7 @@
   <data name="Log.Path.SystemPathRegistered" xml:space="preserve"><value>ADB 폴더를 시스템 PATH에 등록했습니다: {0}</value></data>
   <data name="Error.Path.AutomaticAdbNotFound" xml:space="preserve"><value>Scrcpy 폴더와 레거시 대체 폴더에서 실행 가능한 adb.exe를 찾을 수 없습니다.</value></data>
   <data name="Error.Path.AdbUnavailable" xml:space="preserve"><value>{0} adb.exe를 실행할 수 없습니다. 경로를 확인하세요.</value></data>
+  <data name="Error.Path.ManualAdbUnavailable" xml:space="preserve"><value>설정에서 지정한 ADB 경로("{0}")를 실행할 수 없어 DX Manager를 시작할 수 없습니다. 복구하려면 {1} 파일을 열어 "AdbPath" 값을 비운 뒤 다시 시작하세요 - 자동 ADB 감지로 돌아갑니다.</value></data>
   <data name="Log.Path.CandidateMissing" xml:space="preserve"><value>{0} 파일이 없습니다: {1}</value></data>
   <data name="Log.Path.CandidateExecutionFailed" xml:space="preserve"><value>{0} 실행 실패: {1}</value></data>
   <data name="Log.Path.CandidateUnavailable" xml:space="preserve"><value>{0} 실행 불가: {1}</value></data>

@@ -26,6 +26,48 @@ public class PathsSettingsViewModelTests
     }
 
     [Fact]
+    public void Save_WhenAdbPathNonEmpty_SwitchesToManualSelectionMode()
+    {
+        // 오늘 고친 버그: ADB 경로를 채워 저장해도 AdbSelectionMode가
+        // 전혀 바뀌지 않아, PathService가 그 값을 절대 읽지 않았다
+        // (AdbSelectionMode는 항상 Auto로 남는다). 값을 채우면 Manual로
+        // 넘어가야 실제로 쓰인다.
+        var gateway = new FakeSettingsGateway();
+        var viewModel = new PathsSettingsViewModel(gateway);
+
+        viewModel.AdbPath = "/usr/local/bin/adb";
+        viewModel.SaveCommand.Execute(null);
+
+        Assert.Equal(
+            AdbSelectionMode.Manual,
+            gateway.Current.Paths.AdbSelectionMode);
+    }
+
+    [Fact]
+    public void Save_WhenAdbPathCleared_RestoresAutoSelectionMode()
+    {
+        // 필드를 비우면 자동 감지로 되돌아가야 한다 - Manual로 남아
+        // 있으면 빈 경로로 PathService.SelectRequired가 항상 실패한다.
+        var gateway = new FakeSettingsGateway();
+        gateway.Update(s =>
+        {
+            s.Paths.AdbPath = "/usr/local/bin/adb";
+            s.Paths.AdbSelectionMode = AdbSelectionMode.Manual;
+        });
+
+        var viewModel = new PathsSettingsViewModel(gateway);
+        Assert.Equal("/usr/local/bin/adb", viewModel.AdbPath);
+
+        viewModel.AdbPath = string.Empty;
+        viewModel.SaveCommand.Execute(null);
+
+        Assert.Equal(
+            AdbSelectionMode.Auto,
+            gateway.Current.Paths.AdbSelectionMode);
+        Assert.Equal(string.Empty, gateway.Current.Paths.AdbPath);
+    }
+
+    [Fact]
     public void ResetToBundledDefaults_RepopulatesPathsFromDefaults()
     {
         // 재설정하면 번들 기본값에서 로드된다. 게이트웨이의 현재값이 아니라.
