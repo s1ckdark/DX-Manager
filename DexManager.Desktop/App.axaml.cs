@@ -6,6 +6,7 @@ using DexManager.Desktop.Views;
 using DexManager.Hosting;
 using DexManager.Mac.Platform;
 using DexManager.Models;
+using DexManager.Services;
 using DexManager.ViewModels;
 
 namespace DexManager.Desktop;
@@ -52,6 +53,14 @@ public partial class App : Application
             _appearance = new AppearanceSettingsViewModel(gateway);
             _appearance.ThemeSaved += OnThemeSaved;
             ThemeApplier.Apply(_appearance.SelectedTheme);
+
+            // 저장된 언어를 시작 시 적용한다. LocalizationService는
+            // DexManager.Core에 있어 Avalonia를 참조하지 않으므로 여기서
+            // 직접 호출한다(테마처럼 Desktop 전용 어댑터가 필요 없다).
+            // 이 호출은 이후 LocalizationService.Get이 반환할 문자열의
+            // 기준 컬처를 세팅할 뿐, 이미 만들어진 MainWindow의 XAML
+            // 문자열은 다시 그리지 않는다 — 그건 재시작이 필요하다.
+            LocalizationService.Apply(_appearance.SelectedLanguage);
 
             _shell = new ShellViewModel(host, new AvaloniaUiDispatcher());
             // 셸이 호스트를 넘겨받았다. 이제부터 정리는 셸의 몫이다.
