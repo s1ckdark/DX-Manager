@@ -201,6 +201,8 @@
   <data name="Log.Adb.WakeUpDeviceFound" xml:space="preserve"><value>Scrcpy Wake-up 후 ADB 장치를 확인했습니다.</value></data>
   <data name="Log.Adb.WakeUpDeviceMissing" xml:space="preserve"><value>Scrcpy Wake-up 후에도 ADB 장치를 확인하지 못했습니다.</value></data>
   <data name="Log.Adb.LockProbeFailed" xml:space="preserve"><value>휴대폰의 잠금 상태를 확인하지 못했습니다: {0}</value></data>
+  <data name="Log.Adb.WakeScreenFailed" xml:space="preserve"><value>휴대폰 화면을 깨우지 못했습니다: {0}</value></data>
+  <data name="Log.Adb.DismissKeyguardFailed" xml:space="preserve"><value>휴대폰 잠금화면을 해제하지 못했습니다: {0}</value></data>
   <data name="Log.Main.Shown" xml:space="preserve"><value>메인 창을 표시했습니다.</value></data>
   <data name="Log.Main.DeviceStartDelay" xml:space="preserve"><value>기기 {0}의 시작 명령 전 {1}ms 동안 대기합니다.</value></data>
   <data name="Log.Main.CaptureHotkeyRegistrationFailed" xml:space="preserve"><value>캡처 단축키 등록에 실패했습니다.</value></data>
