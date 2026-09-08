@@ -280,10 +280,17 @@ Phase 4에서 전송 상태창은 주 창 기준 또는 화면 중앙 기준으�
 
 ### 5.1 기존 안전망
 
-xUnit 186개(`DexManager.ViewModels.Tests` 50개 + `DexManager.Tests` 136개) + 다중기기 회귀 39개(총 225개)가 통과 중이다(2026-09-08, Phase 2 종료 시점 실측). Phase 0(`ApplicationHost` 추출)은 동작 변경이 없어야 하므로, **전부 통과**가 완료 조건이다.
+xUnit 284개(`DexManager.ViewModels.Tests` 112개 + `DexManager.Tests` 155개 +
+`DexManager.Desktop.Tests` 17개) + 다중기기 회귀 39개(총 323개)가 통과 중이다
+(2026-09-08, Phase 3 종료 시점 실측). Phase 0(`ApplicationHost` 추출)은 동작 변경이
+없어야 하므로, **전부 통과**가 완료 조건이다.
 
-- `dotnet test DexManager.Mac.sln` — xUnit 186개
+- `dotnet test DexManager.Mac.sln` — xUnit 284개
 - `dotnet run --project DexManager.MultiDeviceTests -c Release` — 39개
+
+`DexManager.Desktop.Tests`는 Phase 3 Task 7에서 신설됐다 — `ThemeApplier`처럼 Avalonia
+타입을 다루는 순수 매핑 함수를, Avalonia를 코어 테스트 프로젝트로 전이 유입시키지 않고
+검증하기 위한 전용 프로젝트다(`.sln`에 등록됨).
 
 빌드는 `DexManager.Tests/ApplicationHostTests.cs`에서 `xUnit1031`(블로킹 `.GetAwaiter().GetResult()`) 경고 1건을 낸다. Phase 0 Task 3에서 브리프 verbatim 코드로 발생했으며 의도적으로 미해결 상태로 남아 있다 — `docs/TODO.md`의 지연 항목 목록 참조.
 
@@ -319,7 +326,7 @@ DX Manager.app/Contents/
 | 0 | `Platform.Mac` 분리 + `ApplicationHost` 추출 | ✅ 완료 — 101개 xUnit + 39개 다중기기 통과, 기능 변경 없음 |
 | 1 | `Desktop` 골격 + `MainWindow` (기기 목록·선택·상태) | 앱 기동, 연결 기기 표시 |
 | 2 | DeX 시작/중지 + 단일창 슬롯 | ✅ 완료 — 실사용 가능. 실기 검증은 KNOWN_ISSUES 참조 |
-| 3 | `SettingsWindow` (연결·값·상호작용·테마) | 설정 변경·영구 저장 |
+| 3 | `SettingsWindow` (연결·값·상호작용·테마) | ✅ 완료 — 설정 변경·영구 저장. 실기 검증은 KNOWN_ISSUES 참조 |
 | 4 | 무선 ADB + 파일 전송 + 전송 상태창 (화면 기준 배치, 4.5절 결정 2) | |
 | 5 | 진단 + 로그 + 기기 폴더 탐색 | |
 | 6 | `MacCaptureService` 선행 수정(4.5절 결정 3) → 미니 컨트롤바 + 캡처 영역 선택 오버레이 | 캡처 실패가 `CaptureResult`에 반영됨 |
@@ -329,7 +336,8 @@ DX Manager.app/Contents/
 
 Phase 1~7은 추가 전용이며 기존 TUI·WinForms를 변경하지 않는다. 어느 단계에서 중단해도 저장소는 정상 상태를 유지하고, TUI가 계속 존재하므로 기능 공백이 없다.
 
-Phase 2 종료 시점부터 GUI 실사용이 가능하다.
+Phase 2 종료 시점부터 GUI 실사용이 가능하다. Phase 3 종료 시점부터 설정 창에서 값을
+바꿔 영구 저장할 수 있다.
 
 ## 8. 열린 항목
 

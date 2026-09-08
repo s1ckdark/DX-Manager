@@ -8,7 +8,7 @@ namespace DexManager.ViewModels;
 /// <summary>
 /// 연결된 기기 목록과 현재 선택. 레지스트리 스냅샷 변경을 구독한다.
 /// </summary>
-public sealed partial class DeviceListViewModel : ObservableObject, IDisposable
+public sealed partial class DeviceListViewModel : ObservableObject, IDisposable, IDeviceSelectionSource
 {
     private readonly PhysicalDeviceRegistry _registry;
     private readonly DeviceRuntimeSessionRegistry _sessions;
@@ -39,6 +39,16 @@ public sealed partial class DeviceListViewModel : ObservableObject, IDisposable
 
     /// <summary>목록이 비어 있는지 여부. 빈 목록 안내 표시에 쓴다.</summary>
     public bool IsEmpty => Devices.Count == 0;
+
+    /// <summary>
+    /// <see cref="IDeviceSelectionSource"/> 구현. <see cref="SelectedDevice"/>가
+    /// 없으면 null이다. SettingsViewModel이 DeviceListViewModel 전체
+    /// 대신 이 좁은 인터페이스만 참조하도록 노출한다.
+    /// </summary>
+    public string SelectedIdentity => SelectedDevice?.Identity;
+
+    partial void OnSelectedDeviceChanged(DeviceViewModel value) =>
+        OnPropertyChanged(nameof(SelectedIdentity));
 
     private void OnSnapshotChanged(
         object sender,

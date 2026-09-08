@@ -496,6 +496,186 @@ namespace DexManager.Services
                     StringComparison.OrdinalIgnoreCase);
         }
 
+        /// <summary>
+        /// <c>dumpsys window</c>로 잠금 화면 상태를 확인한다. Android
+        /// 버전·제조사 스킨마다 노출하는 필드가 달라 절대적으로 믿을 수는
+        /// 없으므로, 알려진 필드를 하나도 찾지 못하면 <see
+        /// cref="LockState.Unknown"/>을 돌려준다 — 호출자는 이를
+        /// <see cref="LockState.Locked"/>가 아닌 값과 똑같이 취급해
+        /// (fail-open) 파싱 공백이 정상적인 DeX 시작을 막지 않게 해야
+        /// 한다.
+        /// </summary>
+        public LockState IsDeviceLocked(string serial)
+        {
+            // ShellForSerial → ProcessRunner.Run은 실행 파일이 없거나
+            // 프로세스를 띄우지 못하면 예외를 그대로 던진다(반환값이 아니라
+            // throw다). 이 탐지는 어디까지나 최선-노력 보조 신호이므로,
+            // 어떤 예외가 나든 잠금 여부를 "모른다"로 접어야 한다 -
+            // 그렇지 않으면 이 기능이 자신이 돕기로 한 DeX 시작 자체를
+            // 깨뜨리게 된다.
+            try
+            {
+                var result = ShellForSerial(serial, "dumpsys window", false);
+                return result.IsSuccess
+                    ? ParseLockState(result.StandardOutput)
+                    : LockState.Unknown;
+            }
+            catch (Exception ex)
+            {
+                _logService.Warning(LocalizationService.Format(
+                    "Log.Adb.LockProbeFailed",
+                    ex.Message));
+                return LockState.Unknown;
+            }
+        }
+
+        /// <summary>
+        /// 잠금 상태를 두 신호의 논리곱으로 판단한다: (1) 잠금 화면이 떠
+        /// 있는가, (2) 그 잠금 화면이 실제로 "보안 설정된" 것인가.
+        ///
+        /// (1)은 <c>mShowingLockscreen</c> → <c>mDreamingLockscreen</c> →
+        /// <c>mKeyguardShowing</c> → <c>isStatusBarKeyguard</c> 순서로, 이
+        /// 고정된 우선순위에서 출력에 실제로 나타나는 첫 필드의 값을
+        /// 취한다. dumpsys 출력에서 필드가 등장하는 순서는 보장되지
+        /// 않으므로, "텍스트에서 먼저 만난 필드"가 아니라 "우선순위가 더
+        /// 높은 필드"가 이겨야 여러 Android 버전·스킨에 걸쳐 결정적이다.
+        ///
+        /// (2)가 필요한 이유: 최신 One UI에서 우선순위 스캔은 대개
+        /// <c>mKeyguardShowing</c>에 도달하는데, 이 필드는 키가드가 올라와
+        /// 있기만 하면 true다 — PIN·패턴·지문이 하나도 걸려 있지 않은
+        /// 스와이프 전용 폰이 그저 화면만 꺼진 채 책상 위에 놓여 있는,
+        /// "가장 흔한 첫 시작 상태"까지 포함해서다. 그 상태에서 Locked를
+        /// 돌려주면 해제할 잠금이 없는 폰에 대고 "먼저 잠금을 해제하라"며
+        /// 원래 잘 되던 DeX 시작을 막게 된다 — 이 기능이 절대 만들어서는
+        /// 안 되는 실패 방향이다. 그래서 잠겨 있다고 "확신"하려면 키가드가
+        /// 보안 설정돼 있다는 적극적 증거가 필요하다.
+        ///
+        /// 확신하지 못하는 모든 경우(잠금 화면 신호 자체가 없음, 보안
+        /// 신호를 못 찾음, 파싱 불가)는 전부 <see cref="LockState.Unknown"/>
+        /// 이며 호출자는 그대로 진행한다(fail-open).
+        /// </summary>
+        public static LockState ParseLockState(string dumpsysWindowOutput)
+        {
+            if (string.IsNullOrWhiteSpace(dumpsysWindowOutput))
+                return LockState.Unknown;
+
+            var showing = ParseKeyguardShowing(dumpsysWindowOutput);
+
+            // 잠금 화면 신호를 하나도 못 찾았다 - 판단 불가.
+            if (showing == null) return LockState.Unknown;
+
+            // 잠금 화면이 떠 있지 않다면 보안 여부와 무관하게 잠겨 있지 않다.
+            if (showing == false) return LockState.Unlocked;
+
+            var secure = ParseKeyguardSecure(dumpsysWindowOutput);
+
+            // 보안 신호가 없거나 읽을 수 없으면 "잠겼다"고 확신할 수 없다.
+            if (secure == null) return LockState.Unknown;
+
+            // 키가드는 떠 있지만 보안 설정이 아니다(스와이프 전용) -
+            // 해제할 잠금이 없으므로 시작을 막을 이유가 없다.
+            return secure == true ? LockState.Locked : LockState.Unlocked;
+        }
+
+        /// <summary>
+        /// 잠금 화면이 떠 있는지를 우선순위 스캔으로 읽는다. 알려진 필드가
+        /// 하나도 없으면 null.
+        /// </summary>
+        private static bool? ParseKeyguardShowing(string dumpsysWindowOutput)
+        {
+            foreach (var fieldName in LockFieldPriority)
+            {
+                var value = MatchBooleanField(dumpsysWindowOutput, fieldName);
+                if (value != null) return value;
+            }
+
+            return null;
+        }
+
+        /// <summary>
+        /// 키가드가 "보안 설정"돼 있는지(= 실제로 해제 자격 증명을 요구하는지)를
+        /// 읽는다. 찾지 못하면 null이고, 호출자는 그때 fail-open한다.
+        ///
+        /// 신호는 두 단계로 찾는다.
+        ///
+        /// 1. 이름 자체에 keyguard가 박혀 있는 필드
+        ///    (<c>isKeyguardSecure</c> / <c>mIsKeyguardSecure</c> /
+        ///    <c>mKeyguardSecure</c> / <c>keyguardSecure</c>)는 의미가
+        ///    모호하지 않으므로 출력 어디에 있든 그대로 신뢰한다.
+        /// 2. AOSP <c>KeyguardServiceDelegate.dump()</c>는 이 값을 그냥
+        ///    <c>secure=</c>라는 맨 이름으로 찍는다(같은 블록의
+        ///    <c>showing=</c>/<c>occluded=</c>와 나란히). 이 이름은 너무
+        ///    일반적이라 출력 아무 데서나 주워 오면 안 된다 —
+        ///    <c>dumpsys window</c>에는 창 목록도 함께 실리고, 엉뚱한 창의
+        ///    플래그를 잠금 근거로 삼으면 그게 곧 "되던 시작을 막는"
+        ///    오탐이 된다. 그래서 이 맨 이름은 반드시
+        ///    <c>KeyguardServiceDelegate</c> 헤더 뒤쪽 블록 안에서만 읽는다.
+        /// </summary>
+        private static bool? ParseKeyguardSecure(string dumpsysWindowOutput)
+        {
+            foreach (var fieldName in KeyguardSecureFieldNames)
+            {
+                var value = MatchBooleanField(dumpsysWindowOutput, fieldName);
+                if (value != null) return value;
+            }
+
+            var delegateIndex = dumpsysWindowOutput.IndexOf(
+                KeyguardServiceDelegateMarker,
+                StringComparison.OrdinalIgnoreCase);
+            if (delegateIndex < 0) return null;
+
+            var block = dumpsysWindowOutput.Substring(
+                delegateIndex,
+                Math.Min(
+                    KeyguardServiceDelegateBlockLength,
+                    dumpsysWindowOutput.Length - delegateIndex));
+
+            return MatchBooleanField(block, "secure");
+        }
+
+        /// <summary>
+        /// <c>이름=true|false</c>를 양쪽 단어 경계와 함께 읽는다. 오른쪽은
+        /// <c>=</c>가 이미 경계 노릇을 하지만(<c>mShowingLockscreenFoo</c>는
+        /// 거부된다) 왼쪽에는 경계가 없어서, 알려진 이름으로 "끝나기만"
+        /// 하는 필드(<c>XmKeyguardShowing</c>)가 스캔을 가로챌 수 있었다.
+        /// </summary>
+        private static bool? MatchBooleanField(string text, string fieldName)
+        {
+            var match = Regex.Match(
+                text,
+                @"(?<![A-Za-z0-9_])" + Regex.Escape(fieldName) + @"\s*=\s*(true|false)",
+                RegexOptions.IgnoreCase);
+            if (!match.Success) return null;
+
+            return string.Equals(
+                match.Groups[1].Value,
+                "true",
+                StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static readonly string[] LockFieldPriority =
+        {
+            "mShowingLockscreen",
+            "mDreamingLockscreen",
+            "mKeyguardShowing",
+            "isStatusBarKeyguard"
+        };
+
+        private static readonly string[] KeyguardSecureFieldNames =
+        {
+            "isKeyguardSecure",
+            "mIsKeyguardSecure",
+            "mKeyguardSecure",
+            "keyguardSecure"
+        };
+
+        private const string KeyguardServiceDelegateMarker = "KeyguardServiceDelegate";
+
+        // KeyguardServiceDelegate.dump()가 찍는 항목은 십수 줄뿐이다.
+        // 블록 뒤에 이어지는 창 목록까지 훑어 엉뚱한 secure=를 줍지
+        // 않도록 넉넉하되 유한한 창으로 자른다.
+        private const int KeyguardServiceDelegateBlockLength = 2000;
+
         public AdbWakeUpResult WakeUp(
             string targetSerial,
             Func<string, bool> scrcpyWakeUp)

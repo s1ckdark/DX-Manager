@@ -1,5 +1,6 @@
 using System.ComponentModel;
 using CommunityToolkit.Mvvm.ComponentModel;
+using CommunityToolkit.Mvvm.Input;
 using DexManager.Hosting;
 
 namespace DexManager.ViewModels;
@@ -33,11 +34,34 @@ public sealed partial class ShellViewModel : ObservableObject, IDisposable
     [ObservableProperty]
     private string _statusText = "Starting…";
 
+    /// <summary>
+    /// <see cref="OpenSettingsCommand"/>가 새 <see cref="SettingsViewModel"/>을
+    /// 준비할 때마다 발생한다. 이 ViewModel은 Avalonia를 몰라야 하므로
+    /// 창을 직접 띄우지 않는다 - Desktop 레이어(Task 12)가 이 이벤트를
+    /// 구독해 실제 설정 창을 연다.
+    /// </summary>
+    public event EventHandler<SettingsViewModel> SettingsRequested;
+
     /// <summary>기기 감시를 시작한다.</summary>
     public void Start()
     {
         _host.Start();
         StatusText = "Watching for devices";
+    }
+
+    /// <summary>
+    /// 현재 선택된 기기를 대상으로 한 <see cref="SettingsViewModel"/>을
+    /// 만들어 <see cref="SettingsRequested"/>로 알린다. 선택된 기기가
+    /// 없어도(Devices.SelectedDevice == null) 전역 설정 페이지는 여전히
+    /// 유효하므로 항상 실행 가능하다 - 기기별 페이지는
+    /// SettingsViewModel이 null로 처리한다.
+    /// </summary>
+    [RelayCommand]
+    private void OpenSettings()
+    {
+        var gateway = new SettingsGateway(_host);
+        var settings = new SettingsViewModel(gateway, Devices, _host.RuntimeSessions, _dispatcher);
+        SettingsRequested?.Invoke(this, settings);
     }
 
     private void OnDeviceListPropertyChanged(

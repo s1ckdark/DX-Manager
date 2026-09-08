@@ -183,6 +183,35 @@ public class DeviceListViewModelTests
     }
 
     [Fact]
+    public void SelectedIdentity_TracksSelectedDeviceAndNotifiesOnChange()
+    {
+        // SettingsViewModel은 DeviceListViewModel 전체가 아니라
+        // IDeviceSelectionSource(SelectedIdentity + 변경 알림)만 본다 -
+        // 이 테스트는 그 좁은 인터페이스 구현 자체를 검증한다.
+        var registry = new PhysicalDeviceRegistry();
+        using var list = new DeviceListViewModel(registry, new DeviceRuntimeSessionRegistry(), new ImmediateUiDispatcher(), new FakeDeviceCommands());
+        IDeviceSelectionSource selection = list;
+
+        Assert.Null(selection.SelectedIdentity);
+
+        registry.Reconcile(new[]
+        {
+            Device("phone-a", "Galaxy A", "USB-A", DeviceTransportKind.Usb),
+            Device("phone-b", "Galaxy B", "USB-B", DeviceTransportKind.Usb)
+        });
+
+        Assert.Equal("phone-a", selection.SelectedIdentity);
+
+        var raisedProperties = new List<string>();
+        selection.PropertyChanged += (_, e) => raisedProperties.Add(e.PropertyName);
+
+        list.SelectedDevice = list.Devices.First(d => d.Identity == "phone-b");
+
+        Assert.Equal("phone-b", selection.SelectedIdentity);
+        Assert.Contains(nameof(IDeviceSelectionSource.SelectedIdentity), raisedProperties);
+    }
+
+    [Fact]
     public void IsEmpty_TracksWhetherTheListHasDevices()
     {
         var registry = new PhysicalDeviceRegistry();

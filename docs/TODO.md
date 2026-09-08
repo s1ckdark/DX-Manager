@@ -33,9 +33,15 @@
     - TUI 설정 메뉴(`InteractiveHost.cs:792`)가 `ApplicationHost.UpdateSettings`를 거친다.
       입력은 잠금 밖에서 받는다.
     - [x] `UpdateSettings`에 `_disposed` 가드 추가 (`Start`/`Stop`이 세운 패턴과 일치시킨다)
-    - [ ] `UpdateSettings`가 무관한 필드까지 정규화함을 문서화 —
+    - [x] `UpdateSettings`가 무관한 필드까지 정규화함을 문서화 —
       `Save` → `SaveCore` → `EnsureDefaults()`가 호출자의 살아있는 객체에 작용한다.
-      Phase 3 설정 화면이 `Settings`에 폼을 바인딩하기 전에 알아야 한다. (미완 — Phase 3로 이월)
+      Phase 3 설정 화면이 `Settings`에 폼을 바인딩하기 전에 알아야 한다. **닫힘(Phase 3
+      Task 2).** `EditableRunSettings`가 원본 프로필에 직접 바인딩하는 대신 스칼라 값을
+      **복사**하고 저장 시 `ApplyTo`로 되돌려 넣는 사본 패턴을 도입해 이 문제를 우회했다 —
+      정규화는 `UpdateSettings` 잠금 안, 대입 뒤에만 실행되므로 편집 중 화면이 바뀌지
+      않는다(`DexManager.ViewModels/Settings/EditableRunSettings.cs:6-12` XML 주석에
+      명시). 전역 페이지(Paths/Appearance/Interaction)는 스칼라 필드 자체가 폼 상태라
+      같은 문제가 애초에 발생하지 않는다.
   - [x] `ApplicationHost._disposed`를 `Interlocked`로 전환 — `DeviceMonitorService`와 동일하게.
     Phase 2에서 창 닫기와 종료 경로가 함께 `Dispose`에 도달하기 전에.
   - [x] `DeviceListViewModel` 생성자의 구독-적용 순서 경합 — 구독 후 `Apply(_registry.Current)`
@@ -126,6 +132,53 @@
     구분할 수 없다. 현재 어느 경로에서도 도달하지 않음.
   - [ ] [Task 12] 목록 행의 `DisplayName`+상태 라벨이 320px 고정 열 안에서 wrap/trim 없는 수평
     `StackPanel` — 긴 기기명이 잘릴 수 있다. 기존 패턴이며 이번에 추가된 것은 `DeX` 라벨뿐.
+
+- [x] macOS GUI Phase 3 — `SettingsWindow` (연결·값·상호작용·테마)
+  - [x] `ISettingsGateway` 경계(`Current`/`GetRunProfile`/`Update`) (Task 1)
+  - [x] `EditableRunSettings` 사본 편집 패턴 — `FromProfile`/`ApplyTo` (Task 2)
+  - [x] 기기별 Display/Stream 값 편집 (Task 3)
+  - [x] 기기별 단일창 슬롯 편집 (Task 4)
+  - [x] 전역 Paths(scrcpy/adb 경로) 편집 (Task 6)
+  - [x] 테마 적용 — `ThemeApplier` + Avalonia 배선 (Task 7)
+  - [x] 언어 선택 저장 + `LocalizationService` 런타임 전환(신규 문자열만, 기존 XAML은
+    재시작 필요) (Task 8)
+  - [x] 상호작용(키매핑) 설정 골격 — `KeyMappingSettings` 10개 스칼라 필드 전부 (Task 9)
+  - [x] `SettingsViewModel` 조립 — 5페이지, SaveAll/Cancel, HasChanges 집계 (Task 11)
+  - [x] 실행중 기기 DeX 경고 — `IsTargetDexRunning` (Task 5)
+  - [x] `SettingsWindow` 뷰(5탭) + `MainWindow` 진입점 + `App.axaml.cs` 배선 (Task 12)
+  - [x] 키 조합 캡처 UX — `HotkeyFormatter`, macOS 훅 부재 안내 (Task 10)
+  - [x] 사용자 실기 피드백 3건 반영
+    - [x] UI-1: Save/Cancel이 창을 닫는다 (`078d1ec`)
+    - [x] UI-2: DeX 시작 전 잠금 감지 + 안내 (`f8980e9`, `7467e04`)
+    - [x] UI-3: 단일창 슬롯 라벨/도움말/워터마크, 무동작 Custom width/height 제거 (`9b1342b`)
+  - [x] `UpdateSettings`가 무관한 필드까지 정규화함을 문서화 — Phase 2 이연 항목 종결
+    (위 "macOS GUI Phase 2 착수 전 선행 정리" 참조)
+  - [ ] 실기 검증 — 아래 항목은 사용자 확인 전까지 미확인이다
+    (`docs/KNOWN_ISSUES.md`의 "macOS GUI Phase 3 실기 검증 범위" 참조)
+    - [ ] 테마 실시간 전환이 열려 있는 다른 창에도 반영된다
+    - [ ] 언어 변경 후 "재시작 후 적용" 안내가 뜬다
+    - [ ] 단축키 필드가 실제 키 입력을 캡처한다
+    - [ ] 대상 기기가 DeX 실행 중일 때 안내 문구가 뜬다
+    - [ ] 기기 미선택 시 Display/Stream·Slot 탭이 placeholder를 보인다
+    - [ ] Save/Cancel을 누르면 실제로 창이 닫힌다
+
+- [ ] macOS GUI Phase 3 리뷰에서 지연된 정리 항목 (파킹, 수정 안 함 — 기록만)
+  - [ ] [Task 5] `SettingsViewModel.OnDeviceSelectionPropertyChanged`가
+    `IDeviceSelectionSource`에 문서화되지 않은 크로스클래스 UI-스레드 불변식에 의존한다
+    (`SelectedIdentity`가 항상 UI 스레드에서만 바뀐다는 가정). 오늘은 안전하나 향후
+    off-thread 변경이 생기면 조용히 깨질 수 있다.
+  - [ ] [Task 10] hotkey 캡처의 `KeyDown` Tunnel 핸들러가 `e.Handled=true`를 무조건
+    설정해 포커스 중 Tab/Shift+Tab/Escape도 삼킨다. hotkey-recorder 표준 UX라 요구
+    위반은 아니나, UI-1이 같은 창을 건드렸으니 원하면 통과 예외를 추가할 수 있다.
+  - [ ] [UI-1] Save가 무효 페이지를 조용히 건너뛰고도(스킵된 편집 폐기) 창을 닫는다 —
+    수정 전에는 창이 열려 있어 사용자가 보고 고칠 수 있었던 안전망이 사라졌다.
+  - [ ] [Ruling 6] 설정 창 문자열 약 38/40개가 하드코딩 영어다(MainWindow의 기존
+    상태와 동일, 회귀 아님). 언어 설정을 추가한 이번 Phase 이후 지역화 완성이 자연스러운
+    후속이다.
+  - [ ] [Ruling 7] `SingleWindowSlotSettings.CustomWidth`/`CustomHeight`는 실행 경로가
+    전혀 소비하지 않는 레거시 WinForms 잔재다. Slot 탭 UI에서는 숨겼으나(UI-3) 모델
+    속성과 `AppSettings` 라운드트립/clamp 로직은 그대로 남아 있다 — 완전히 걷어낼지는
+    후속 판단.
 
 - [ ] 세션 중 기기 분리 시 overlay 잔여물 자동 회수
   - 현상: DeX 실행 중 기기가 사라지면 종료 처리가
