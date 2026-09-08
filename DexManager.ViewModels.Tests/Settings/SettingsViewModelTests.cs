@@ -188,6 +188,78 @@ public class SettingsViewModelTests
         Assert.True(settings.HasChanges);
     }
 
+    // --- 창 닫기 (UI-1: Cancel/Save 둘 다 창을 닫아야 한다) ---
+
+    [Fact]
+    public void SaveAll_RaisesCloseRequestedExactlyOnce()
+    {
+        var gateway = new FakeSettingsGateway();
+        var deviceSelection = new FakeDeviceSelectionSource();
+        var settings = CreateSettings(gateway, deviceSelection);
+
+        var raiseCount = 0;
+        settings.CloseRequested += (_, _) => raiseCount++;
+
+        settings.SaveAllCommand.Execute(null);
+
+        Assert.Equal(1, raiseCount);
+    }
+
+    [Fact]
+    public void Cancel_RaisesCloseRequestedExactlyOnce()
+    {
+        var gateway = new FakeSettingsGateway();
+        var deviceSelection = new FakeDeviceSelectionSource();
+        var settings = CreateSettings(gateway, deviceSelection);
+
+        var raiseCount = 0;
+        settings.CloseRequested += (_, _) => raiseCount++;
+
+        settings.CancelCommand.Execute(null);
+
+        Assert.Equal(1, raiseCount);
+    }
+
+    [Fact]
+    public void SaveAll_PersistsEditsBeforeRaisingCloseRequested()
+    {
+        // CloseRequested가 저장을 가로막거나 순서를 흐트러뜨리지 않는지
+        // 확인한다 - 이벤트 핸들러 안에서 게이트웨이를 들여다봐도 이미
+        // 저장이 끝나 있어야 한다.
+        var gateway = new FakeSettingsGateway();
+        var deviceSelection = new FakeDeviceSelectionSource();
+        var settings = CreateSettings(gateway, deviceSelection);
+
+        settings.Paths.ScrcpyPath = "/new/scrcpy";
+
+        string scrcpyPathWhenClosed = null;
+        settings.CloseRequested += (_, _) => scrcpyPathWhenClosed = gateway.Current.Paths.ScrcpyPath;
+
+        settings.SaveAllCommand.Execute(null);
+
+        Assert.Equal("/new/scrcpy", scrcpyPathWhenClosed);
+        Assert.Equal("/new/scrcpy", gateway.Current.Paths.ScrcpyPath);
+    }
+
+    [Fact]
+    public void Cancel_DiscardsEditsBeforeRaisingCloseRequested()
+    {
+        var gateway = new FakeSettingsGateway();
+        var deviceSelection = new FakeDeviceSelectionSource();
+        var settings = CreateSettings(gateway, deviceSelection);
+
+        var originalScrcpyPath = gateway.Current.Paths.ScrcpyPath;
+        settings.Paths.ScrcpyPath = "/edited/scrcpy";
+
+        string scrcpyPathWhenClosed = null;
+        settings.CloseRequested += (_, _) => scrcpyPathWhenClosed = settings.Paths.ScrcpyPath;
+
+        settings.CancelCommand.Execute(null);
+
+        Assert.Equal(originalScrcpyPath, scrcpyPathWhenClosed);
+        Assert.False(settings.HasChanges);
+    }
+
     // --- 실행 중 기기 경고 (task-5) ---
 
     [Fact]

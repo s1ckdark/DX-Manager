@@ -89,6 +89,15 @@ public sealed partial class SettingsViewModel : ObservableObject, IDisposable
     private bool _hasChanges;
 
     /// <summary>
+    /// SaveAll 또는 Cancel이 끝나면(각 커맨드의 기존 동작을 모두 마친 뒤)
+    /// 발생한다. 이 타입은 Avalonia에 의존하지 않으므로 창을 직접 닫지
+    /// 못한다 - Desktop 레이어(App.axaml.cs)가 이 이벤트를 구독해 설정
+    /// 창을 닫는다. ShellViewModel.SettingsRequested,
+    /// AppearanceSettingsViewModel.ThemeSaved와 같은 이벤트 패턴이다.
+    /// </summary>
+    public event EventHandler CloseRequested;
+
+    /// <summary>
     /// 대상 기기(<see cref="IDeviceSelectionSource.SelectedIdentity"/>)에서
     /// 지금 이 순간 DeX가 실행 중인지. true여도 저장은 그대로 허용된다 -
     /// Global Constraint("실행 중 변경은 다음 시작부터")를 화면이 정직하게
@@ -207,6 +216,11 @@ public sealed partial class SettingsViewModel : ObservableObject, IDisposable
     /// 건너뛴다 - 바인딩이 이미 그 페이지의 저장 버튼을 비활성화하지만,
     /// 바인딩을 우회해 SaveAll이 강제로 불려도 잘못된 입력이 조용히
     /// 저장되지 않도록 여기서도 같은 조건을 존중한다.
+    ///
+    /// 모든 저장과 재계산이 끝난 뒤 <see cref="CloseRequested"/>를 올려
+    /// Desktop 레이어가 설정 창을 닫게 한다 - 유효하지 않아 건너뛴 페이지가
+    /// 있어도 나머지 페이지가 저장됐다면 창은 닫힌다(그 페이지의 편집은
+    /// 조용히 버려진다; 표준 다이얼로그 관례를 따른 선택이다).
     /// </summary>
     [RelayCommand]
     private void SaveAll()
@@ -218,6 +232,8 @@ public sealed partial class SettingsViewModel : ObservableObject, IDisposable
         if (Slot != null) TrySave(Slot.SaveCommand);
 
         RecomputeHasChanges();
+
+        CloseRequested?.Invoke(this, EventArgs.Empty);
     }
 
     private static void TrySave(IRelayCommand command)
@@ -237,6 +253,10 @@ public sealed partial class SettingsViewModel : ObservableObject, IDisposable
     /// 재구독해야 한다(SettingsViewModel의 Appearance 프로퍼티 변경 통지를
     /// 계기로 삼을 수 있다). 기기 선택 변경은 Appearance를 건드리지 않으므로
     /// 이 재구독 필요성은 Cancel에서만 발생한다.
+    ///
+    /// 기존 동작(페이지 재생성으로 편집 버리기)은 그대로 두고, 끝에서만
+    /// <see cref="CloseRequested"/>를 올린다 - Desktop 레이어가 이를 듣고
+    /// 설정 창을 닫는다.
     /// </summary>
     [RelayCommand]
     private void Cancel()
@@ -250,6 +270,8 @@ public sealed partial class SettingsViewModel : ObservableObject, IDisposable
         AttachGlobalPageHandlers();
 
         LoadDevicePages(_deviceSelection.SelectedIdentity);
+
+        CloseRequested?.Invoke(this, EventArgs.Empty);
     }
 
     public void Dispose()

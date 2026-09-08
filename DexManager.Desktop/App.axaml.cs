@@ -152,6 +152,7 @@ public partial class App : Application
         _openSettings = settings;
         HookAppearanceThemeSaved(settings.Appearance);
         settings.PropertyChanged += OnOpenSettingsPropertyChanged;
+        settings.CloseRequested += OnSettingsCloseRequested;
 
         var window = new SettingsWindow { DataContext = settings };
         _settingsWindow = window;
@@ -183,6 +184,17 @@ public partial class App : Application
         HookAppearanceThemeSaved(_openSettings?.Appearance);
     }
 
+    /// <summary>
+    /// SettingsViewModel.SaveAll/Cancel이 각자의 기존 동작(저장 또는 편집
+    /// 버리기)을 끝낸 뒤 올리는 신호다 - 이 타입은 Avalonia에 의존하지
+    /// 않으므로 창을 직접 닫지 못한다. 여기서 실제로 창을 닫는다. Close()는
+    /// SettingsWindow.Closed를 동기적으로 발생시키므로 OnSettingsWindowClosed가
+    /// 바로 뒤이어 구독 해제와 Dispose를 맡는다 - 이 핸들러에서 별도로
+    /// SettingsViewModel을 정리할 필요가 없다.
+    /// </summary>
+    private void OnSettingsCloseRequested(object sender, EventArgs e)
+        => _settingsWindow?.Close();
+
     private void HookAppearanceThemeSaved(AppearanceSettingsViewModel appearance)
     {
         _openSettingsAppearance = appearance;
@@ -208,7 +220,10 @@ public partial class App : Application
             window.Closed -= OnSettingsWindowClosed;
 
         if (_openSettings != null)
+        {
             _openSettings.PropertyChanged -= OnOpenSettingsPropertyChanged;
+            _openSettings.CloseRequested -= OnSettingsCloseRequested;
+        }
 
         UnhookAppearanceThemeSaved();
 
@@ -243,6 +258,7 @@ public partial class App : Application
         if (_openSettings != null)
         {
             _openSettings.PropertyChanged -= OnOpenSettingsPropertyChanged;
+            _openSettings.CloseRequested -= OnSettingsCloseRequested;
             UnhookAppearanceThemeSaved();
             _openSettings.Dispose();
             _openSettings = null;
