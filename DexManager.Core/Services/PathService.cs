@@ -16,19 +16,25 @@ namespace DexManager.Services
         private readonly ProcessRunner _processRunner;
         private readonly IPathProvider _pathProvider;
         private readonly IPlatformService _platformService;
+        // 후보 프로브 재시도 예산의 시계. 테스트가 시간을 결정적으로
+        // 흘릴 수 있게 주입만 받아 ProbeRetryBudget에 그대로 넘긴다 -
+        // null이면 예산이 DateTime.UtcNow를 쓴다.
+        private readonly Func<DateTime> _utcNow;
 
         public PathService(
             SettingsService settingsService,
             LogService logService,
             ProcessRunner processRunner,
             IPathProvider pathProvider = null,
-            IPlatformService platformService = null)
+            IPlatformService platformService = null,
+            Func<DateTime> utcNow = null)
         {
             _settingsService = settingsService;
             _logService = logService;
             _processRunner = processRunner;
             _pathProvider = pathProvider;
             _platformService = platformService;
+            _utcNow = utcNow;
         }
 
         public string SelectAdbPath(AppSettings settings, int timeoutMs)
@@ -119,7 +125,14 @@ namespace DexManager.Services
             // 남긴다 - 그렇지 않으면 사용자는 자신의 설정이 조용히
             // 무시됐다는 사실을 알아챌 방법이 없다(개별 후보 경고를 직접
             // 뒤져 짜맞추지 않는 한).
-            var preferred = GetScrcpyAdb(settings, timeoutMs);
+            // 재시도 예산은 이 체인 <b>전체</b>가 하나를 나눠 쓴다 -
+            // 후보마다 새로 만들면 재시도가 후보 수만큼 곱해져(각 후보가
+            // 자기 몫을 온전히 받아) 예산을 둔 의미가 사라진다. 각 후보의
+            // 첫 시도는 예산과 무관하게 항상 실행되므로, 예산이 소진돼도
+            // 뒤쪽 후보를 못 찾게 되지는 않는다.
+            var retryBudget = ProbeRetryBudget.For(timeoutMs, _utcNow);
+
+            var preferred = GetScrcpyAdb(settings, timeoutMs, retryBudget);
             var selected = preferred;
             if (selected == null && _pathProvider != null)
             {
@@ -129,6 +142,7 @@ namespace DexManager.Services
                         candidatePath,
                         "System/Platform ADB",
                         timeoutMs,
+                        retryBudget,
                         true);
                     if (selected != null) break;
                 }
@@ -140,7 +154,8 @@ namespace DexManager.Services
                     settings.Paths.Win7AdbPath,
                     LocalizationService.Get(
                         "Path.Description.LegacyAdb"),
-                    timeoutMs);
+                    timeoutMs,
+                    retryBudget);
             }
 
             if (selected == null)
@@ -153,6 +168,7 @@ namespace DexManager.Services
                         systemAdb,
                         "PATH ADB",
                         timeoutMs,
+                        retryBudget,
                         true);
                 }
             }
@@ -185,10 +201,13 @@ namespace DexManager.Services
             int timeoutMs,
             Func<string, string> describeUnavailable = null)
         {
+            // 후보가 하나뿐인 별개의 경로다 - 자동 선택 체인과 예산을
+            // 나눠 쓸 이유가 없으므로 호출마다 새 예산을 준다.
             var candidate = GetRunnableCandidate(
                 configuredPath,
                 description,
-                timeoutMs);
+                timeoutMs,
+                ProbeRetryBudget.For(timeoutMs, _utcNow));
             if (candidate == null)
             {
                 var message = describeUnavailable != null
@@ -208,7 +227,8 @@ namespace DexManager.Services
 
         private AdbPathCandidate GetScrcpyAdb(
             AppSettings settings,
-            int timeoutMs)
+            int timeoutMs,
+            ProbeRetryBudget retryBudget)
         {
             var configuredScrcpy = _settingsService.ResolvePath(
                 settings.Paths.ScrcpyPath);
@@ -224,6 +244,7 @@ namespace DexManager.Services
                 LocalizationService.Get(
                     "Path.Description.ScrcpyAdb"),
                 timeoutMs,
+                retryBudget,
                 true);
         }
 
@@ -231,6 +252,7 @@ namespace DexManager.Services
             string configuredPath,
             string description,
             int timeoutMs,
+            ProbeRetryBudget retryBudget,
             bool pathIsAbsolute = false)
         {
             if (string.IsNullOrWhiteSpace(configuredPath)) return null;
@@ -253,16 +275,33 @@ namespace DexManager.Services
                 // 오판하지 않도록 짧게 재시도한다(TransientProbeRetry) -
                 // 타임아웃이 아닌 실패(파일은 있지만 adb가 아니다 등)는
                 // 다시 해봤자 같은 결과이므로 그 경우는 즉시 반환된다.
-                var result = TransientProbeRetry.Run(delegate
-                {
-                    return _processRunner.Run(
-                        path,
-                        "version",
-                        Path.GetDirectoryName(path),
-                        Math.Max(timeoutMs, 3000),
-                        false,
-                        Encoding.Default);
-                });
+                // 재시도에 쓸 수 있는 시간은 체인이 공유하는 retryBudget이
+                // 정한다 - 첫 시도는 예산과 무관하게 언제나 실행된다.
+                // 부하로 fork/exec 자체가 EAGAIN으로 실패하는 경우도 같은
+                // 정책으로 재시도된다 - 그 외 예외는 아래 catch가 그대로
+                // 받아 "실행 불가"로 기록하고 다음 후보로 넘어간다.
+                var result = TransientProbeRetry.Run(
+                    delegate
+                    {
+                        return _processRunner.Run(
+                            path,
+                            "version",
+                            Path.GetDirectoryName(path),
+                            ProbeRetryBudget.EffectiveProbeTimeoutMs(timeoutMs),
+                            false,
+                            Encoding.Default);
+                    },
+                    retryBudget,
+                    retrySkipped: delegate
+                    {
+                        // 이 줄이 없으면 사용자는 "왜 이 후보만 한 번밖에
+                        // 시도하지 않았나"를 로그만 보고는 알 수 없다 -
+                        // 앞 후보가 예산을 다 썼다는 사실이 어디에도
+                        // 남지 않기 때문이다.
+                        _logService.Warning(LocalizationService.Format(
+                            "Log.Path.CandidateRetryBudgetExhausted",
+                            description));
+                    });
                 if (!result.IsSuccess)
                 {
                     _logService.Warning(LocalizationService.Format(

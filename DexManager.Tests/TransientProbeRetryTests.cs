@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.ComponentModel;
 using DexManager.Models;
 using DexManager.Utils;
 using Xunit;
@@ -17,6 +18,15 @@ namespace DexManager.Tests
     /// 파싱이 깨졌다 등)는 재시도해도 같은 결과가 나올 뿐이므로 재시도
     /// 하지 않는다 - 오직 TimedOut만 "다시 해볼 가치가 있는" 신호로
     /// 취급한다.
+    ///
+    /// 결과가 아니라 <b>예외</b>로 끝나는 일시 실패(부하 시 fork/exec의
+    /// EAGAIN)도 같은 정책으로 재시도된다 - 그 판정 집합이 의도한 것보다
+    /// 넓어지지 않는지(ENOENT/EACCES는 즉시 전파) 함께 고정한다.
+    ///
+    /// 여기에 더해, 횟수 상한이 후보 <b>하나</b>에 대한 상한일 뿐이라
+    /// 후보를 줄줄이 프로브하는 체인에서는 재시도가 후보 수만큼 곱해진다.
+    /// 그 곱셈을 끊는 공유 예산(ProbeRetryBudget)의 소비 규칙도 여기서
+    /// 함께 고정한다 - 예산 자체의 성질은 ProbeRetryBudgetTests가 맡는다.
     /// </summary>
     public class TransientProbeRetryTests
     {
@@ -102,6 +112,196 @@ namespace DexManager.Tests
         {
             Assert.Throws<ArgumentNullException>(
                 () => TransientProbeRetry.Run(null));
+        }
+
+        [Fact]
+        public void Run_SharedBudgetIsAlreadyUsedUp_StillRunsTheFirstAttemptButSkipsTheRetry()
+        {
+            var callCount = 0;
+            var timedOut = TimedOutResult();
+            var skipped = 0;
+            var exhausted = new ProbeRetryBudget(TimeSpan.Zero);
+
+            var result = TransientProbeRetry.Run(
+                delegate
+                {
+                    callCount++;
+                    return timedOut;
+                },
+                exhausted,
+                delay: delegate { },
+                retrySkipped: delegate { skipped++; });
+
+            Assert.Same(timedOut, result);
+            // 핵심: 예산이 없어도 첫 시도는 반드시 돈다. 첫 시도까지
+            // 예산으로 자르면 앞 후보가 느렸다는 이유만으로 정말 살아
+            // 있는 뒤쪽 후보를 아예 시도조차 못 하게 되어, 후보를 여러 개
+            // 두는 fail-open 설계가 무너진다.
+            Assert.Equal(1, callCount);
+            // 건너뛴 사실은 호출자에게 알려야 한다 - 그래야 "왜 이 후보만
+            // 한 번만 시도했나"가 로그로 남는다.
+            Assert.Equal(1, skipped);
+        }
+
+        [Fact]
+        public void Run_RetryChargesTheSharedBudget_SoTheNextCandidateOnlyGetsItsFirstAttempt()
+        {
+            // 체인을 흉내 낸다: 예산 하나를 후보 둘이 나눠 쓴다. 첫 후보의
+            // 재시도가 예산을 다 쓰면 둘째 후보는 첫 시도만 받는다 -
+            // 이것이 "후보 N개 × 재시도"라는 곱셈을 끊는 성질이다.
+            var clock = new ManualClock();
+            var budget = new ProbeRetryBudget(
+                TimeSpan.FromSeconds(15),
+                clock.Now);
+
+            var firstCandidateCalls = 0;
+            var firstResult = TransientProbeRetry.Run(
+                delegate
+                {
+                    firstCandidateCalls++;
+                    // 부하가 걸린 프로브 하나가 타임아웃 상한을 꽉 채운다.
+                    clock.Advance(TimeSpan.FromSeconds(15));
+                    return TimedOutResult();
+                },
+                budget,
+                delay: delegate { });
+
+            Assert.True(firstResult.TimedOut);
+            // 첫 후보는 예산이 남아 있었으므로 재시도까지 받는다.
+            Assert.Equal(2, firstCandidateCalls);
+
+            var secondCandidateCalls = 0;
+            var skipped = 0;
+            TransientProbeRetry.Run(
+                delegate
+                {
+                    secondCandidateCalls++;
+                    clock.Advance(TimeSpan.FromSeconds(15));
+                    return TimedOutResult();
+                },
+                budget,
+                delay: delegate { },
+                retrySkipped: delegate { skipped++; });
+
+            Assert.Equal(1, secondCandidateCalls);
+            Assert.Equal(1, skipped);
+        }
+
+        [Theory]
+        [InlineData(TransientProbeRetry.EagainLinux)]
+        [InlineData(TransientProbeRetry.EagainMac)]
+        public void IsTransient_Eagain_IsWorthRetrying(int nativeErrorCode)
+        {
+            // EAGAIN은 "지금은 자원이 없다"는 뜻일 뿐 후보가 죽었다는 뜻이
+            // 아니다 - 타임아웃과 똑같이 잠깐 뒤에 다시 하면 된다.
+            Assert.True(
+                TransientProbeRetry.IsTransient(
+                    new Win32Exception(nativeErrorCode)));
+        }
+
+        [Theory]
+        [InlineData(2)]  // ENOENT - 파일이 없다
+        [InlineData(13)] // EACCES - 실행 권한이 없다
+        public void IsTransient_PermanentWin32Failures_AreNotWorthRetrying(
+            int nativeErrorCode)
+        {
+            // 이 집합을 넓히면 진짜 영구 실패를 재시도하느라 시작만 늦어진다 -
+            // 그게 바로 이 판정을 별도 메서드로 뽑아 고정하는 이유다.
+            Assert.False(
+                TransientProbeRetry.IsTransient(
+                    new Win32Exception(nativeErrorCode)));
+        }
+
+        [Fact]
+        public void IsTransient_NonWin32Exception_IsNotWorthRetrying()
+        {
+            Assert.False(
+                TransientProbeRetry.IsTransient(
+                    new InvalidOperationException("boom")));
+        }
+
+        [Fact]
+        public void Run_ProbeThrowsEagainThenSucceeds_RetriesAndReturnsTheSuccess()
+        {
+            var callCount = 0;
+            var success = SuccessResult();
+
+            var result = TransientProbeRetry.Run(
+                delegate
+                {
+                    callCount++;
+                    if (callCount == 1)
+                        throw new Win32Exception(TransientProbeRetry.EagainMac);
+                    return success;
+                },
+                delay: delegate { });
+
+            // 그 전에는 이 예외가 호출자의 catch에 그대로 걸려 멀쩡한
+            // 후보가 "실행 불가"로 탈락했다 - 타임아웃과 똑같은 일시
+            // 현상인데도 재시도가 없었다.
+            Assert.Same(success, result);
+            Assert.Equal(2, callCount);
+        }
+
+        [Fact]
+        public void Run_ProbeThrowsEagainOnEveryAttempt_ThrowsTheLastOne()
+        {
+            var callCount = 0;
+
+            var thrown = Assert.Throws<Win32Exception>(() => TransientProbeRetry.Run(
+                delegate
+                {
+                    callCount++;
+                    throw new Win32Exception(
+                        TransientProbeRetry.EagainLinux,
+                        "attempt " + callCount);
+                },
+                delay: delegate { }));
+
+            // 재시도를 다 쓰고도 안 되면 삼키지 않고 그대로 던진다 -
+            // 호출자의 catch가 사유를 로그해야 후보가 왜 탈락했는지 남는다.
+            Assert.Equal("attempt " + TransientProbeRetry.MaxAttempts, thrown.Message);
+            Assert.Equal(TransientProbeRetry.MaxAttempts, callCount);
+        }
+
+        [Fact]
+        public void Run_ProbeThrowsPermanentWin32Failure_PropagatesImmediatelyWithoutRetrying()
+        {
+            var callCount = 0;
+
+            Assert.Throws<Win32Exception>(() => TransientProbeRetry.Run(
+                delegate
+                {
+                    callCount++;
+                    // ENOENT - 파일이 없다. 다시 해도 없다.
+                    throw new Win32Exception(2, "no such file");
+                },
+                delay: delegate { }));
+
+            Assert.Equal(1, callCount);
+        }
+
+        [Fact]
+        public void Run_ProbeThrowsEagain_ButTheSharedBudgetIsUsedUp_DoesNotRetry()
+        {
+            var callCount = 0;
+            var skipped = 0;
+            var exhausted = new ProbeRetryBudget(TimeSpan.Zero);
+
+            Assert.Throws<Win32Exception>(() => TransientProbeRetry.Run(
+                delegate
+                {
+                    callCount++;
+                    throw new Win32Exception(TransientProbeRetry.EagainMac);
+                },
+                exhausted,
+                delay: delegate { },
+                retrySkipped: delegate { skipped++; }));
+
+            // 예외 재시도도 타임아웃 재시도와 같은 예산을 쓴다 - 따로
+            // 세면 체인 상한이 예외 경로로 새어 나간다.
+            Assert.Equal(1, callCount);
+            Assert.Equal(1, skipped);
         }
 
         private static ProcessResult SuccessResult()

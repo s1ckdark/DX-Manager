@@ -13,7 +13,10 @@ namespace DexManager.Hosting;
 /// </summary>
 public sealed class ApplicationHost : IDisposable
 {
-    private const int AdbSelectionTimeoutMs = 5000;
+    // 후보 adb 프로브에 허용하는 시간. 재시도 예산이 이 값에서 유도되므로
+    // (ProbeRetryBudget.For) 회귀 테스트가 실제로 배송되는 이 값을 그대로
+    // 참조한다 - 여기서 값을 바꾸면 테스트도 함께 따라간다.
+    internal const int AdbSelectionTimeoutMs = 5000;
 
     private readonly IPlatformService _platformService;
     private readonly IPathProvider _pathProvider;
