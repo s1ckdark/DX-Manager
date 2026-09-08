@@ -277,6 +277,9 @@ namespace DexManager.Services
                 // 다시 해봤자 같은 결과이므로 그 경우는 즉시 반환된다.
                 // 재시도에 쓸 수 있는 시간은 체인이 공유하는 retryBudget이
                 // 정한다 - 첫 시도는 예산과 무관하게 언제나 실행된다.
+                // 부하로 fork/exec 자체가 EAGAIN으로 실패하는 경우도 같은
+                // 정책으로 재시도된다 - 그 외 예외는 아래 catch가 그대로
+                // 받아 "실행 불가"로 기록하고 다음 후보로 넘어간다.
                 var result = TransientProbeRetry.Run(
                     delegate
                     {
