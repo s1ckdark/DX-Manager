@@ -291,6 +291,23 @@ public class AdbServiceLockStateTests
     }
 
     [Fact]
+    public void ParseTrustState_WhenALongerFieldEndsWithDeviceLocked_DoesNotWinOverTheRealField()
+    {
+        // 좌측 워드 경계 고정. `deviceLocked`로 끝나는 더 긴 이름이 앞에
+        // 오더라도 진짜 `deviceLocked`가 이겨야 한다. 경계가 없으면 앞선
+        // `mDeviceLocked=1`이 먼저 매치되어 잠기지 않은 폰을 Locked로
+        // 판정하고, DeX 시작을 잘못 막는다 - 이 기능이 절대 하면 안 되는
+        // 실패 방향이다. 같은 성격의 가드가 MatchBooleanField에도 있고,
+        // 그쪽은 실기 출력의 `simSecure=false`가 `secure=false`로 오독되는
+        // 것을 막아 load-bearing임이 확인됐다.
+        const string dump = """
+             User "Owner" (id=0, flags=0x4c13) (current): mDeviceLocked=1, trustManaged=1, deviceLocked=0, strongAuthRequired=0x0
+            """;
+
+        Assert.Equal(LockState.Unlocked, AdbService.ParseTrustState(dump));
+    }
+
+    [Fact]
     public void IsDeviceLocked_PrefersDumpsysTrustOverDumpsysWindow_WhenTrustGivesAnAnswer()
     {
         // dumpsys window 쪽은 (일부러) 반대 답을 준다 - trust가 이겨야
