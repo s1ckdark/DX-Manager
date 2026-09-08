@@ -507,10 +507,26 @@ namespace DexManager.Services
         /// </summary>
         public LockState IsDeviceLocked(string serial)
         {
-            var result = ShellForSerial(serial, "dumpsys window", false);
-            return result.IsSuccess
-                ? ParseLockState(result.StandardOutput)
-                : LockState.Unknown;
+            // ShellForSerial → ProcessRunner.Run은 실행 파일이 없거나
+            // 프로세스를 띄우지 못하면 예외를 그대로 던진다(반환값이 아니라
+            // throw다). 이 탐지는 어디까지나 최선-노력 보조 신호이므로,
+            // 어떤 예외가 나든 잠금 여부를 "모른다"로 접어야 한다 -
+            // 그렇지 않으면 이 기능이 자신이 돕기로 한 DeX 시작 자체를
+            // 깨뜨리게 된다.
+            try
+            {
+                var result = ShellForSerial(serial, "dumpsys window", false);
+                return result.IsSuccess
+                    ? ParseLockState(result.StandardOutput)
+                    : LockState.Unknown;
+            }
+            catch (Exception ex)
+            {
+                _logService.Warning(LocalizationService.Format(
+                    "Log.Adb.LockProbeFailed",
+                    ex.Message));
+                return LockState.Unknown;
+            }
         }
 
         /// <summary>

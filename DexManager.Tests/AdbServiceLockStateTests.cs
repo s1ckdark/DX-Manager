@@ -1,6 +1,7 @@
 using DexManager.Models;
 using DexManager.Services;
 using DexManager.Tests.FakePlatform;
+using DexManager.Utils;
 
 namespace DexManager.Tests;
 
@@ -106,5 +107,33 @@ public class AdbServiceLockStateTests
             adb.Invocations,
             line => line.Contains("-s phone-a", StringComparison.Ordinal) &&
                 line.Contains("dumpsys window", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void IsDeviceLocked_WhenTheAdbProcessCannotEvenBeLaunched_FailsOpenToUnknownInsteadOfThrowing()
+    {
+        // ShellForSerial이 타는 ProcessRunner.Run은 결과가 실패인 채로
+        // "돌아오는" 게 아니라, 실행 파일이 없으면 FileNotFoundException을
+        // 그대로 "던진다"(ProcessRunner.cs). 이 잠금 탐지는 어디까지나
+        // 최선-노력 보조 신호이므로, 이 예외 하나 때문에 DeX 시작 전체가
+        // 죽어서는 안 된다 - 그러면 이 기능이 도우려던 대상을 스스로
+        // 깨뜨리는 셈이다. IsSuccess 분기만으로는 "실패로 반환된" 경우만
+        // 잡고 "던져진" 경우를 놓친다는 게 이 테스트가 고정하는 간극이다.
+        var logService = new LogService();
+        var processRunner = new ProcessRunner(logService);
+        var missingAdbPath = Path.Combine(
+            Path.GetTempPath(),
+            "dxm-tests-missing-adb",
+            Guid.NewGuid().ToString("N"),
+            "adb");
+        var adbService = new AdbService(
+            missingAdbPath,
+            1000,
+            processRunner,
+            logService);
+
+        var result = adbService.IsDeviceLocked("phone-a");
+
+        Assert.Equal(LockState.Unknown, result);
     }
 }
