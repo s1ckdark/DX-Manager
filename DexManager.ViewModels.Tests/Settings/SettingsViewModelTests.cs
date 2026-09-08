@@ -171,5 +171,19 @@ public class SettingsViewModelTests
             ? AppTheme.Light
             : AppTheme.Dark;
         Assert.True(settings.HasChanges);
+
+        settings.Appearance.SaveCommand.Execute(null);
+        Assert.False(settings.Appearance.HasChanges);
+        Assert.False(settings.HasChanges);
+
+        // Paths in isolation: nothing else is dirty here (Slot/Appearance were just
+        // saved above). If Paths' PropertyChanged subscription or its "Paths.HasChanges
+        // ||" term dropped out of RecomputeHasChanges, this would be the only assertion
+        // in the suite to notice - every other test that touches Paths either checks
+        // only settings.Paths.HasChanges directly, or co-dirties another page whose
+        // notification would mask a Paths-wiring regression.
+        settings.Paths.ScrcpyPath = "/isolated/paths/only";
+        Assert.True(settings.Paths.HasChanges);
+        Assert.True(settings.HasChanges);
     }
 }
