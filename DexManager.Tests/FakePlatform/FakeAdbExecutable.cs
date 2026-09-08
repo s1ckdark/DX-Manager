@@ -25,6 +25,8 @@ public sealed class FakeAdbExecutable
 {
     private readonly string _root;
     private readonly string _logPath;
+    private readonly Dictionary<string, string> _dumpsysTrustFilePathByTransport =
+        new();
 
     public FakeAdbExecutable(
         string root,
@@ -87,6 +89,7 @@ public sealed class FakeAdbExecutable
                     "dumpsys-trust-" + trustIndex + ".txt");
                 File.WriteAllText(trustFilePath, device.Value ?? string.Empty);
                 trustIndex++;
+                _dumpsysTrustFilePathByTransport[device.Key] = trustFilePath;
 
                 var prefix = "*\"-s " + device.Key + " \"*";
                 script.Append("  ").Append(prefix)
@@ -131,6 +134,26 @@ public sealed class FakeAdbExecutable
     /// <c>adb version</c> 호출을 준비 단계에서 걷어내는 데 쓴다.
     /// </summary>
     public void ClearInvocations() => File.WriteAllText(_logPath, string.Empty);
+
+    /// <summary>
+    /// 생성자에 넘겼던 <c>dumpsys trust</c> 출력을 테스트 도중 다시 쓴다.
+    /// 스크립트는 매 호출마다 이 파일을 그대로 cat하므로, 다음 호출부터
+    /// 새 내용이 즉시 보인다 - 잠김 -&gt; 해제 같은 상태 전환을
+    /// 폴링 도중 흉내내는 데 쓴다. 생성자에
+    /// <paramref name="serial"/>이 <c>dumpsysTrustOutputByTransport</c>의
+    /// 키로 없었다면 아무 것도 하지 않는다(그 기기는 애초에 이 명령에
+    /// 응답하도록 설정되지 않았다).
+    /// </summary>
+    public void UpdateDumpsysTrustOutput(string serial, string output)
+    {
+        if (!_dumpsysTrustFilePathByTransport.TryGetValue(
+            serial,
+            out var trustFilePath))
+        {
+            return;
+        }
+        File.WriteAllText(trustFilePath, output ?? string.Empty);
+    }
 
     /// <summary>이 실행 파일을 adb로 돌려주는 경로 제공자를 만든다.</summary>
     public FakePathProvider CreatePathProvider() =>

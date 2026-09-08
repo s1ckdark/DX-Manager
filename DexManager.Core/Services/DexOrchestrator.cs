@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using DexManager.Models;
+using DexManager.Utils;
 
 namespace DexManager.Services
 {
@@ -13,14 +14,41 @@ namespace DexManager.Services
         // 시간은 측정하지 못했으므로, 이 저장소의 다른 UI 안정화 대기와
         // 같은 자릿수(150~250ms, VirtualDisplayService.cs)로 보수적이되
         // 짧게 잡는다.
+        //
+        // 폴로 바꾸지 않는다 - DismissKeyguardLockProbeBudgetMs와 달리,
+        // 이 대기 다음에는 "너무 이르면 오판하는" 게이트가 없다. wake가
+        // 부족하면 DismissKeyguard 자체가 무효(no-op)가 될 뿐이고, 그건
+        // 상태를 다시 확인해도 되돌릴 수 없다(같은 dismiss를 다시 보내지
+        // 않는 한, 폴은 그러지 않는다) - 그러니 폴로 바꿔도 정확성이
+        // 좋아지지 않는다. interactiveState는 관측 가능하지만(dumpsys
+        // window), 그걸 새로 파싱하는 비용을 들일 만한 실측 실패 사례가
+        // 없다 - 이 값 자체가 이미 작고 네트워크에 의존하지 않는 로컬
+        // 대기라, 있는 그대로 둔다.
         private const int WakeSettleDelayMs = 300;
 
-        // DismissKeyguard 직후 잠금 프로브까지 두는 짧은 대기. wm dismiss-
-        // keyguard는 WakeScreen의 하드웨어/인터랙티브 상태 전환보다 더
-        // 동기적인 WindowManager 호출이므로 WakeSettleDelayMs보다 짧게
-        // 잡되, 여전히 이 저장소의 UI 안정화 대기(150ms,
-        // VirtualDisplayService.cs)와 같은 자릿수를 쓴다.
-        private const int DismissKeyguardSettleDelayMs = 150;
+        // DismissKeyguard 직후 잠금 프로브 예산과 재확인 간격. 이전에는
+        // 고정 대기(150ms) 뒤 딱 한 번만 확인해서, dismiss 반영이 그보다
+        // 느리면 프로브가 "아직 해제 중"인 기기를 Locked로 읽어 시작을
+        // 막았다(fail-*closed* - 이 기능에서 유일하게 fail-open 규율을
+        // 어기는 지점이었다). LockStatePoll로 바꿔 Locked가 관측되는
+        // 동안만 재확인하고, Unlocked나 Unknown이 나오면(둘 다 이미
+        // 판단이 끝난 상태다) 즉시 멈춘다.
+        //
+        // 예산 2000ms: 실기에서 해제가 1초 안쪽으로 끝나는 것이
+        // 확인됐으므로(.omc/research/2026-09-08-realdevice-lock-findings.md
+        // 9절), 그 두 배 이상의 여유를 준다 - 일시적으로 느린 기기도
+        // 통과시키되, 시작 버튼을 누른 뒤 체감될 만큼 무한정 기다리지는
+        // 않는다.
+        // 간격 150ms: VirtualDisplayService.cs의 UI 안정화 대기와 같은
+        // 자릿수. 매 확인이 adb 왕복(dumpsys trust, 필요하면 dumpsys
+        // window)이므로 이보다 더 촘촘히 돌면 왕복 비용만 늘고 얻는 게
+        // 없다.
+        //
+        // 공통 경로(대부분의 실기)에서는 오히려 더 빠르다 - 첫 확인이
+        // 즉시 나가므로, dismiss가 이미 반영돼 있으면 예전처럼 150ms를
+        // 무조건 태우지 않고 바로 다음 단계로 넘어간다.
+        private const int DismissKeyguardLockProbeBudgetMs = 2000;
+        private const int DismissKeyguardLockProbeIntervalMs = 150;
 
         private readonly AdbService _adbService;
         private readonly VirtualDisplayService _virtualDisplayService;
@@ -273,19 +301,25 @@ namespace DexManager.Services
             // 준다.
             Thread.Sleep(WakeSettleDelayMs);
             _adbService.DismissKeyguard(serial);
-            // 키가드 해제는 즉시 반영되지 않을 수 있다. 아래 잠금 프로브가
-            // "해제하는 중" 상태를 잘못 읽지 않도록 짧게 대기한다.
-            // dismiss는 깨우기(하드웨어/인터랙티브 상태 전환)보다 더
-            // 동기적인 WindowManager 호출이므로 더 짧은 값을 쓴다 -
-            // 그래도 이 저장소의 UI 안정화 대기와 같은 자릿수(150ms,
-            // VirtualDisplayService.cs)다.
-            Thread.Sleep(DismissKeyguardSettleDelayMs);
+            // 키가드 해제는 즉시 반영되지 않을 수 있다. 고정 대기 뒤
+            // 딱 한 번만 확인하면, 해제가 그 대기보다 느릴 때 "아직
+            // 해제 중"인 기기를 Locked로 오판해 시작을 막는다(fail-
+            // *closed* - 이미 풀리고 있는 폰에게 "먼저 잠금을 해제하라"고
+            // 잘못 안내하는 것과 같다). LockStatePoll로 Locked가 관측되는
+            // 동안만 짧게 재확인한다 - 예산과 간격의 근거는
+            // DismissKeyguardLockProbeBudgetMs/IntervalMs 선언부 참고.
+            var lockState = LockStatePoll.Until(
+                delegate { return _adbService.IsDeviceLocked(serial); },
+                TimeSpan.FromMilliseconds(DismissKeyguardLockProbeBudgetMs),
+                TimeSpan.FromMilliseconds(DismissKeyguardLockProbeIntervalMs));
             // DeX는 새 가상 디스플레이를 만들어 그것만 미러링한다. 잠금
             // 화면은 항상 기본 디스플레이(0)에만 그려지므로 DeX 미러로는
             // 잠금을 풀 수 없다 - 그 우회는 불가능하다. 그래서 시작 전에
             // 잠겨 있음을 확신할 때만 막고, 판단이 애매하면(Unknown) 통과
             // 시킨다 - 파싱 공백이 정상적으로 될 시작을 막는 것이 더 나쁜
-            // 실패 방향이기 때문이다(fail-open).
+            // 실패 방향이기 때문이다(fail-open). LockStatePoll은 이
+            // 판단을 언제 내릴지만 바꿀 뿐, Locked/Unlocked/Unknown 중
+            // 어느 쪽으로 판단할지는 그대로 여기서 결정한다.
             //
             // 위치에 따른 부수 효과(의도적, 불변식 위반 아님): 이 게이트는
             // 아래의 CleanupStaleSession보다 먼저 중단하므로, 지연된
@@ -297,7 +331,7 @@ namespace DexManager.Services
             // RuntimeFactory.CreatedInstances를 각자의 identity로 순회하며
             // 종료) 반드시 회수되므로 불변식 자체는 유지된다 - 다만
             // 고아가 남아 있는 시간 창은 이 게이트만큼 넓어졌다.
-            if (_adbService.IsDeviceLocked(serial) == LockState.Locked)
+            if (lockState == LockState.Locked)
             {
                 throw new InvalidOperationException(
                     LocalizationService.Get(
