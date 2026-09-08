@@ -496,6 +496,65 @@ namespace DexManager.Services
                     StringComparison.OrdinalIgnoreCase);
         }
 
+        /// <summary>
+        /// <c>dumpsys window</c>로 잠금 화면 상태를 확인한다. Android
+        /// 버전·제조사 스킨마다 노출하는 필드가 달라 절대적으로 믿을 수는
+        /// 없으므로, 알려진 필드를 하나도 찾지 못하면 <see
+        /// cref="LockState.Unknown"/>을 돌려준다 — 호출자는 이를
+        /// <see cref="LockState.Locked"/>가 아닌 값과 똑같이 취급해
+        /// (fail-open) 파싱 공백이 정상적인 DeX 시작을 막지 않게 해야
+        /// 한다.
+        /// </summary>
+        public LockState IsDeviceLocked(string serial)
+        {
+            var result = ShellForSerial(serial, "dumpsys window", false);
+            return result.IsSuccess
+                ? ParseLockState(result.StandardOutput)
+                : LockState.Unknown;
+        }
+
+        /// <summary>
+        /// <c>mShowingLockscreen</c> → <c>mDreamingLockscreen</c> →
+        /// <c>mKeyguardShowing</c> → <c>isStatusBarKeyguard</c> 순서로,
+        /// 이 고정된 우선순위에서 출력에 실제로 나타나는 첫 필드의 값을
+        /// 취한다. dumpsys 출력에서 필드가 등장하는 순서는 보장되지
+        /// 않으므로, "텍스트에서 먼저 만난 필드"가 아니라 "우선순위가 더
+        /// 높은 필드"가 이겨야 여러 Android 버전·스킨에 걸쳐 결정적이다.
+        /// 네 필드 중 어느 것도 나타나지 않으면 <see
+        /// cref="LockState.Unknown"/>이다.
+        /// </summary>
+        public static LockState ParseLockState(string dumpsysWindowOutput)
+        {
+            if (string.IsNullOrWhiteSpace(dumpsysWindowOutput))
+                return LockState.Unknown;
+
+            foreach (var fieldName in LockFieldPriority)
+            {
+                var match = Regex.Match(
+                    dumpsysWindowOutput,
+                    Regex.Escape(fieldName) + @"\s*=\s*(true|false)",
+                    RegexOptions.IgnoreCase);
+                if (!match.Success) continue;
+
+                return string.Equals(
+                    match.Groups[1].Value,
+                    "true",
+                    StringComparison.OrdinalIgnoreCase)
+                    ? LockState.Locked
+                    : LockState.Unlocked;
+            }
+
+            return LockState.Unknown;
+        }
+
+        private static readonly string[] LockFieldPriority =
+        {
+            "mShowingLockscreen",
+            "mDreamingLockscreen",
+            "mKeyguardShowing",
+            "isStatusBarKeyguard"
+        };
+
         public AdbWakeUpResult WakeUp(
             string targetSerial,
             Func<string, bool> scrcpyWakeUp)

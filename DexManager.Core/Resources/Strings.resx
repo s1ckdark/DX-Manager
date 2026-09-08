@@ -273,6 +273,7 @@
   <data name="Log.Dex.OperationInProgress" xml:space="preserve"><value>A DeX operation is already in progress.</value></data>
   <data name="Log.Dex.AlreadyRunning" xml:space="preserve"><value>DeX is already running.</value></data>
   <data name="Error.Dex.NoAuthorizedDevice" xml:space="preserve"><value>No authorized ADB device is connected.</value></data>
+  <data name="Error.Dex.DeviceLocked" xml:space="preserve"><value>The phone appears to be locked. Unlock it first, then try again.</value></data>
   <data name="Log.Dex.StartCompleted" xml:space="preserve"><value>Completed the DeX startup sequence.</value></data>
   <data name="Log.Dex.StartFailed" xml:space="preserve"><value>Could not start DeX.</value></data>
   <data name="Log.Dex.StartCancelled" xml:space="preserve"><value>Cancelled DeX startup because shutdown was requested.</value></data>

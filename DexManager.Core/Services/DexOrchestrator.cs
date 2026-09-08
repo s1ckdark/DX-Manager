@@ -235,6 +235,18 @@ namespace DexManager.Services
                     LocalizationService.Get(
                         "Error.Dex.NoAuthorizedDevice"));
             }
+            // DeX는 새 가상 디스플레이를 만들어 그것만 미러링한다. 잠금
+            // 화면은 항상 기본 디스플레이(0)에만 그려지므로 DeX 미러로는
+            // 잠금을 풀 수 없다 - 그 우회는 불가능하다. 그래서 시작 전에
+            // 잠겨 있음을 확신할 때만 막고, 판단이 애매하면(Unknown) 통과
+            // 시킨다 - 파싱 공백이 정상적으로 될 시작을 막는 것이 더 나쁜
+            // 실패 방향이기 때문이다(fail-open).
+            if (_adbService.IsDeviceLocked(serial) == LockState.Locked)
+            {
+                throw new InvalidOperationException(
+                    LocalizationService.Get(
+                        "Error.Dex.DeviceLocked"));
+            }
             deviceIdentity = GetVerifiedDeviceIdentity(
                 serial,
                 deviceIdentity);

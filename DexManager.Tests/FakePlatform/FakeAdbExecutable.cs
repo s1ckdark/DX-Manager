@@ -28,7 +28,8 @@ public sealed class FakeAdbExecutable
 
     public FakeAdbExecutable(
         string root,
-        IReadOnlyDictionary<string, string> hardwareSerialsByTransport)
+        IReadOnlyDictionary<string, string> hardwareSerialsByTransport,
+        IReadOnlyDictionary<string, string> dumpsysWindowOutputByTransport = null)
     {
         _root = root;
         var directory = Path.Combine(root, "fake-adb");
@@ -50,6 +51,27 @@ public sealed class FakeAdbExecutable
             script.Append("  ").Append(prefix)
                 .Append("\"getprop ro.serialno\"*) printf '")
                 .Append(device.Value).Append("\\n'; exit 0 ;;\n");
+        }
+        // dumpsys window의 실제 출력은 등호·따옴표·개행이 뒤섞여 있어 셸
+        // case 본문에 직접 박아 넣으면 인용 규칙이 쉽게 깨진다. 그래서
+        // 값을 파일에 그대로 적어 두고, 매칭되면 그 파일을 그대로 cat한다 —
+        // 내용에 어떤 문자가 와도 안전하다.
+        if (dumpsysWindowOutputByTransport != null)
+        {
+            var dumpIndex = 0;
+            foreach (var device in dumpsysWindowOutputByTransport)
+            {
+                var dumpFilePath = Path.Combine(
+                    directory,
+                    "dumpsys-window-" + dumpIndex + ".txt");
+                File.WriteAllText(dumpFilePath, device.Value ?? string.Empty);
+                dumpIndex++;
+
+                var prefix = "*\"-s " + device.Key + " \"*";
+                script.Append("  ").Append(prefix)
+                    .Append("\"dumpsys window\"*) cat \"")
+                    .Append(dumpFilePath).Append("\"; exit 0 ;;\n");
+            }
         }
         script.Append("esac\n");
         script.Append("exit 0\n");

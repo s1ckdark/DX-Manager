@@ -273,6 +273,7 @@
   <data name="Log.Dex.OperationInProgress" xml:space="preserve"><value>DeX 작업이 이미 진행 중입니다.</value></data>
   <data name="Log.Dex.AlreadyRunning" xml:space="preserve"><value>DeX가 이미 실행 중입니다.</value></data>
   <data name="Error.Dex.NoAuthorizedDevice" xml:space="preserve"><value>승인된 ADB 장치가 연결되어 있지 않습니다.</value></data>
+  <data name="Error.Dex.DeviceLocked" xml:space="preserve"><value>휴대폰이 잠겨 있는 것 같습니다. 먼저 잠금을 해제한 후 다시 시도하세요.</value></data>
   <data name="Log.Dex.StartCompleted" xml:space="preserve"><value>DeX 실행 흐름을 완료했습니다.</value></data>
   <data name="Log.Dex.StartFailed" xml:space="preserve"><value>DeX 시작에 실패했습니다.</value></data>
   <data name="Log.Dex.StartCancelled" xml:space="preserve"><value>종료 요청으로 DeX 시작을 취소했습니다.</value></data>
