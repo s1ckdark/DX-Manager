@@ -510,10 +510,6 @@ namespace DexManager.Services
         /// 메서드 다음에 호출해야 한다(잠들어 있는 동안에는 <c>wm
         /// dismiss-keyguard</c> 자체가 무효였다).
         ///
-        /// 이름이 비슷한 <see cref="WakeUp"/>과 절대 혼동하면 안 된다 -
-        /// 그건 adb 연결 자체를 복구하는 기능(KillServer/StartServer →
-        /// 인증 기기 확인 → scrcpy 폴백)이지 화면과는 무관하다.
-        ///
         /// DeX 시작의 사전 단계로 쓰이므로 <see cref="IsDeviceLocked"/>와
         /// 같은 fail-open 규율을 따른다: 어떤 예외가 나든 잡아서 false로
         /// 접는다 - 화면을 깨우지 못했다고 정상적으로 될 DeX 시작 자체를
@@ -829,49 +825,6 @@ namespace DexManager.Services
         // 않도록 넉넉하되 유한한 창으로 자른다.
         private const int KeyguardServiceDelegateBlockLength = 2000;
 
-        public AdbWakeUpResult WakeUp(
-            string targetSerial,
-            Func<string, bool> scrcpyWakeUp)
-        {
-            _logService.Info(
-                LocalizationService.Get("Log.Adb.WakeUpStarting"));
-            var normalizedTarget = string.IsNullOrWhiteSpace(targetSerial)
-                ? string.Empty
-                : targetSerial.Trim();
-            if (!IsTcpIpSerial(normalizedTarget))
-                KillServer();
-            StartServer();
-
-            var devicesBefore = GetDevices();
-            if (ContainsAuthorizedDevice(devicesBefore, normalizedTarget))
-            {
-                return new AdbWakeUpResult(true, false, devicesBefore);
-            }
-
-            if (scrcpyWakeUp == null)
-            {
-                _logService.Warning(LocalizationService.Get(
-                    "Log.Adb.WakeUpScrcpyUnavailable"));
-                return new AdbWakeUpResult(false, false, devicesBefore);
-            }
-
-            _logService.Warning(LocalizationService.Get(
-                "Log.Adb.WakeUpFallback"));
-            var scrcpyStarted = scrcpyWakeUp(normalizedTarget);
-            var devicesAfter = GetDevices();
-            var success = scrcpyStarted &&
-                ContainsAuthorizedDevice(devicesAfter, normalizedTarget);
-
-            if (success)
-                _logService.Info(LocalizationService.Get(
-                    "Log.Adb.WakeUpDeviceFound"));
-            else
-                _logService.Warning(LocalizationService.Get(
-                    "Log.Adb.WakeUpDeviceMissing"));
-
-            return new AdbWakeUpResult(success, true, devicesAfter);
-        }
-
         public static IList<AdbDeviceInfo> ParseDevices(string output)
         {
             var devices = new List<AdbDeviceInfo>();
@@ -971,25 +924,6 @@ namespace DexManager.Services
                 port <= 65535;
         }
 
-        private static bool ContainsAuthorizedDevice(
-            IEnumerable<AdbDeviceInfo> devices,
-            string serial)
-        {
-            foreach (var device in devices ?? Enumerable.Empty<AdbDeviceInfo>())
-            {
-                if (device == null || !device.IsAuthorized) continue;
-                if (string.IsNullOrWhiteSpace(serial) ||
-                    string.Equals(
-                        device.Serial,
-                        serial,
-                        StringComparison.OrdinalIgnoreCase))
-                {
-                    return true;
-                }
-            }
-            return false;
-        }
-
         public static bool IsEmulatorSerial(string serial)
         {
             return !string.IsNullOrWhiteSpace(serial) &&
@@ -1061,22 +995,5 @@ namespace DexManager.Services
             else
                 _logService.Warning(message);
         }
-    }
-
-    public sealed class AdbWakeUpResult
-    {
-        public AdbWakeUpResult(
-            bool success,
-            bool usedScrcpy,
-            IList<AdbDeviceInfo> devices)
-        {
-            Success = success;
-            UsedScrcpy = usedScrcpy;
-            Devices = devices ?? new List<AdbDeviceInfo>();
-        }
-
-        public bool Success { get; private set; }
-        public bool UsedScrcpy { get; private set; }
-        public IList<AdbDeviceInfo> Devices { get; private set; }
     }
 }

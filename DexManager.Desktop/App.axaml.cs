@@ -16,12 +16,6 @@ public partial class App : Application
 {
     private ShellViewModel _shell;
 
-    // 외관 설정 뷰모델을 앱 수명 동안 들고 있는다. 아직 이 값을 편집하는
-    // 화면이 없더라도, 저장 시 즉시 재적용(ThemeSaved 구독)이 동작하려면
-    // 인스턴스가 GC되지 않고 살아 있어야 한다. 나중에 설정 화면이 이
-    // 인스턴스를 재사용한다.
-    private AppearanceSettingsViewModel _appearance;
-
     // 설정 창은 한 번에 하나만 띄운다 - ShellViewModel.OpenSettingsCommand는
     // 호출될 때마다 새 SettingsViewModel을 만들므로, 창이 이미 열려 있으면
     // 새로 만든 뷰모델은 즉시 Dispose하고 기존 창을 포커스한다(Task 12).
@@ -66,11 +60,14 @@ public partial class App : Application
             host = MacApplicationHostFactory.Create();
 
             // 저장된 테마를 시작 시 적용한다. App.axaml의 하드코딩된
-            // RequestedThemeVariant="Default"를 대신한다.
+            // RequestedThemeVariant="Default"를 대신한다. 이 인스턴스는
+            // 시작 시점의 읽기 전용 스냅샷일 뿐이다 - 이 값을 편집하는
+            // 화면이 없으므로 Save()가 불릴 일이 없고, 설정 창은 자신만의
+            // AppearanceSettingsViewModel을 새로 만든다(재사용하지 않는다).
+            // 그래서 지역 변수로 충분하고 ThemeSaved를 구독할 필요가 없다.
             var gateway = new SettingsGateway(host);
-            _appearance = new AppearanceSettingsViewModel(gateway);
-            _appearance.ThemeSaved += OnThemeSaved;
-            ThemeApplier.Apply(_appearance.SelectedTheme);
+            var appearance = new AppearanceSettingsViewModel(gateway);
+            ThemeApplier.Apply(appearance.SelectedTheme);
 
             // 저장된 언어를 시작 시 적용한다. LocalizationService는
             // DexManager.Core에 있어 Avalonia를 참조하지 않으므로 여기서
@@ -78,7 +75,7 @@ public partial class App : Application
             // 이 호출은 이후 LocalizationService.Get이 반환할 문자열의
             // 기준 컬처를 세팅할 뿐, 이미 만들어진 MainWindow의 XAML
             // 문자열은 다시 그리지 않는다 — 그건 재시작이 필요하다.
-            LocalizationService.Apply(_appearance.SelectedLanguage);
+            LocalizationService.Apply(appearance.SelectedLanguage);
 
             _shell = new ShellViewModel(host, new AvaloniaUiDispatcher());
             // 셸이 호스트를 넘겨받았다. 이제부터 정리는 셸의 몫이다.
@@ -105,8 +102,8 @@ public partial class App : Application
             // null 검사를 해서 우연히 무해할 뿐 보장은 아니고, 종료 신호가
             // 이 호출과 겹치면 두 스레드가 동기화 없이 같은 정리를 돈다.
             // 가드를 거치면 "정확히 한 번"이 실제로 성립한다. 이 catch 이후에는
-            // StartupErrorWindow만 만들고 _shell/_appearance를 새로 만들지
-            // 않으므로, 나중 OnExit이 no-op이 되어도 놓치는 정리는 없다.
+            // StartupErrorWindow만 만들고 _shell을 새로 만들지 않으므로,
+            // 나중 OnExit이 no-op이 되어도 놓치는 정리는 없다.
             _cleanupGuard.TryRunOnce(DisposeQuietly);
             DisposeHostQuietly(host);
             Report(ex);
@@ -146,9 +143,11 @@ public partial class App : Application
     internal bool TryRunShutdownCleanup() => _cleanupGuard.TryRunOnce(DisposeQuietly);
 
     /// <summary>테마가 저장되면(AppearanceSettingsViewModel.SaveCommand)
-    /// 즉시 재적용한다. Avalonia 타입 매핑은 ThemeApplier가 맡는다. 시작
-    /// 시점의 _appearance와 설정 창의 SettingsViewModel.Appearance 양쪽 모두
-    /// 이 핸들러 하나를 공유한다 - 상태가 없는 순수 재적용이라 안전하다.</summary>
+    /// 즉시 재적용한다. Avalonia 타입 매핑은 ThemeApplier가 맡는다. 설정
+    /// 창의 SettingsViewModel.Appearance가 이 핸들러를 구독한다(시작
+    /// 시점의 AppearanceSettingsViewModel은 Save()가 불릴 일이 없는
+    /// 읽기 전용 스냅샷이라 구독하지 않는다) - 상태가 없는 순수 재적용이라
+    /// 안전하다.</summary>
     private void OnThemeSaved(object sender, AppTheme theme)
         => ThemeApplier.Apply(theme);
 
@@ -265,12 +264,6 @@ public partial class App : Application
     /// </summary>
     private void DisposeQuietly()
     {
-        if (_appearance != null)
-        {
-            _appearance.ThemeSaved -= OnThemeSaved;
-            _appearance = null;
-        }
-
         // 설정 창이 아직 열려 있으면(예: 확인 없이 앱이 종료되는 경로)
         // Closed 핸들러를 먼저 떼어 이중 Dispose를 피하고, 여기서 직접
         // 한 번만 정리한다. SettingsViewModel.Dispose 자체도 _disposed

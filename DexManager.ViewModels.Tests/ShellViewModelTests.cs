@@ -1,3 +1,4 @@
+using System.Reflection;
 using DexManager.Models;
 using DexManager.Services;
 using Xunit;
@@ -110,6 +111,55 @@ public class ShellViewModelTests
         Assert.NotNull(raised.Paths);
         Assert.Null(raised.DisplayStream);
         Assert.Null(raised.Slot);
+    }
+
+    [Fact]
+    public void OpenSettingsCommand_WithASubscriber_DeliversAnUndisposedSettingsViewModel()
+    {
+        using var temp = new TempHostRoot();
+        var host = temp.CreateHost();
+        using var shell = new ShellViewModel(host, new ImmediateUiDispatcher());
+
+        SettingsViewModel raised = null;
+        shell.SettingsRequested += (_, settings) => raised = settings;
+
+        shell.OpenSettingsCommand.Execute(null);
+
+        Assert.NotNull(raised);
+        Assert.False(raised.IsDisposed);
+    }
+
+    [Fact]
+    public void OpenSettingsCommand_WithNoSubscriber_DisposesTheUnconsumedSettingsViewModel()
+    {
+        using var temp = new TempHostRoot();
+        var host = temp.CreateHost();
+        using var shell = new ShellViewModel(host, new ImmediateUiDispatcher());
+
+        // 일부러 SettingsRequested를 구독하지 않는다 - Task 12(App)가
+        // 아직 붙지 않았거나 이미 떨어져 나간 상황을 흉내낸다. 이 경로에서
+        // 만들어진 SettingsViewModel이 Dispose되지 않으면, 그 생성자가
+        // 구독한 host.RuntimeSessions.Changed에 핸들러가 그대로 남는다 -
+        // SettingsViewModel은 이 구독을 Dispose에서만 해제하므로, 구독자
+        // 수가 호출 전후로 그대로인지를 보면 Dispose가 실제로 불렸는지
+        // 관측할 수 있다.
+        var before = RuntimeSessionsChangedSubscriberCount(host.RuntimeSessions);
+
+        shell.OpenSettingsCommand.Execute(null);
+
+        var after = RuntimeSessionsChangedSubscriberCount(host.RuntimeSessions);
+        Assert.Equal(before, after);
+    }
+
+    private static int RuntimeSessionsChangedSubscriberCount(
+        DeviceRuntimeSessionRegistry registry)
+    {
+        var field = typeof(DeviceRuntimeSessionRegistry).GetField(
+            "Changed",
+            BindingFlags.Instance | BindingFlags.NonPublic);
+        Assert.NotNull(field);
+        var handler = field.GetValue(registry) as Delegate;
+        return handler?.GetInvocationList().Length ?? 0;
     }
 
     [Fact]

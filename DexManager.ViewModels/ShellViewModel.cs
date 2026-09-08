@@ -55,13 +55,28 @@ public sealed partial class ShellViewModel : ObservableObject, IDisposable
     /// 없어도(Devices.SelectedDevice == null) 전역 설정 페이지는 여전히
     /// 유효하므로 항상 실행 가능하다 - 기기별 페이지는
     /// SettingsViewModel이 null로 처리한다.
+    ///
+    /// SettingsViewModel의 생성자는 런타임 세션 레지스트리와 기기 선택
+    /// 변경을 구독한다(IDisposable) - 구독자가 없으면 <c>?.Invoke</c>가
+    /// 조용히 no-op이 되어 이 인스턴스가 아무에게도 넘어가지 않은 채
+    /// 구독만 남아 새는 결과가 된다. 그래서 호출 전에 구독자 존재를
+    /// 먼저 확인하고, 없으면 즉시 Dispose한다.
     /// </summary>
     [RelayCommand]
     private void OpenSettings()
     {
+        var handler = SettingsRequested;
+
         var gateway = new SettingsGateway(_host);
         var settings = new SettingsViewModel(gateway, Devices, _host.RuntimeSessions, _dispatcher);
-        SettingsRequested?.Invoke(this, settings);
+
+        if (handler == null)
+        {
+            settings.Dispose();
+            return;
+        }
+
+        handler.Invoke(this, settings);
     }
 
     private void OnDeviceListPropertyChanged(

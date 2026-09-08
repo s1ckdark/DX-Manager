@@ -195,11 +195,6 @@
   <data name="Log.Adb.PairResult" xml:space="preserve"><value>ADB pair result</value></data>
   <data name="Log.Adb.DevicesResult" xml:space="preserve"><value>ADB devices result</value></data>
   <data name="Log.Adb.DeviceCount" xml:space="preserve"><value>ADB device query result: {0} device(s)</value></data>
-  <data name="Log.Adb.WakeUpStarting" xml:space="preserve"><value>Starting ADB wake-up.</value></data>
-  <data name="Log.Adb.WakeUpScrcpyUnavailable" xml:space="preserve"><value>ADB wake-up failed: scrcpy wake-up is not configured.</value></data>
-  <data name="Log.Adb.WakeUpFallback" xml:space="preserve"><value>Default ADB wake-up failed. Starting scrcpy wake-up.</value></data>
-  <data name="Log.Adb.WakeUpDeviceFound" xml:space="preserve"><value>Detected the ADB device after scrcpy wake-up.</value></data>
-  <data name="Log.Adb.WakeUpDeviceMissing" xml:space="preserve"><value>Could not detect an ADB device after scrcpy wake-up.</value></data>
   <data name="Log.Adb.LockProbeFailed" xml:space="preserve"><value>Could not determine the phone's lock state: {0}</value></data>
   <data name="Log.Adb.WakeScreenFailed" xml:space="preserve"><value>Could not wake the phone's screen: {0}</value></data>
   <data name="Log.Adb.DismissKeyguardFailed" xml:space="preserve"><value>Could not dismiss the phone's keyguard: {0}</value></data>
@@ -366,9 +361,6 @@
   <data name="Log.Scrcpy.AlreadyRunning" xml:space="preserve"><value>Skipped duplicate launch because scrcpy is already running.</value></data>
   <data name="Log.Scrcpy.Start" xml:space="preserve"><value>Starting scrcpy: {0}</value></data>
   <data name="Log.Scrcpy.Stopped" xml:space="preserve"><value>Stopped scrcpy.</value></data>
-  <data name="Log.Scrcpy.WakeUpFileMissing" xml:space="preserve"><value>The scrcpy wake-up executable is missing: {0}</value></data>
-  <data name="Log.Scrcpy.WakeUpStarting" xml:space="preserve"><value>Starting scrcpy wake-up.</value></data>
-  <data name="Log.Scrcpy.WakeUpFailed" xml:space="preserve"><value>scrcpy wake-up failed.</value></data>
   <data name="Log.Scrcpy.ProcessExited" xml:space="preserve"><value>The scrcpy process exited.</value></data>
   <data name="Error.Scrcpy.ExitedBeforeWindow" xml:space="preserve"><value>scrcpy exited before its window was ready.</value></data>
   <data name="Log.Scrcpy.WindowReady" xml:space="preserve"><value>scrcpy window ready: PID={0}</value></data>
