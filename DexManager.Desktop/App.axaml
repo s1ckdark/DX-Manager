@@ -1,7 +1,8 @@
+<!-- RequestedThemeVariant는 여기서 더 이상 고정하지 않는다. App.axaml.cs가
+     시작 시 저장된 테마(ThemeApplier.Apply)로 이 값을 설정한다. -->
 <Application xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             x:Class="DexManager.Desktop.App"
-             RequestedThemeVariant="Default">
+             x:Class="DexManager.Desktop.App">
   <Application.Styles>
     <FluentTheme />
   </Application.Styles>

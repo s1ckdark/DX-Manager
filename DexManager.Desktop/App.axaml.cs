@@ -5,6 +5,7 @@ using Avalonia.Markup.Xaml;
 using DexManager.Desktop.Views;
 using DexManager.Hosting;
 using DexManager.Mac.Platform;
+using DexManager.Models;
 using DexManager.ViewModels;
 
 namespace DexManager.Desktop;
@@ -12,6 +13,12 @@ namespace DexManager.Desktop;
 public partial class App : Application
 {
     private ShellViewModel _shell;
+
+    // 외관 설정 뷰모델을 앱 수명 동안 들고 있는다. 아직 이 값을 편집하는
+    // 화면이 없더라도, 저장 시 즉시 재적용(ThemeSaved 구독)이 동작하려면
+    // 인스턴스가 GC되지 않고 살아 있어야 한다. 나중에 설정 화면이 이
+    // 인스턴스를 재사용한다.
+    private AppearanceSettingsViewModel _appearance;
 
     public override void Initialize() => AvaloniaXamlLoader.Load(this);
 
@@ -38,6 +45,13 @@ public partial class App : Application
         try
         {
             host = MacApplicationHostFactory.Create();
+
+            // 저장된 테마를 시작 시 적용한다. App.axaml의 하드코딩된
+            // RequestedThemeVariant="Default"를 대신한다.
+            var gateway = new SettingsGateway(host);
+            _appearance = new AppearanceSettingsViewModel(gateway);
+            _appearance.ThemeSaved += OnThemeSaved;
+            ThemeApplier.Apply(_appearance.SelectedTheme);
 
             _shell = new ShellViewModel(host, new AvaloniaUiDispatcher());
             // 셸이 호스트를 넘겨받았다. 이제부터 정리는 셸의 몫이다.
@@ -82,6 +96,11 @@ public partial class App : Application
     private void OnExit(object sender, ControlledApplicationLifetimeExitEventArgs e)
         => DisposeQuietly();
 
+    /// <summary>테마가 저장되면(AppearanceSettingsViewModel.SaveCommand)
+    /// 즉시 재적용한다. Avalonia 타입 매핑은 ThemeApplier가 맡는다.</summary>
+    private void OnThemeSaved(object sender, AppTheme theme)
+        => ThemeApplier.Apply(theme);
+
     /// <summary>
     /// 셸을 해제한다. <see cref="ApplicationHost.Dispose"/>는 정리 실패를
     /// <see cref="AggregateException"/>으로 던지는데, 종료 이벤트 처리기에서
@@ -89,6 +108,12 @@ public partial class App : Application
     /// </summary>
     private void DisposeQuietly()
     {
+        if (_appearance != null)
+        {
+            _appearance.ThemeSaved -= OnThemeSaved;
+            _appearance = null;
+        }
+
         try
         {
             _shell?.Dispose();
