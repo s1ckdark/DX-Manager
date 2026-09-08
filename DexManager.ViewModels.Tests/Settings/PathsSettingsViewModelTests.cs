@@ -122,6 +122,54 @@ public class PathsSettingsViewModelTests
     }
 
     [Fact]
+    public void Save_WhenAdbPathOnlyGainsWhitespace_IsNotTreatedAsAnEdit()
+    {
+        // 붙여넣기로 흔히 섞여 들어오는 앞뒤 공백은 진짜 편집이 아니다 -
+        // 트림 없이 베이스라인과 비교하면 자동 감지값과 공백 하나 차이인
+        // 문자열이 "편집됨"으로 잡혀 Manual로 넘어가고, 그 공백 섞인
+        // 경로는 존재하지 않는 파일이라 다음 실행이 막힌다.
+        var gateway = new FakeSettingsGateway();
+        gateway.Update(s =>
+        {
+            s.Paths.AdbPath = "/opt/homebrew/bin/adb";
+            s.Paths.AdbSelectionMode = AdbSelectionMode.Auto;
+        });
+
+        var viewModel = new PathsSettingsViewModel(gateway);
+
+        viewModel.AdbPath = "  /opt/homebrew/bin/adb  ";
+        viewModel.SaveCommand.Execute(null);
+
+        Assert.Equal(
+            AdbSelectionMode.Auto,
+            gateway.Current.Paths.AdbSelectionMode);
+        Assert.Equal(
+            "/opt/homebrew/bin/adb",
+            gateway.Current.Paths.AdbPath);
+    }
+
+    [Fact]
+    public void Save_WhenAdbPathEnteredWithWhitespace_IsStoredTrimmed()
+    {
+        // 진짜 편집(다른 경로를 입력)일 때도 저장되는 값 자체는 트림돼야
+        // 한다 - 안 그러면 트림 안 된 값이 그대로 실행 불가능한 Manual
+        // 경로로 설정 파일에 남는다.
+        var gateway = new FakeSettingsGateway();
+        var viewModel = new PathsSettingsViewModel(gateway);
+
+        viewModel.AdbPath = "  /usr/local/bin/adb  ";
+        viewModel.SaveCommand.Execute(null);
+
+        Assert.Equal("/usr/local/bin/adb", gateway.Current.Paths.AdbPath);
+        Assert.Equal(
+            AdbSelectionMode.Manual,
+            gateway.Current.Paths.AdbSelectionMode);
+        // 화면에 바인딩된 값도 트림된 값으로 되돌아와야, 다음 저장에서
+        // 베이스라인 비교가 다시 어긋나지 않는다.
+        Assert.Equal("/usr/local/bin/adb", viewModel.AdbPath);
+    }
+
+    [Fact]
     public void ResetToBundledDefaults_RepopulatesPathsFromDefaults()
     {
         // 재설정하면 번들 기본값에서 로드된다. 게이트웨이의 현재값이 아니라.

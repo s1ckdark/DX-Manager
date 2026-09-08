@@ -74,7 +74,16 @@ public sealed partial class PathsSettingsViewModel : ObservableObject
     [RelayCommand(CanExecute = nameof(CanSave))]
     private void Save()
     {
-        var adbPath = AdbPath ?? string.Empty;
+        // 붙여넣기로 흔히 섞여 들어오는 앞뒤 공백은 트림하고 나서
+        // 베이스라인과 비교한다 - 안 그러면 자동 감지값과 공백 하나 차이인
+        // 문자열이 "편집됨"으로 잡혀 Manual로 넘어가고, 그 공백 섞인
+        // 경로는 존재하지 않는 파일이라 다음 실행이 막힌다. 저장하는
+        // 값도 같은 이유로 트림한다 - 안 그러면 트림 안 된 값 자체가
+        // 그대로 실행 불가능한 Manual 경로로 남는다. AdbPath 프로퍼티에도
+        // 다시 대입해 두어야, 이번에 트림된 값이 다음 Save의 베이스라인이
+        // 되고(트림 여부로 "편집됨"이 잘못 튀지 않는다) 화면에도 트림된
+        // 값이 보인다.
+        var adbPath = (AdbPath ?? string.Empty).Trim();
         var adbPathEdited = !string.Equals(
             adbPath,
             _baselineAdbPath,
@@ -95,6 +104,7 @@ public sealed partial class PathsSettingsViewModel : ObservableObject
             }
         });
 
+        AdbPath = adbPath;
         CaptureBaseline();
         OnPropertyChanged(nameof(HasChanges));
     }
