@@ -38,18 +38,10 @@ public sealed class InteractiveHost : IDisposable
     private bool _isRunning;
     private bool _disposed;
     private int _shutdownStarted;
-    private int _runtimeServicesDisposed;
 
     public InteractiveHost()
     {
-        var pathProvider = new MacPathProvider();
-
-        _host = new ApplicationHost(
-            new MacPlatformService(),
-            pathProvider,
-            new MacCaptureService(pathProvider.DefaultScreenshotFolder),
-            new MacKeyboardService(),
-            new MacAutoStartService());
+        _host = MacApplicationHostFactory.Create();
 
         _host.DeviceMonitor.DeviceConnected += (_, e) =>
         {
@@ -754,38 +746,50 @@ public sealed class InteractiveHost : IDisposable
             var opt = Console.ReadLine()?.Trim();
             if (string.IsNullOrWhiteSpace(opt)) return;
 
+            // 입력을 먼저 받아 mutation으로 포장한다. UpdateSettings는
+            // 잠금을 잡으므로 그 안에서 사용자 입력을 기다리면 다른
+            // 소비자가 프롬프트가 닫힐 때까지 막힌다.
+            Action<AppSettings> mutate = null;
             switch (opt)
             {
                 case "1":
                     Console.Write("Enter Width (e.g. 1920, 2560): ");
-                    if (int.TryParse(Console.ReadLine(), out var w)) _settings.VirtualDisplay.Width = w;
+                    if (int.TryParse(Console.ReadLine(), out var w))
+                        mutate = s => s.VirtualDisplay.Width = w;
                     break;
                 case "2":
                     Console.Write("Enter Height (e.g. 1080, 1440): ");
-                    if (int.TryParse(Console.ReadLine(), out var h)) _settings.VirtualDisplay.Height = h;
+                    if (int.TryParse(Console.ReadLine(), out var h))
+                        mutate = s => s.VirtualDisplay.Height = h;
                     break;
                 case "3":
                     Console.Write("Enter DPI (e.g. 160, 200, 240): ");
-                    if (int.TryParse(Console.ReadLine(), out var dpi)) _settings.VirtualDisplay.Dpi = dpi;
+                    if (int.TryParse(Console.ReadLine(), out var dpi))
+                        mutate = s => s.VirtualDisplay.Dpi = dpi;
                     break;
                 case "4":
                     Console.Write("Enter Bitrate (e.g. 16M, 24M, 32M): ");
                     var br = Console.ReadLine()?.Trim();
-                    if (!string.IsNullOrWhiteSpace(br)) _settings.Scrcpy.BitRate = br;
+                    if (!string.IsNullOrWhiteSpace(br))
+                        mutate = s => s.Scrcpy.BitRate = br;
                     break;
                 case "5":
                     Console.Write("Enter Max FPS (e.g. 60, 120): ");
-                    if (int.TryParse(Console.ReadLine(), out var fps)) _settings.Scrcpy.MaxFps = fps;
+                    if (int.TryParse(Console.ReadLine(), out var fps))
+                        mutate = s => s.Scrcpy.MaxFps = fps;
                     break;
                 case "6":
-                    _settings.Scrcpy.TurnScreenOff = !_settings.Scrcpy.TurnScreenOff;
+                    mutate = s => s.Scrcpy.TurnScreenOff = !s.Scrcpy.TurnScreenOff;
                     break;
                 case "7":
-                    _settings.Scrcpy.StayAwake = !_settings.Scrcpy.StayAwake;
+                    mutate = s => s.Scrcpy.StayAwake = !s.Scrcpy.StayAwake;
                     break;
             }
 
-            _settingsService.Save(_settings);
+            // 기존 동작 보존: 인식되지 않은 항목이나 잘못된 입력에도
+            // 저장이 일어나고 같은 문구가 나왔다. 정규화 부작용을 위해
+            // 저장 자체는 유지한다.
+            _host.UpdateSettings(mutate ?? (_ => { }));
             AnsiConsole.Success("Settings updated and saved.");
             Thread.Sleep(800);
         }
@@ -837,80 +841,12 @@ public sealed class InteractiveHost : IDisposable
                 _activeRuntime?.Dex.CurrentSession?.DeviceIdentity ??
                 _selectedDeviceIdentity ??
                 string.Empty;
-            var errors = new List<Exception>();
 
             AnsiConsole.Info("Shutting down DX Manager and cleaning up active sessions...");
-            try
-            {
-                _deviceMonitor?.Stop();
-            }
-            catch (Exception ex)
-            {
-                errors.Add(ex);
-            }
 
-            try
-            {
-                _deviceMonitor?.Dispose();
-            }
-            catch (Exception ex)
-            {
-                errors.Add(ex);
-            }
-
-            try
-            {
-                _keyboardService?.Dispose();
-            }
-            catch (Exception ex)
-            {
-                errors.Add(ex);
-            }
-
-            if (_activeRuntime != null)
-            {
-                try
-                {
-                    _activeRuntime.FileTransfers.RequestShutdown();
-                    _activeRuntime.PhoneTransfers.RequestShutdown();
-                    _activeRuntime.CompanionGuardian.RequestShutdown();
-                    _activeRuntime.ScreenOff.RequestShutdown();
-                    _activeRuntime.SingleWindows.RequestShutdown();
-                    _activeRuntime.Dex.RequestShutdown();
-                }
-                catch (Exception ex)
-                {
-                    errors.Add(ex);
-                }
-
-                try
-                {
-                    _activeRuntime.SingleWindows.StopAll();
-                }
-                catch (Exception ex)
-                {
-                    errors.Add(ex);
-                }
-
-                try
-                {
-                    await _activeRuntime.Dex.ShutdownAsync(
-                        fallbackSerial,
-                        fallbackIdentity);
-                    if (_activeRuntime.Dex.HasDeferredDisplayCleanup)
-                    {
-                        errors.Add(new InvalidOperationException(
-                            "DeX display cleanup was deferred because the " +
-                            "target device was unavailable."));
-                    }
-                }
-                catch (Exception ex)
-                {
-                    errors.Add(ex);
-                }
-            }
-
-            DisposeRuntimeServices(errors);
+            var errors = await _host.ShutdownAsync(
+                fallbackSerial,
+                fallbackIdentity);
 
             foreach (var error in errors)
             {
@@ -938,35 +874,5 @@ public sealed class InteractiveHost : IDisposable
             _disposed = true;
             Shutdown();
             _host?.Dispose();
-        }
-
-        private void DisposeRuntimeServices(ICollection<Exception> errors)
-        {
-            if (Interlocked.Exchange(ref _runtimeServicesDisposed, 1) != 0)
-                return;
-            if (_activeRuntime == null) return;
-
-            var disposables = new IDisposable[]
-            {
-                _activeRuntime.SingleWindows,
-                _activeRuntime.Scrcpy,
-                _activeRuntime.ScreenOff,
-                _activeRuntime.PhoneTransfers,
-                _activeRuntime.CompanionGuardian,
-                _activeRuntime.FileTransfers
-            };
-
-            foreach (var disposable in disposables)
-            {
-                try
-                {
-                    disposable.Dispose();
-                }
-                catch (Exception ex)
-                {
-                    _logService.Error("macOS runtime service disposal failed.", ex);
-                    errors.Add(ex);
-                }
-            }
         }
     }

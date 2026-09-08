@@ -34,18 +34,15 @@ public partial class App : Application
     /// </summary>
     private Window CreateMainWindow()
     {
+        ApplicationHost host = null;
         try
         {
-            var pathProvider = new MacPathProvider();
-
-            var host = new ApplicationHost(
-                new MacPlatformService(),
-                pathProvider,
-                new MacCaptureService(pathProvider.DefaultScreenshotFolder),
-                new MacKeyboardService(),
-                new MacAutoStartService());
+            host = MacApplicationHostFactory.Create();
 
             _shell = new ShellViewModel(host, new AvaloniaUiDispatcher());
+            // 셸이 호스트를 넘겨받았다. 이제부터 정리는 셸의 몫이다.
+            host = null;
+
             var window = new MainWindow { DataContext = _shell };
 
             _shell.Start();
@@ -55,9 +52,30 @@ public partial class App : Application
         {
             // ApplicationHost 생성자는 adb를 찾지 못하면 FileNotFoundException을
             // 던진다. 여기서 막지 않으면 창도 대화상자도 없이 앱이 죽는다.
+            //
+            // ShellViewModel 생성이 던지면 _shell은 null이라 DisposeQuietly가
+            // 아무것도 하지 않는다. 이미 만들어진 호스트를 직접 회수한다.
             DisposeQuietly();
+            DisposeHostQuietly(host);
             Report(ex);
             return StartupErrorWindow.Create(ex);
+        }
+    }
+
+    /// <summary>
+    /// 셸이 넘겨받지 못한 호스트를 회수한다. 정리 실패는 보고만 하고
+    /// 삼키지 않는다 — 이 경로는 이미 오류 처리 중이다.
+    /// </summary>
+    private static void DisposeHostQuietly(ApplicationHost host)
+    {
+        if (host == null) return;
+        try
+        {
+            host.Dispose();
+        }
+        catch (Exception ex)
+        {
+            Report(ex);
         }
     }
 

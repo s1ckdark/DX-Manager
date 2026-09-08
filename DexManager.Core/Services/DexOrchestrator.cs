@@ -453,8 +453,14 @@ namespace DexManager.Services
             {
                 DeferDisplayCleanup(session);
             }
-            else if (session == null)
+            else if (session == null &&
+                     (!string.IsNullOrWhiteSpace(fallbackSerial) ||
+                      HasStableIdentity(fallbackIdentity)))
             {
+                // 세션도 없고 대상 serial·identity도 없으면 회수할 overlay도,
+                // 명령을 보낼 기기도 없다. 이때의 예외는 실패가 아니라 대상
+                // 부재이므로 시도하지 않는다. 대상이 하나라도 있으면 기존
+                // 동작 그대로 시도하고, 실패하면 그대로 던진다.
                 string verifiedIdentity;
                 if (!CleanupConnectedTargetOverlay(
                     fallbackSerial,

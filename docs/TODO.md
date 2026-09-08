@@ -20,8 +20,8 @@
   - [ ] 판정: 계속 켜게 되는가? 아니면 스펙 폐기. 맞다면 무엇이 부족한지가 그때 드러난다
   - 앱 코드는 아직 한 줄도 없다(문서만). 접는 비용이 가장 싼 시점이다.
 
-- [ ] macOS GUI Phase 2 착수 전 선행 정리 (Phase 1 최종 리뷰 지적)
-  - [ ] `ApplicationHost`로 정리(teardown) 책임 이관 — **Phase 2의 첫 작업**
+- [x] macOS GUI Phase 2 착수 전 선행 정리 (Phase 1 최종 리뷰 지적)
+  - [x] `ApplicationHost`로 정리(teardown) 책임 이관 — **Phase 2의 첫 작업**
     - 현상: 조립은 `ApplicationHost`가 공유하나 정리는 `InteractiveHost.ShutdownAsync`에만 있다.
       `Dex.ShutdownAsync`, `SingleWindows.StopAll()`, `HasDeferredDisplayCleanup`,
       `DisposeRuntimeServices` 등 `AGENTS.md`의 프로세스·overlay 불변식을 강제하는 코드 전부.
@@ -29,31 +29,103 @@
       Phase 2는 정리 코드를 GUI에 복제하거나 옮겨야 하며 **옮기는 쪽을 먼저 한다.**
     - 부수 증상: TUI 종료 시 호스트의 `DeviceMonitor`·`KeyboardService`가 직접 해제되는데
       `ApplicationHost._disposed`는 `false`로 남는다. 하나의 수명주기를 두 플래그가 추적한다.
-  - [ ] `UpdateSettings`에 프로덕션 호출자 연결 — 스펙 8.1절 공백 5가 아직 절반만 닫혔다
-    - TUI 설정 메뉴(`InteractiveHost.cs:760-788`)가 여전히 `_settings`를 직접 수정하고
-      잠금 밖에서 저장한다. 스펙이 지목한 바로 그 메뉴다.
-    - `_settingsLock`이 인스턴스 필드라 호스트 하나당 소비자 하나 계약과 어긋난다 —
-      겨냥한 두 소비자를 조율할 수 없다.
-    - [ ] `UpdateSettings`에 `_disposed` 가드 추가 (`Start`/`Stop`이 세운 패턴과 일치시킨다)
+  - [x] `UpdateSettings`에 프로덕션 호출자 연결 — 스펙 8.1절 공백 5가 이제 닫혔다
+    - TUI 설정 메뉴(`InteractiveHost.cs:792`)가 `ApplicationHost.UpdateSettings`를 거친다.
+      입력은 잠금 밖에서 받는다.
+    - [x] `UpdateSettings`에 `_disposed` 가드 추가 (`Start`/`Stop`이 세운 패턴과 일치시킨다)
     - [ ] `UpdateSettings`가 무관한 필드까지 정규화함을 문서화 —
       `Save` → `SaveCore` → `EnsureDefaults()`가 호출자의 살아있는 객체에 작용한다.
-      Phase 3 설정 화면이 `Settings`에 폼을 바인딩하기 전에 알아야 한다.
-  - [ ] `ApplicationHost._disposed`를 `Interlocked`로 전환 — `DeviceMonitorService`와 동일하게.
+      Phase 3 설정 화면이 `Settings`에 폼을 바인딩하기 전에 알아야 한다. (미완 — Phase 3로 이월)
+  - [x] `ApplicationHost._disposed`를 `Interlocked`로 전환 — `DeviceMonitorService`와 동일하게.
     Phase 2에서 창 닫기와 종료 경로가 함께 `Dispose`에 도달하기 전에.
-  - [ ] `DeviceListViewModel` 생성자의 구독-적용 순서 경합 — 구독 후 `Apply(_registry.Current)`
+  - [x] `DeviceListViewModel` 생성자의 구독-적용 순서 경합 — 구독 후 `Apply(_registry.Current)`
     사이에 `Reconcile`이 끼면 큐의 오래된 스냅샷이 이긴다. `DeviceRegistrySnapshot.Generation`으로 판별 가능.
 
-- [ ] macOS GUI Phase 2 설계 시 주의 (Phase 1 최종 리뷰 지적)
-  - DeX 시작·중지 명령을 `ShellViewModel`에 두지 않는다. `host.SelectedSerial`을 읽는 것이
+- [x] macOS GUI Phase 2 설계 시 주의 (Phase 1 최종 리뷰 지적)
+  - [x] DeX 시작·중지 명령을 `ShellViewModel`에 두지 않는다. `host.SelectedSerial`을 읽는 것이
     최소 저항 경로가 되어 복수 기기 불변식이 조용히 무너지며 어떤 테스트도 잡지 못한다.
     명령은 `DeviceViewModel`에 두고 serial을 행에서 가져온다.
-    `ApplicationHost.SelectedSerial`은 문서대로 진단 전용으로 유지한다.
-  - `DeviceViewModel`에 `IDisposable`을 붙인다. 행에 세션 상태 구독을 달는 순간
-    `Apply`의 `Devices.RemoveAt(i)`가 기기를 뽑을 때마다 하나씩 샌다. 지금은 공짜다.
-  - [ ] `new ShellViewModel(...)`가 던질 때 이미 만들어진 `ApplicationHost`가 새지 않게 한다 —
+    `ApplicationHost.SelectedSerial`은 문서대로 진단 전용으로 유지한다. — 반영됨.
+  - [x] `DeviceViewModel`에 `IDisposable`을 붙인다. 행에 세션 상태 구독을 달는 순간
+    `Apply`의 `Devices.RemoveAt(i)`가 기기를 뽑을 때마다 하나씩 샌다. 지금은 공짜다. — 반영됨.
+  - [x] `new ShellViewModel(...)`가 던질 때 이미 만들어진 `ApplicationHost`가 새지 않게 한다 —
     현재는 `_shell`이 null이라 종료 훅의 `DisposeQuietly()`가 no-op이 된다.
-  - [ ] 워크플로 `paths:` 필터에 `DexManager.Platform.Mac/**` 추가 — main에 이미 있던 공백이라
+    `App.axaml.cs`의 `DisposeHostQuietly(host)`가 이 경로를 회수한다.
+  - [x] 워크플로 `paths:` 필터에 `DexManager.Platform.Mac/**` 추가 — main에 이미 있던 공백이라
     그 프로젝트만 건드린 PR은 macOS 워크플로를 트리거하지 않는다.
+
+- [x] macOS GUI Phase 2 — DeX 시작/중지와 단일창 슬롯
+  - [x] 런타임 정리 책임을 `ApplicationHost`로 이관
+  - [x] `UpdateSettings`에 프로덕션 호출자 연결과 `_disposed` 가드
+  - [x] `ApplicationHost._disposed`를 `Interlocked`로 전환
+  - [x] `DeviceListViewModel` 생성자의 구독-적용 경합 해소
+  - [x] `DeviceViewModel`에 `IDisposable`
+  - [x] identity별 런타임 1개를 보장하는 `DeviceRuntimeCoordinator`
+  - [x] 명령을 `DeviceViewModel`에 배치 (`SelectedSerial`은 진단 전용 유지)
+  - [x] 워크플로 `paths:`에 `DexManager.Platform.Mac/**` 추가
+  - [ ] 실기 검증 — 아래 항목은 사용자 확인 전까지 미확인이다
+    (`docs/KNOWN_ISSUES.md`의 "macOS GUI Phase 2 실기 검증 범위" 참조)
+    - [ ] 기기 목록에 연결된 기기가 나타난다
+    - [ ] `Start DeX`를 누르면 scrcpy 창이 뜨고, 목록의 행에 `DeX` 표시가 붙는다
+    - [ ] `Stop DeX`를 누르면 창이 닫히고 `DeX` 표시가 사라진다
+    - [ ] 중지 뒤 `adb shell settings get global overlay_display_devices`가 `null`을
+      돌려준다 (overlay 회수 확인 — overlay 불변식 직접 검증 항목)
+    - [ ] 슬롯 1에 앱 패키지를 넣고 `Start`를 누르면 그 앱 창이 뜬다
+    - [ ] 슬롯 `Stop`으로 창이 닫힌다
+    - [ ] 창을 닫으면 남은 scrcpy 프로세스가 없다 — `pgrep -fl scrcpy`가 비어야 한다
+    - [ ] DeX 실행 중 창을 닫아도 overlay가 회수된다 (overlay 불변식 직접 검증 항목)
+
+- [ ] macOS GUI Phase 2 리뷰에서 지연된 정리 항목 (17건, `.superpowers/sdd/2026-09-07-macos-gui-phase2/deferred-items.txt`에서 이관)
+  - 각 Task 리뷰가 발견했으나 12개 Task 각각에서 고치는 대신 한 번에 정리하기로 미룬 항목이다.
+    수정하기 전에 반드시 이 목록을 다시 읽고 파일:줄을 확인한다.
+  - [ ] **[더 중요함]** `ApplicationHost.ShutdownAsync`(`DexManager.Core/Hosting/ApplicationHost.cs:387-393`)의
+    teardown 루프가 같은 `fallbackSerial`/`fallbackIdentity`를 `RuntimeFactory.CreatedInstances`의
+    모든 런타임에 방송한다. 런타임이 하나뿐이던 시절엔 무해했으나, 이제 `DeviceRuntimeCoordinator`가
+    기기별로 런타임을 하나씩 만들므로, 세션 없는 런타임이 **다른 기기의 serial**로 overlay 정리를
+    시도할 수 있다. 검증 결과: 오늘 시점엔 위험한 조합(비-null fallback + 다중 런타임)을 만드는
+    호출자가 없다 — GUI(`App.axaml.cs`의 `Dispose()` → `ShutdownAsync(null, null)`, 이 경로만 여러
+    런타임을 가질 수 있다)는 항상 `(null, null)`을 넘기고, TUI(`InteractiveHost.cs:847`)는 비-null
+    fallback을 넘기지만 `_activeRuntime` 하나만 유지하므로 그 fallback은 항상 자기 자신의 런타임과
+    같은 기기를 가리킨다. 그래서 잠재적(latent)이지 실제로 발생하는(live) 버그는 아니다. **이 조합이
+    실제로 발생하기 전에 반드시 고쳐야 한다** — 예: 런타임별로 자기 자신의 세션에서만 fallback을
+    끌어오게 하거나, fallback을 아예 없애고 세션이 없는 런타임은 정리를 건너뛴다.
+  - [ ] **[더 중요함]** `DexManager.Mac/Hosting/InteractiveHost.cs`의 죽은 멤버 2개 — `_settingsService`(:15),
+    `_keyboardService`(:29). 둘 다 `_host`로 위임하는 프로퍼티인데 유일한 소비자였던 코드가 이전
+    Task에서 삭제되어 이제 선언 자체 말고는 참조가 없다. 삭제 대상.
+  - [ ] [Task 1] `ApplicationHost.cs:283-286`(`IsDisposed`)와 `:292-294`(`Dispose`)의 XML 주석이
+    이번에 도입한 스레드 안전 보장("원자적으로 한 번만 true로 전이")을 언급하지 않는다.
+  - [ ] [Task 3] `DexOrchestrator.cs:459-462`의 근거 주석이 "건너뛰는 경우"를 설명하는데
+    "실행되는" 분기 안에 있다. `else if` 위로 옮겨야 한다.
+  - [ ] [Task 3] `ApplicationHost.cs:~483` `Dispose()`가 `ShutdownAsync` 자체가 fault하면
+    raw 재던짐 → 문서화된 `AggregateException` 계약 위반. 사실상 도달 불가.
+  - [ ] [Task 3] `ApplicationHost.cs:336-340` vs `:372` — `_disposed`는 `ShutdownAsync` 끝에서만
+    설정되고 `_shutdownStarted`는 진입부에서 설정되므로, 정리 진행 중 두 번째 호출자는 빈 목록과
+    `IsDisposed==false`를 본다. 이미 수용된 결과이나, 이제 진입점이 둘이라 도달 가능해졌다는 점만 기록.
+  - [ ] [Task 3] 빌드 경고 신규 발생 — `DexManager.Tests/ApplicationHostTests.cs`의
+    `Dispose_AfterShutdownAsync_DoesNotThrow`에서 `.GetAwaiter().GetResult()` 때문에
+    `xUnit1031` analyzer 경고. 브리프 verbatim이라 구현자 책임 아님. 2026-09-08 기준 여전히
+    유효(스펙 5.1절 참조) — 최종 fix wave 후보.
+  - [ ] [Task 5] `Apply` 내부 근거 주석 17줄이 가드 본문 3줄보다 길다 — 필드/메서드 위 doc comment로
+    옮길 여지. 컨트롤러 지시 사항이라 수용 가능.
+  - [ ] [Task 5] 개명된 테스트의 중간 assertion들이 `MarshalsSnapshotChangesThroughTheDispatcher`와
+    일부 겹친다. 커버리지 중복이지 결함 아님.
+  - [ ] [Task 6] `DeviceListViewModel.Dispose()`가 `Devices`를 비우면서 `OnPropertyChanged(nameof(IsEmpty))`를
+    올리지 않는다(`Apply`은 올린다). 해체 중 바인딩이 남아 있으면 빈 상태 배너가 갱신되지 않는다.
+  - [ ] [Task 7] `GetOrCreate`를 실제 동시 호출로 검증하는 테스트가 없다(순차 호출만). 이 Task의
+    존재 이유인 동시성 보장이 코드 검토로만 확인됨.
+  - [ ] [Task 9] `StopDexAsync` 핸들러에 `OperationCanceledException` 전용 catch가 없다(Start에는
+    있음). 취소된 중지가 "DeX stop failed: A task was canceled."로 표시된다. 기능적 버그는 아님.
+  - [ ] [Task 9] `DeviceRuntimeCommands`가 `GetOrCreate`/`TryGet`을 `Task.Run`으로 감싼 뒤
+    `DexOrchestrator`의 메서드를 부르는데 그쪽도 자체 `Task.Run`을 한다 — 무해한 스레드풀 이중 홉.
+  - [ ] [Task 10] 슬롯 Stop에 `CanExecute`/`IsBusy` 게이팅이 없다(행의 `StopDexCommand`에는 있음).
+    범위 확장 방지를 위해 의도적으로 남김.
+  - [ ] [Task 10] 새 fail-fast 테스트가 2초 고정 벽시계 경계를 쓴다. 느린 CI 러너에서 이론적
+    flake 벡터(통과 경로). 위험 낮음.
+  - [ ] [Task 11] `DisposeHostQuietly`와 `DisposeQuietly`가 실패 시 구분 없는 `Report(ex)`를
+    부른다(`App.axaml.cs:60,78,98`). 두 곳이 같은 catch에서 실패하면 "Fatal error:" 두 줄을
+    구분할 수 없다. 현재 어느 경로에서도 도달하지 않음.
+  - [ ] [Task 12] 목록 행의 `DisplayName`+상태 라벨이 320px 고정 열 안에서 wrap/trim 없는 수평
+    `StackPanel` — 긴 기기명이 잘릴 수 있다. 기존 패턴이며 이번에 추가된 것은 `DeX` 라벨뿐.
 
 - [ ] 세션 중 기기 분리 시 overlay 잔여물 자동 회수
   - 현상: DeX 실행 중 기기가 사라지면 종료 처리가

@@ -19,7 +19,11 @@ public sealed partial class ShellViewModel : ObservableObject, IDisposable
         _host = host ?? throw new ArgumentNullException(nameof(host));
         _dispatcher = dispatcher ?? throw new ArgumentNullException(nameof(dispatcher));
 
-        Devices = new DeviceListViewModel(host.DeviceRegistry, dispatcher);
+        Devices = new DeviceListViewModel(
+            host.DeviceRegistry,
+            host.RuntimeSessions,
+            dispatcher,
+            new DeviceRuntimeCommands(host));
         Devices.PropertyChanged += OnDeviceListPropertyChanged;
         _host.SelectedSerialChanged += OnSelectedSerialChanged;
     }

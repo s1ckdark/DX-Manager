@@ -21,6 +21,8 @@ namespace DexManager.Services
         private readonly object _sync = new object();
         private readonly Dictionary<Guid, DeviceRuntimeServiceSet> _created =
             new Dictionary<Guid, DeviceRuntimeServiceSet>();
+        private readonly List<DeviceRuntimeServiceSet> _createdOrder =
+            new List<DeviceRuntimeServiceSet>();
 
         public DeviceRuntimeServiceFactory(
             string scrcpyPath,
@@ -117,7 +119,11 @@ namespace DexManager.Services
                 screenOff,
                 virtualDisplay,
                 dex);
-            lock (_sync) _created.Add(services.InstanceId, services);
+            lock (_sync)
+            {
+                _created.Add(services.InstanceId, services);
+                _createdOrder.Add(services);
+            }
             return services;
         }
 
@@ -130,6 +136,19 @@ namespace DexManager.Services
                 return _created.TryGetValue(instanceId, out services)
                     ? services
                     : null;
+            }
+        }
+
+        /// <summary>
+        /// 이 팩토리가 지금까지 만든 런타임 세트를 생성 순서대로 돌려준다.
+        /// 호출 시점의 스냅샷이므로 순회 중 새 런타임이 생겨도 영향이 없다.
+        /// 정리 경로가 회수 대상을 찾는 데 쓴다.
+        /// </summary>
+        public IReadOnlyList<DeviceRuntimeServiceSet> CreatedInstances
+        {
+            get
+            {
+                lock (_sync) return _createdOrder.ToList();
             }
         }
     }

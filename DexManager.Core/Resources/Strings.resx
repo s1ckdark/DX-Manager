@@ -296,6 +296,14 @@
   <data name="Log.Dex.ShutdownCleanupFailed" xml:space="preserve"><value>ADB cleanup before program exit failed.</value></data>
   <data name="Log.Dex.SessionStarted" xml:space="preserve"><value>Managed session started: {0}</value></data>
   <data name="Log.Dex.SessionEnded" xml:space="preserve"><value>Managed session ended: {0}</value></data>
+  <data name="Log.ApplicationHost.DeviceMonitorStopFailed" xml:space="preserve"><value>Could not stop the device monitor during shutdown.</value></data>
+  <data name="Log.ApplicationHost.DeviceMonitorDisposeFailed" xml:space="preserve"><value>Could not dispose the device monitor during shutdown.</value></data>
+  <data name="Log.ApplicationHost.KeyboardServiceDisposeFailed" xml:space="preserve"><value>Could not dispose the keyboard service during shutdown.</value></data>
+  <data name="Log.ApplicationHost.RuntimeRequestShutdownFailed" xml:space="preserve"><value>Could not signal shutdown to one or more runtime services.</value></data>
+  <data name="Log.ApplicationHost.RuntimeStopAllFailed" xml:space="preserve"><value>Could not stop all Single Window sessions during shutdown.</value></data>
+  <data name="Log.ApplicationHost.RuntimeDexShutdownFailed" xml:space="preserve"><value>Could not shut down the DeX session cleanly.</value></data>
+  <data name="Log.ApplicationHost.RuntimeDisplayCleanupDeferred" xml:space="preserve"><value>DeX display cleanup was deferred because the target device was unavailable.</value></data>
+  <data name="Log.ApplicationHost.RuntimeDisposalFailed" xml:space="preserve"><value>Could not dispose {0} during runtime shutdown.</value></data>
   <data name="Log.Environment.Completed" xml:space="preserve"><value>Completed the environment check.</value></data>
   <data name="Log.Hotkey.LowLevelEnabled" xml:space="preserve"><value>Using low-level keyboard hook hotkeys: capture={0}, exit={1}</value></data>
   <data name="Log.Hotkey.MessageReceived" xml:space="preserve"><value>WM_HOTKEY received: WParam={0}, LParam={1}</value></data>
