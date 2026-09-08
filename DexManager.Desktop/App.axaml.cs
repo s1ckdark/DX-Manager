@@ -98,7 +98,16 @@ public partial class App : Application
             //
             // ShellViewModel 생성이 던지면 _shell은 null이라 DisposeQuietly가
             // 아무것도 하지 않는다. 이미 만들어진 호스트를 직접 회수한다.
-            DisposeQuietly();
+            //
+            // 이 경로도 _cleanupGuard를 거친다. 여기서 직접 부르면 가드의
+            // _started가 서지 않아, 이후 StartupErrorWindow를 닫을 때 OnExit이
+            // 같은 정리를 한 번 더 돌린다 - 지금은 DisposeQuietly가 필드마다
+            // null 검사를 해서 우연히 무해할 뿐 보장은 아니고, 종료 신호가
+            // 이 호출과 겹치면 두 스레드가 동기화 없이 같은 정리를 돈다.
+            // 가드를 거치면 "정확히 한 번"이 실제로 성립한다. 이 catch 이후에는
+            // StartupErrorWindow만 만들고 _shell/_appearance를 새로 만들지
+            // 않으므로, 나중 OnExit이 no-op이 되어도 놓치는 정리는 없다.
+            _cleanupGuard.TryRunOnce(DisposeQuietly);
             DisposeHostQuietly(host);
             Report(ex);
             return StartupErrorWindow.Create(ex);

@@ -89,8 +89,21 @@ internal static class Program
     {
         if (Application.Current is not App app) return;
 
-        BoundedExecutor.RunWithBudget(
-            () => app.TryRunShutdownCleanup(),
-            SignalCleanupBudget);
+        try
+        {
+            BoundedExecutor.RunWithBudget(
+                () => app.TryRunShutdownCleanup(),
+                SignalCleanupBudget);
+        }
+        catch
+        {
+            // 신호 처리기에서 예외가 새어 나가면 CLR이 fail-fast로 프로세스를
+            // 죽인다 - 의도한 "정리하고 기본 종료"가 크래시로 바뀐다.
+            // DisposeQuietly 안에서 실제로 던질 만한 곳(_shell?.Dispose()의
+            // adb/프로세스 정리)은 이미 자체 try/catch가 있지만, 그렇지 않은
+            // 경로(_openSettings.Dispose() 등)가 언젠가 던질 수 있다.
+            // 어차피 프로세스는 곧 종료되므로 여기서는 삼키고 기본 종료 처리에
+            // 맡기는 것이 크래시보다 낫다.
+        }
     }
 }
