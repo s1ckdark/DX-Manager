@@ -342,6 +342,10 @@
   <data name="Log.Path.CandidateMissing" xml:space="preserve"><value>{0} 파일이 없습니다: {1}</value></data>
   <data name="Log.Path.CandidateExecutionFailed" xml:space="preserve"><value>{0} 실행 실패: {1}</value></data>
   <data name="Log.Path.CandidateUnavailable" xml:space="preserve"><value>{0} 실행 불가: {1}</value></data>
+  <data name="Path.CandidateTimedOut" xml:space="preserve"><value>{0}ms 안에 응답이 없어 타임아웃</value></data>
+  <data name="Path.CandidateCanceled" xml:space="preserve"><value>종료 처리 중 취소됨</value></data>
+  <data name="Path.CandidateExitCode" xml:space="preserve"><value>종료 코드 {0}</value></data>
+  <data name="Log.Path.PreferredAdbFallback" xml:space="preserve"><value>선호하는 ADB({0})를 사용할 수 없어 대신 {1}을(를) 사용합니다: {2}</value></data>
   <data name="Log.Path.Selection" xml:space="preserve"><value>ADB {0}: {1}</value></data>
   <data name="Log.Path.SelectedAdbPath" xml:space="preserve"><value>선택된 ADB 경로: {0}</value></data>
   <data name="Log.Path.AdbVersion" xml:space="preserve"><value>ADB 버전: {0}</value></data>

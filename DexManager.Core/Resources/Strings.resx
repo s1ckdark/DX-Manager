@@ -342,6 +342,10 @@
   <data name="Log.Path.CandidateMissing" xml:space="preserve"><value>{0} file is missing: {1}</value></data>
   <data name="Log.Path.CandidateExecutionFailed" xml:space="preserve"><value>{0} execution failed: {1}</value></data>
   <data name="Log.Path.CandidateUnavailable" xml:space="preserve"><value>{0} cannot be executed: {1}</value></data>
+  <data name="Path.CandidateTimedOut" xml:space="preserve"><value>timed out after {0}ms</value></data>
+  <data name="Path.CandidateCanceled" xml:space="preserve"><value>canceled during shutdown</value></data>
+  <data name="Path.CandidateExitCode" xml:space="preserve"><value>exited with code {0}</value></data>
+  <data name="Log.Path.PreferredAdbFallback" xml:space="preserve"><value>Preferred ADB ({0}) was unavailable - using {1} instead: {2}</value></data>
   <data name="Log.Path.Selection" xml:space="preserve"><value>ADB {0}: {1}</value></data>
   <data name="Log.Path.SelectedAdbPath" xml:space="preserve"><value>Selected ADB path: {0}</value></data>
   <data name="Log.Path.AdbVersion" xml:space="preserve"><value>ADB version: {0}</value></data>
