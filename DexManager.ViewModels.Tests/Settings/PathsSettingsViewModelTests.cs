@@ -28,17 +28,34 @@ public class PathsSettingsViewModelTests
     [Fact]
     public void ResetToBundledDefaults_RepopulatesPathsFromDefaults()
     {
-        // 재설정하면 편집값이 번들 기본값으로 다시 채워진다.
+        // 재설정하면 번들 기본값에서 로드된다. 게이트웨이의 현재값이 아니라.
+        // 이것을 검증하기 위해 게이트웨이의 현재값을 번들 기본값과
+        // 다르게 밀어놓은 뒤 reset을 호출한다. Reset이 CreateDefault()를
+        // 읽으면 기본값으로 돌아오고, gateway.Current를 읽으면
+        // "live" 값으로 가버린다. 그러므로 이 테스트는
+        // 회귀(gateway.Current를 읽는 버그)를 반드시 잡아야 한다.
         var gateway = new FakeSettingsGateway();
         var defaultSettings = AppSettings.CreateDefault();
+
+        // 게이트웨이의 현재 경로를 번들 기본값과 다르게 설정한다.
+        gateway.Update(s =>
+        {
+            s.Paths.ScrcpyPath = "/live/scrcpy";
+            s.Paths.AdbPath = "/live/adb";
+        });
+
         var viewModel = new PathsSettingsViewModel(gateway);
 
-        // 기존 값과 다르게 설정한다.
-        viewModel.ScrcpyPath = "/different/scrcpy";
-        viewModel.AdbPath = "/different/adb";
+        // 초기 로드 후에는 gateway.Current.Paths(현재값)로 로드되어 있다.
+        Assert.Equal("/live/scrcpy", viewModel.ScrcpyPath);
+        Assert.Equal("/live/adb", viewModel.AdbPath);
 
+        // 재설정 호출
         viewModel.ResetToBundledDefaultsCommand.Execute(null);
 
+        // Reset이 CreateDefault()를 읽으면 번들 기본값으로 복구된다.
+        // Reset이 gateway.Current를 읽으면 이미 live 값이므로 변하지 않는다.
+        // 따라서 이 어서션은 CreateDefault() 사용을 강제한다.
         Assert.Equal(defaultSettings.Paths.ScrcpyPath, viewModel.ScrcpyPath);
         Assert.Equal(defaultSettings.Paths.AdbPath, viewModel.AdbPath);
     }
