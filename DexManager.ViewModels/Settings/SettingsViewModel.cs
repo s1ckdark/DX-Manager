@@ -367,6 +367,13 @@ public sealed partial class SettingsViewModel : ObservableObject, IDisposable
         CloseRequested?.Invoke(this, EventArgs.Empty);
     }
 
+    /// <summary>Dispose가 이미 실행되었는지. ApplicationHost.IsDisposed와
+    /// 같은 이유로 공개한다 - 소유자가 이 인스턴스를 계속 들고 있어야
+    /// 하는지, 아니면 이미 정리된 채로 버려도 되는지를 테스트와 호출자가
+    /// 관측할 수 있어야 한다(예: ShellViewModel.OpenSettings가 구독자
+    /// 없이 만든 인스턴스를 즉시 Dispose하는지 검증).</summary>
+    public bool IsDisposed => _disposed;
+
     public void Dispose()
     {
         if (_disposed) return;
