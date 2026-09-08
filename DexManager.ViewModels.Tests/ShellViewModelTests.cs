@@ -71,6 +71,48 @@ public class ShellViewModelTests
     }
 
     [Fact]
+    public void OpenSettingsCommand_RaisesSettingsRequestedWithAReadySettingsViewModel()
+    {
+        using var temp = new TempHostRoot();
+        var host = temp.CreateHost();
+        using var shell = new ShellViewModel(host, new ImmediateUiDispatcher());
+
+        host.DeviceRegistry.Reconcile(new[]
+        {
+            Device("phone-a", "Galaxy A", "USB-A", DeviceTransportKind.Usb)
+        });
+        shell.Devices.SelectedDevice =
+            shell.Devices.Devices.First(d => d.Identity == "phone-a");
+
+        SettingsViewModel raised = null;
+        shell.SettingsRequested += (_, settings) => raised = settings;
+
+        shell.OpenSettingsCommand.Execute(null);
+
+        Assert.NotNull(raised);
+        Assert.NotNull(raised.DisplayStream);
+        Assert.NotNull(raised.Slot);
+    }
+
+    [Fact]
+    public void OpenSettingsCommand_WithNoDeviceSelected_StillProducesGlobalPagesOnly()
+    {
+        using var temp = new TempHostRoot();
+        var host = temp.CreateHost();
+        using var shell = new ShellViewModel(host, new ImmediateUiDispatcher());
+
+        SettingsViewModel raised = null;
+        shell.SettingsRequested += (_, settings) => raised = settings;
+
+        shell.OpenSettingsCommand.Execute(null);
+
+        Assert.NotNull(raised);
+        Assert.NotNull(raised.Paths);
+        Assert.Null(raised.DisplayStream);
+        Assert.Null(raised.Slot);
+    }
+
+    [Fact]
     public void SelectionPostedBeforeDispose_IsIgnoredWhenItRuns()
     {
         using var temp = new TempHostRoot();
