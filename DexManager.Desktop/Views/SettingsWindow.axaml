@@ -196,8 +196,12 @@
         </StackPanel>
       </TabItem>
 
-      <!-- Interaction: global, never null. Hotkey fields are plain TwoWay
-           TextBoxes for now - Task 10 upgrades them to live key capture. -->
+      <!-- Interaction: global, never null. Hotkey fields capture a live key
+           combination (Task 10) instead of taking typed text - KeyDown is
+           intercepted in the Tunnel phase in SettingsWindow.axaml.cs before
+           TextBox's own key handling runs, so IsReadOnly here is a second,
+           redundant line of defense (blocks paste/context-menu edits), not
+           the primary guard against raw text entry. -->
       <TabItem Header="Interaction">
         <ScrollViewer>
           <StackPanel DataContext="{Binding Interaction}"
@@ -211,10 +215,20 @@
                        IsVisible="{Binding ValidationMessage, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
 
             <TextBlock Text="Capture hotkey" FontWeight="SemiBold" />
-            <TextBox Text="{Binding CaptureHotkey, Mode=TwoWay}" />
+            <TextBox x:Name="CaptureHotkeyBox"
+                     Text="{Binding CaptureHotkey, Mode=TwoWay}"
+                     IsReadOnly="True"
+                     Watermark="Click here, then press a key combination" />
 
             <TextBlock Text="Exit hotkey" FontWeight="SemiBold" />
-            <TextBox Text="{Binding ExitHotkey, Mode=TwoWay}" />
+            <TextBox x:Name="ExitHotkeyBox"
+                     Text="{Binding ExitHotkey, Mode=TwoWay}"
+                     IsReadOnly="True"
+                     Watermark="Click here, then press a key combination" />
+
+            <TextBlock Text="{x:Static local:SettingsWindowStrings.HotkeyMacNotice}"
+                       Opacity="0.7"
+                       TextWrapping="Wrap" />
 
             <CheckBox Content="Use low-level keyboard hook for hotkeys" IsChecked="{Binding UseLowLevelHotkeys, Mode=TwoWay}" />
             <CheckBox Content="Write keyboard diagnostic logs" IsChecked="{Binding LogKeyboardDiagnostics, Mode=TwoWay}" />

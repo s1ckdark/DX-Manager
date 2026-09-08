@@ -31,4 +31,10 @@ public static class SettingsWindowStrings
     public static string SettingsButtonLabel => LocalizationService.Get("Main.Settings");
 
     public static string DexRunningNotice => LocalizationService.Get("Settings.DexRunningNotice");
+
+    /// <summary>Task 10: Interaction 탭 단축키 필드 아래에 표시하는 정직한
+    /// 고지. macOS에는 실제 전역 단축키 리스너가 아직 없다(MacKeyboardService가
+    /// 완전한 스텁) - 캡처/표시/저장은 되지만 앱이 그 값을 실제로 감지해
+    /// 반응하지는 않는다.</summary>
+    public static string HotkeyMacNotice => LocalizationService.Get("Settings.HotkeyMacNotice");
 }
