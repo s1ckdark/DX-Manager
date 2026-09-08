@@ -338,6 +338,7 @@
   <data name="Log.Path.CandidateMissing" xml:space="preserve"><value>{0} 파일이 없습니다: {1}</value></data>
   <data name="Log.Path.CandidateExecutionFailed" xml:space="preserve"><value>{0} 실행 실패: {1}</value></data>
   <data name="Log.Path.CandidateUnavailable" xml:space="preserve"><value>{0} 실행 불가: {1}</value></data>
+  <data name="Log.Path.CandidateRetryBudgetExhausted" xml:space="preserve"><value>{0}: 이번 시작의 ADB 후보들이 공유하는 재시도 예산이 이미 소진돼 한 번만 시도했습니다.</value></data>
   <data name="Path.CandidateTimedOut" xml:space="preserve"><value>{0}ms 안에 응답이 없어 타임아웃</value></data>
   <data name="Path.CandidateCanceled" xml:space="preserve"><value>종료 처리 중 취소됨</value></data>
   <data name="Path.CandidateExitCode" xml:space="preserve"><value>종료 코드 {0}</value></data>

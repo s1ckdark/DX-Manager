@@ -18,6 +18,10 @@ namespace DexManager.Tests
     /// 이미 재시도 "정책"(횟수, 언제 재시도하는지) 자체를 가짜 델리게이트로
     /// 빈틈없이 고정했으므로, 여기서는 진짜 프로세스 하나로 "이음매"만
     /// 검증한다 - 정책을 다시 반복하지 않는다.
+    ///
+    /// 체인 전체의 재시도 예산(ProbeRetryBudget)이 후보마다가 아니라
+    /// <b>체인 하나당 하나</b>로 배선됐는지도 여기서 본다 - 그 배선은
+    /// PathService 안에서만 관측할 수 있어 단위 테스트로는 고정되지 않는다.
     /// </summary>
     public class PathServiceCandidateRetryTests
     {
@@ -142,6 +146,86 @@ namespace DexManager.Tests
                     line.Contains("timed out after", StringComparison.Ordinal));
         }
 
+        [Fact]
+        public async Task SelectAdbPath_EveryCandidateTimesOut_TheSharedBudgetStopsRetryingAfterTheFirstCandidate()
+        {
+            using var root = new TempRoot();
+            var probeLog = Path.Combine(root.Path, "probe-log");
+            var candidates = new[] { "cand1", "cand2", "cand3" }
+                .Select(name =>
+                {
+                    var scriptPath = Path.Combine(root.Path, name);
+                    WriteCountingAlwaysSlowAdbScript(scriptPath, probeLog, name);
+                    return scriptPath;
+                })
+                .ToArray();
+
+            var logService = new LogService();
+            var settingsService = new SettingsService(logService, root.Path);
+            var processRunner = new ProcessRunner(logService);
+            var pathProvider = new FakePathProvider(
+                root.Path,
+                candidateAdbPaths: candidates);
+            // 프로브 하나가 타임아웃 상한을 꽉 채우는 상황을 흉내 낸다.
+            // 실제로 15초를 기다리지 않고 시계만 앞당기므로(예산은
+            // wall-clock을 보되 그 시계를 주입받는다) 이 테스트가 걸리는
+            // 시간은 후보들의 실제 프로브 타임아웃(3초 바닥)뿐이다.
+            var clock = new AdvancingClock(TimeSpan.FromSeconds(15));
+            var pathService = new PathService(
+                settingsService,
+                logService,
+                processRunner,
+                pathProvider,
+                utcNow: clock.Now);
+            var settings = AppSettings.CreateDefault();
+            // scrcpy 옆 adb는 일부러 없는 경로로 둔다 - 프로브 없이 즉시
+            // 탈락해야 후보 셋만 남아 계산이 분명해진다.
+            settings.Paths.ScrcpyPath = Path.Combine(root.Path, "no-scrcpy", "scrcpy");
+
+            try
+            {
+                await Task.Run(() => pathService.SelectAdbPath(settings, 3000));
+            }
+            catch (FileNotFoundException)
+            {
+                // 후보가 모두 죽었을 때 PATH에서 진짜 adb를 찾느냐는 이
+                // 머신마다 다르다 - 여기서 고정하는 건 프로브 횟수뿐이다.
+            }
+
+            var probes = File.ReadAllLines(probeLog);
+            // 핵심 단언: 후보 3개가 모두 타임아웃해도 프로브는 3×2=6번이
+            // 아니라 4번만 돈다. 첫 후보가 예산을 다 썼으므로 2·3번
+            // 후보는 첫 시도만 받는다 - 첫 시도까지 잘렸다면 4가 아니라
+            // 2가 나왔을 것이고, 예산이 없었다면 6이 나왔을 것이다.
+            Assert.Equal(4, probes.Length);
+            Assert.Equal(2, probes.Count(line => line == "cand1"));
+            Assert.Equal(1, probes.Count(line => line == "cand2"));
+            Assert.Equal(1, probes.Count(line => line == "cand3"));
+
+            // 재시도를 건너뛴 사실이 로그에 남아야 한다 - 그렇지 않으면
+            // "왜 이 후보만 한 번만 시도했나"를 사용자가 추적할 수 없다.
+            Assert.Contains(
+                logService.GetSessionEntries(),
+                line =>
+                    line.Contains("System/Platform ADB", StringComparison.Ordinal) &&
+                    line.Contains("was probed only once", StringComparison.Ordinal));
+        }
+
+        private static void WriteCountingAlwaysSlowAdbScript(
+            string scriptPath,
+            string probeLogPath,
+            string name)
+        {
+            var script =
+                "#!/bin/sh\n" +
+                "if [ \"$*\" = \"version\" ]; then\n" +
+                "  printf '" + name + "\\n' >> \"" + probeLogPath + "\"\n" +
+                "  exec sleep 30\n" +
+                "fi\n" +
+                "exit 0\n";
+            WriteExecutable(scriptPath, script);
+        }
+
         private static void WriteSlowThenFastAdbScript(
             string scriptPath,
             string counterFilePath)
@@ -181,6 +265,31 @@ namespace DexManager.Tests
                     UnixFileMode.UserRead |
                     UnixFileMode.UserWrite |
                     UnixFileMode.UserExecute);
+            }
+        }
+
+        /// <summary>
+        /// 조회될 때마다 정해진 만큼 앞으로 가는 시계. "프로브 하나가 이만큼
+        /// 걸렸다"를 실제로 기다리지 않고 흉내 내기 위한 것이다 - 예산은
+        /// 재시도 시작·끝에 한 번씩 시계를 보므로, 재시도 하나가 정확히
+        /// <c>step</c>만큼 청구된다.
+        /// </summary>
+        private sealed class AdvancingClock
+        {
+            private readonly TimeSpan _step;
+            private DateTime _current =
+                new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+
+            public AdvancingClock(TimeSpan step)
+            {
+                _step = step;
+            }
+
+            public DateTime Now()
+            {
+                var now = _current;
+                _current += _step;
+                return now;
             }
         }
 
