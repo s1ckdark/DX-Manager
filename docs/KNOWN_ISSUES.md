@@ -310,6 +310,36 @@ Cancel 클릭, 슬롯 화면 확인)을 했으므로 **창 자체가 뜨고 탭�
 이 목록은 코드 검토와 자동 테스트(xUnit 284개 — Desktop 17 + ViewModels 112 +
 Core 155 — + 다중기기 39개)로만 뒷받침된다.
 
+## 터미널 앱 신호 종료 실기 검증
+
+PR #9는 `DexManager.Mac`에 `PosixSignalRegistration`(SIGTERM/SIGINT/SIGHUP)을 넣어
+`overlay_display_devices` 누수를 막았다. 리뷰 단계에서는 실제 pty로 종료 시간까지
+측정했으나 기기가 연결돼 있지 않아 **"overlay가 실제로 회수되는가"는 미검증**이었다.
+
+2026-09-10 SM-F971N(One UI 9.0, Android 17)에서 확인했다. 조건은 `--dex` 모드로
+DeX를 띄운 뒤 `yes > /dev/null` 4개로 CPU 부하를 건 상태다 — 정리 사슬이 한가할 때보다
+오래 걸리게 만들어, 예산이 짧으면 잘리도록 한 것이다.
+
+| 신호 | 종료까지 | `overlay_display_devices` | scrcpy |
+| :--- | ---: | :--- | :--- |
+| Ctrl+C (tmux pty, `send-keys C-c`) | 0.33초 | `null` 회수 | 정리됨 |
+| SIGINT (`kill -INT`) | 0.34초 | `null` 회수 | 정리됨 |
+| SIGTERM (`kill -TERM`) | 0.22초 | `null` 회수 | 정리됨 |
+| SIGHUP (`kill -HUP`) | 0.22초 | `null` 회수 | 정리됨 |
+
+Ctrl+C와 SIGINT는 앱이 `DeX session stopped and display overlay cleaned up`을 출력한
+뒤 종료했다. 15초 예산은 상한일 뿐 지연이 아니라는 점도 함께 확인된다 — 네 경우 모두
+0.4초 안에 끝났다.
+
+**계측 함정 기록.** 첫 시도에서 SIGINT만 21.79초가 걸리고 overlay가 남아 결함으로
+보였으나, 이는 앱이 아니라 검증 장치의 문제였다. tmux 서버가 오래전에 기동해
+`DOTNET_ROOT`가 없는 환경을 물려주었고, 그래서 scrcpy에 넘긴 `DXMAdbProxy`(프레임워크
+의존 .NET 앱)가 실행되지 못했다. 정리 경로가 adb를 호출할 수 없으니 overlay를 회수할
+방법이 없었던 것이다. tmux 세션에 환경을 명시적으로 주입한 뒤 같은 신호가 0.34초에
+깨끗하게 끝났다. 신호 검증 하네스는 **앱이 adb를 실제로 실행할 수 있는 환경**에서
+돌려야 하며, 그렇지 않으면 정리 실패를 앱 결함으로 오독하게 된다. 이 프록시 실행 실패가
+사용자에게 어떻게 보이는지는 `docs/TODO.md`에 별도 항목으로 남겼다.
+
 ## 개발용 Scrcpy 번들 아키텍처
 
 저장소의 `tools/scrcpy`는 Apple Silicon용 Scrcpy 4.1이며 macOS 개발

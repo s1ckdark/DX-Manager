@@ -180,13 +180,22 @@
     속성과 `AppSettings` 라운드트립/clamp 로직은 그대로 남아 있다 — 완전히 걷어낼지는
     후속 판단.
 
-- [ ] 신호 종료 시 overlay 회수 실기 검증 (PR #9 후속, 기기 재연결 대기)
-  - PR #9(터미널 앱 `PosixSignalRegistration`)는 리뷰어가 실제 pty로
-    종료 시간·"stopped cleanly"까지 실측했지만 기기 미연결 상태였다.
-    실기에서 확인할 것: `--dex` + Ctrl+C **부하 중**(4× CPU) →
-    `overlay_display_devices`가 `null`로 돌아오는지, `kill -TERM`/`kill -HUP`
-    도 같은지. 명령은 `.omc/research/mac-fix-report.md` 하단.
-  - GUI는 2026-09-08 SM-F971N에서 SIGTERM 회수 확인됨. 터미널 앱만 남음.
+- [x] 신호 종료 시 overlay 회수 실기 검증 (PR #9 후속)
+      (2026-09-10 SM-F971N, `--dex` + 4× CPU 부하: Ctrl+C 0.33s / SIGINT 0.34s /
+      SIGTERM 0.22s / SIGHUP 0.22s, 네 경우 모두 `overlay_display_devices`가
+      `null`로 회수되고 scrcpy 정리됨. 상세는 `docs/KNOWN_ISSUES.md`의
+      "터미널 앱 신호 종료 실기 검증" 절)
+- [ ] `DXMAdbProxy`가 실행 불가일 때 원인과 무관한 오류가 표시된다
+  - 현상: 앱은 scrcpy에 `ADB=<번들>/tools/adb-proxy/DXMAdbProxy`를 넘긴다.
+    이 프록시는 프레임워크 의존 .NET 앱이라 `DOTNET_ROOT`/공유 런타임을 못 찾으면
+    `You must install .NET to run this application`으로 죽고, scrcpy는
+    `adb start-server` 실패 → 즉시 종료한다. 사용자에게 보이는 메시지는
+    **"scrcpy exited before its window was ready."** 뿐이라 원인을 알 수 없다.
+  - 재현: 2026-09-10, tmux 서버가 오래된 환경(=`DOTNET_ROOT` 없음)을 물려준
+    셸에서 `dotnet DXManager.Mac.dll --dex`. 환경변수를 주입하니 정상 동작.
+  - [ ] 포터블 패키지(자체 포함 게시)에서도 재현되는지 먼저 확인 — 개발 실행
+        전용 문제일 수 있다
+  - [ ] 프록시 실행 실패를 감지해 실제 원인을 로그·UI에 표시
 - [ ] adb 후보 프로브 체인 테스트를 가짜 `ProcessRunner`로 전환 (PR #10 후속)
   - 현상: `PathServiceCandidateRetryTests`의 체인 회귀 테스트가 실제
     프로세스 타임아웃 바닥(`Math.Max(timeoutMs, 3000)`)을 타서 약 20초,
