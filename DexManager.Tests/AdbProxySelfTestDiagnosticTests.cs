@@ -20,6 +20,9 @@ public class AdbProxySelfTestDiagnosticTests : IDisposable
         "App: /tmp/tools/adb-proxy/DXMAdbProxy\n" +
         ".NET location: Not found";
 
+    /// <summary>테스트가 달리 명시하지 않을 때 쓰는 일반 프로세스 예산.</summary>
+    private const int DefaultProcessTimeoutMs = 15000;
+
     private readonly string _root;
     private readonly string _proxyPath;
 
@@ -55,7 +58,8 @@ public class AdbProxySelfTestDiagnosticTests : IDisposable
 
         var item = EnvironmentCheckService.BuildFileTransferHelperCheck(
             missing,
-            _ =>
+            DefaultProcessTimeoutMs,
+            (_, _) =>
             {
                 invoked = true;
                 return SelfTestPassed();
@@ -73,7 +77,8 @@ public class AdbProxySelfTestDiagnosticTests : IDisposable
     {
         var item = EnvironmentCheckService.BuildFileTransferHelperCheck(
             _proxyPath,
-            path =>
+            DefaultProcessTimeoutMs,
+            (path, _) =>
             {
                 Assert.Equal(_proxyPath, path);
                 return SelfTestPassed();
@@ -88,7 +93,8 @@ public class AdbProxySelfTestDiagnosticTests : IDisposable
     {
         var item = EnvironmentCheckService.BuildFileTransferHelperCheck(
             _proxyPath,
-            _ => new ProcessResult
+            DefaultProcessTimeoutMs,
+            (_, _) => new ProcessResult
             {
                 FileName = _proxyPath,
                 Arguments = "--self-test",
@@ -112,7 +118,8 @@ public class AdbProxySelfTestDiagnosticTests : IDisposable
     {
         var item = EnvironmentCheckService.BuildFileTransferHelperCheck(
             _proxyPath,
-            _ => new ProcessResult
+            DefaultProcessTimeoutMs,
+            (_, _) => new ProcessResult
             {
                 FileName = _proxyPath,
                 Arguments = "--self-test",
@@ -132,7 +139,8 @@ public class AdbProxySelfTestDiagnosticTests : IDisposable
     {
         var item = EnvironmentCheckService.BuildFileTransferHelperCheck(
             _proxyPath,
-            _ => new ProcessResult
+            DefaultProcessTimeoutMs,
+            (_, _) => new ProcessResult
             {
                 FileName = _proxyPath,
                 Arguments = "--self-test",
@@ -153,7 +161,8 @@ public class AdbProxySelfTestDiagnosticTests : IDisposable
     {
         var item = EnvironmentCheckService.BuildFileTransferHelperCheck(
             _proxyPath,
-            _ => throw new UnauthorizedAccessException("permission denied"));
+            DefaultProcessTimeoutMs,
+            (_, _) => throw new UnauthorizedAccessException("permission denied"));
 
         // 예외를 삼켜 진단 전체를 죽이지는 않되, 삼킨 뒤 Passed로 보고하면
         // 이 작업이 고치려는 결함이 그대로 남는다.
@@ -166,9 +175,74 @@ public class AdbProxySelfTestDiagnosticTests : IDisposable
     {
         var item = EnvironmentCheckService.BuildFileTransferHelperCheck(
             _proxyPath,
-            _ => null);
+            DefaultProcessTimeoutMs,
+            (_, _) => null);
 
         Assert.Equal(EnvironmentCheckStatus.Failed, item.Status);
+    }
+
+    /// <summary>
+    /// 자기진단 타임아웃이 <c>AppSettings.Timing.ProcessTimeoutMs</c>에서
+    /// 유도된 값임을 고정한다. 예전에는 이 계산이 private 메서드 안에만 있어
+    /// 테스트가 쓰는 이음매를 완전히 우회했고, <c>/ 3</c>을 <c>* 3</c>으로
+    /// 바꿔도 스위트 273개가 전부 초록이었다(기본값 기준 5초 → 45초).
+    /// 여러 지점을 함께 고정하므로 상수를 그대로 돌려주도록 바꾸면 깨진다.
+    /// </summary>
+    [Theory]
+    [InlineData(15000, 5000)]  // AppSettings.Timing.ProcessTimeoutMs 기본값
+    [InlineData(1000, 333)]    // NormalizeRange가 허용하는 하한
+    [InlineData(120000, 40000)] // 상한
+    [InlineData(3000, 1000)]
+    public void ResolveSelfTestTimeoutMs_IsOneThirdOfTheProcessBudget(
+        int processTimeoutMs,
+        int expectedMs)
+    {
+        Assert.Equal(
+            expectedMs,
+            EnvironmentCheckService.ResolveSelfTestTimeoutMs(processTimeoutMs));
+    }
+
+    /// <summary>
+    /// 유도식이 맞다는 것만으로는 부족하다 — 점검이 러너에게 실제로 그 값을
+    /// 넘기는지까지 고정한다. 두 지점을 함께 보므로 유도를 건너뛰고 예산을
+    /// 그대로 넘기거나(15000), 5000을 하드코딩해도 여기서 깨진다.
+    /// </summary>
+    [Theory]
+    [InlineData(15000, 5000)]
+    [InlineData(3000, 1000)]
+    public void SelfTestRunner_ReceivesTheDerivedTimeout(
+        int processTimeoutMs,
+        int expectedTimeoutMs)
+    {
+        var observed = -1;
+
+        EnvironmentCheckService.BuildFileTransferHelperCheck(
+            _proxyPath,
+            processTimeoutMs,
+            (_, timeoutMs) =>
+            {
+                observed = timeoutMs;
+                return SelfTestPassed();
+            });
+
+        Assert.Equal(expectedTimeoutMs, observed);
+    }
+
+    [Fact]
+    public void ResolveSelfTestTimeoutMs_FollowsTheDefaultProcessBudget()
+    {
+        // 값을 다른 출처에 다시 못 박거나(예: 하드코딩 5000) 기본값만 바꾸고
+        // 유도식을 따라오지 않으면 여기서 깨진다. 자기진단이 일반 ADB 예산보다
+        // 짧아야 한다는 것 자체도 함께 고정한다.
+        var processTimeoutMs =
+            AppSettings.CreateDefault().Timing.ProcessTimeoutMs;
+
+        var timeoutMs =
+            EnvironmentCheckService.ResolveSelfTestTimeoutMs(processTimeoutMs);
+
+        Assert.Equal(5000, timeoutMs);
+        Assert.Equal(processTimeoutMs / 3, timeoutMs);
+        Assert.True(timeoutMs < processTimeoutMs);
     }
 
     /// <summary>

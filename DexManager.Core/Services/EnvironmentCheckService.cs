@@ -233,15 +233,10 @@ namespace DexManager.Services
             ICollection<EnvironmentCheckItem> results,
             string path)
         {
-            // A third of the general process budget - 5s at the 15000ms default,
-            // and AppSettings.EnsureDefaults clamps ProcessTimeoutMs to at least
-            // 1000ms, so this never drops below 333ms. A working self-test
-            // measured 20ms on this machine, so the margin is large while the
-            // diagnostics page never stalls for a full ADB timeout.
-            var timeoutMs = _settings.Timing.ProcessTimeoutMs / 3;
             results.Add(BuildFileTransferHelperCheck(
                 path,
-                candidate => new ProcessRunner(_logService).Run(
+                _settings.Timing.ProcessTimeoutMs,
+                (candidate, timeoutMs) => new ProcessRunner(_logService).Run(
                     candidate,
                     FileTransferEnvironment.SelfTestArgument,
                     null,
@@ -249,9 +244,33 @@ namespace DexManager.Services
                     false)));
         }
 
+        /// <summary>
+        /// 자기진단 실행에 허용할 시간을 일반 프로세스 예산에서 유도한다.
+        /// </summary>
+        // A third of the general process budget - 5000ms at the 15000ms default.
+        // AppSettings.EnsureDefaults does not clamp ProcessTimeoutMs; NormalizeRange
+        // substitutes the 15000ms default whenever the stored value falls outside
+        // 1000..120000, so the value reaching this method is always in that range
+        // and the quotient never drops below 333ms. A working self-test measured
+        // 20ms on this machine, so even the floor leaves a wide margin.
+        //
+        // The bound this buys is not exactly this value: on a timeout
+        // ProcessRunner.Run waits a further 2000ms in TryTerminateProcess for the
+        // kill to land, so a wedged proxy holds the diagnostics page for up to
+        // timeoutMs + 2000ms - about 7s at the default, against 17s if the full
+        // ADB budget were used here.
+        internal static int ResolveSelfTestTimeoutMs(int processTimeoutMs)
+        {
+            return processTimeoutMs / 3;
+        }
+
+        // The general process budget is taken as a parameter rather than read
+        // from settings here so that a test can observe the timeout this check
+        // actually hands the runner, not just the arithmetic that derives it.
         internal static EnvironmentCheckItem BuildFileTransferHelperCheck(
             string path,
-            Func<string, ProcessResult> selfTestRunner)
+            int processTimeoutMs,
+            Func<string, int, ProcessResult> selfTestRunner)
         {
             var name = LocalizationService.Get(
                 "Environment.FileTransferHelper");
@@ -270,7 +289,9 @@ namespace DexManager.Services
             ProcessResult result;
             try
             {
-                result = selfTestRunner(path);
+                result = selfTestRunner(
+                    path,
+                    ResolveSelfTestTimeoutMs(processTimeoutMs));
             }
             catch (Exception ex)
             {
