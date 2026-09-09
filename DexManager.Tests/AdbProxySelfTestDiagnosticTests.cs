@@ -151,7 +151,10 @@ public class AdbProxySelfTestDiagnosticTests : IDisposable
             });
 
         Assert.Equal(EnvironmentCheckStatus.Failed, item.Status);
-        Assert.Contains(
+        // Contains가 아니라 Equal이다. 예전에는 이 사유가
+        // Environment.HelperRunFailed 안에 중첩돼 주어를 두 번 말했다
+        // ("...실행할 수 없습니다: ...응답하지 않아 중단했습니다").
+        Assert.Equal(
             LocalizationService.Get("Environment.HelperNoResponse"),
             item.Message);
     }

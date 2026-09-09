@@ -224,11 +224,15 @@ namespace DexManager.Services
             }
         }
 
-        // scrcpy is handed this very file through the ADB environment variable
-        // (FileTransferCoordinator.ConfigureScrcpyProcess), so the diagnostics
-        // page launches exactly what scrcpy would launch. Existence proves
-        // nothing on its own: the debug build is framework-dependent, and
-        // without a discoverable .NET runtime the apphost aborts before Main().
+        // Existence proves nothing on its own: the debug build is
+        // framework-dependent, and without a discoverable .NET runtime the
+        // apphost aborts before Main(). So the candidate is launched.
+        //
+        // The candidate comes from the same search chain FileTransferCoordinator
+        // uses for the path it hands scrcpy as the ADB environment variable, and
+        // no production caller passes that constructor an explicit proxyPath, so
+        // today the two resolve to the same file. The chains are duplicated, not
+        // shared - see docs/TODO.md. This check speaks for the file it launched.
         private void AddFileTransferHelperCheck(
             ICollection<EnvironmentCheckItem> results,
             string path)
@@ -302,12 +306,18 @@ namespace DexManager.Services
             }
 
             // A null result carries no evidence either way, which is the same
-            // situation as a run that never answered.
+            // situation as a run that never answered. This reason is a complete
+            // sentence and names its own subject, so it is not wrapped in
+            // Environment.HelperRunFailed the way a process-supplied reason is.
             if (result == null || result.TimedOut)
             {
-                return BuildHelperFailure(
-                    name,
-                    LocalizationService.Get("Environment.HelperNoResponse"));
+                return new EnvironmentCheckItem
+                {
+                    Name = name,
+                    Status = EnvironmentCheckStatus.Failed,
+                    Message = LocalizationService.Get(
+                        "Environment.HelperNoResponse")
+                };
             }
 
             // Both conditions are required. Measured on this machine, an apphost
