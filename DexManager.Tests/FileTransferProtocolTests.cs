@@ -20,6 +20,47 @@ namespace DexManager.Tests
             Assert.Equal("/sdcard/Download/", FileTransferEnvironment.DefaultRemoteDirectory);
             Assert.Equal(1, FileTransferEnvironment.ProtocolVersion);
             Assert.Equal(64 * 1024, FileTransferEnvironment.MaximumMessageBytes);
+            Assert.Equal("--self-test", FileTransferEnvironment.SelfTestArgument);
+            Assert.Equal(
+                "self-test passed",
+                FileTransferEnvironment.SelfTestSuccessMarker);
+        }
+
+        /// <summary>
+        /// 이 프로토콜 파일은 저장소 루트의 <c>Shared/</c>(DexManager.AdbProxy와
+        /// 레거시 DexManager가 링크로 컴파일)와 <c>DexManager.Core/Shared/</c>
+        /// (Core가 직접 컴파일) 두 벌로 존재한다. 두 벌이 갈라지면 프록시가 찍는
+        /// 자기진단 표식과 EnvironmentCheckService가 찾는 표식이 조용히 달라져,
+        /// 멀쩡한 프록시가 자기 성공 문장을 근거로 FAIL 표시된다. 지금까지는
+        /// "같게 유지한다"는 합의였을 뿐 강제하는 것이 없었다.
+        /// </summary>
+        [Fact]
+        public void SharedProtocolFile_BothCopiesAreByteIdentical()
+        {
+            var root = FindRepositoryRoot();
+            var linked = Path.Combine(root, "Shared", "FileTransferProtocol.cs");
+            var compiled = Path.Combine(
+                root, "DexManager.Core", "Shared", "FileTransferProtocol.cs");
+
+            Assert.True(File.Exists(linked), linked);
+            Assert.True(File.Exists(compiled), compiled);
+            Assert.Equal(
+                File.ReadAllBytes(linked),
+                File.ReadAllBytes(compiled));
+        }
+
+        private static string FindRepositoryRoot()
+        {
+            var directory = new DirectoryInfo(AppContext.BaseDirectory);
+            while (directory != null)
+            {
+                if (File.Exists(Path.Combine(directory.FullName, "DexManager.Mac.sln")))
+                    return directory.FullName;
+                directory = directory.Parent;
+            }
+
+            throw new InvalidOperationException(
+                "DexManager.Mac.sln was not found above " + AppContext.BaseDirectory);
         }
 
         [Fact]

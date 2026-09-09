@@ -1,3 +1,4 @@
+using DexManager.FileTransfer;
 using DexManager.Models;
 using DexManager.Services;
 
@@ -170,13 +171,19 @@ public class AdbProxySelfTestDiagnosticTests : IDisposable
         Assert.Equal(EnvironmentCheckStatus.Failed, item.Status);
     }
 
+    /// <summary>
+    /// DXMAdbProxy가 실제로 찍는 줄과 같은 모양으로 만든다. 표식은 프록시가
+    /// 쓰는 것과 같은 선언(<see cref="FileTransferEnvironment"/>)에서 가져오므로
+    /// 이 테스트가 표식 사본을 따로 들고 있지 않다.
+    /// </summary>
     private static ProcessResult SelfTestPassed()
     {
         return new ProcessResult
         {
-            Arguments = "--self-test",
+            Arguments = FileTransferEnvironment.SelfTestArgument,
             ExitCode = 0,
-            StandardOutput = "DX Manager ADB proxy 2.0.0 self-test passed.",
+            StandardOutput = "DX Manager ADB proxy 2.0.0 " +
+                FileTransferEnvironment.SelfTestSuccessMarker + ".",
             StandardError = string.Empty
         };
     }

@@ -13,13 +13,18 @@ internal static class Program
     {
         try
         {
-            if (args.Length == 1 && args[0] == "--self-test")
+            if (args.Length == 1 &&
+                args[0] == FileTransferEnvironment.SelfTestArgument)
             {
                 var version = Assembly.GetExecutingAssembly()
                     .GetCustomAttribute<AssemblyInformationalVersionAttribute>()?
                     .InformationalVersion ?? "unknown";
+                // The marker comes from the shared protocol file so that
+                // EnvironmentCheckService, which matches on it, cannot fall out
+                // of step with what this line actually prints.
                 Console.WriteLine(
-                    $"DX Manager ADB proxy {version} self-test passed.");
+                    "DX Manager ADB proxy " + version + " " +
+                    FileTransferEnvironment.SelfTestSuccessMarker + ".");
                 return 0;
             }
 

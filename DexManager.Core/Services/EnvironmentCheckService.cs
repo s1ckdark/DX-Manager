@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using DexManager.FileTransfer;
 using DexManager.Models;
 using DexManager.Utils;
 
@@ -223,13 +224,6 @@ namespace DexManager.Services
             }
         }
 
-        private const string ProxySelfTestArgument = "--self-test";
-
-        // DXMAdbProxy prints this only after Main() starts (Program.cs in
-        // DexManager.AdbProxy), so it separates "the process really ran" from
-        // "the apphost died before any managed code executed".
-        private const string ProxySelfTestSuccessMarker = "self-test passed";
-
         // scrcpy is handed this very file through the ADB environment variable
         // (FileTransferCoordinator.ConfigureScrcpyProcess), so the diagnostics
         // page launches exactly what scrcpy would launch. Existence proves
@@ -249,7 +243,7 @@ namespace DexManager.Services
                 path,
                 candidate => new ProcessRunner(_logService).Run(
                     candidate,
-                    ProxySelfTestArgument,
+                    FileTransferEnvironment.SelfTestArgument,
                     null,
                     timeoutMs,
                     false)));
@@ -300,10 +294,13 @@ namespace DexManager.Services
             // stdout, so the exit code alone would already be enough; the marker
             // is kept because the exit code comes from an apphost this project
             // does not control, and an earlier session reported seeing exit 0
-            // for the same failure.
+            // for the same failure. The marker is the shared constant the proxy
+            // itself prints (FileTransferEnvironment), so it cannot drift; it
+            // only appears after Main() starts, which is what separates "the
+            // process ran" from "the apphost died before any managed code".
             var passed = result.IsSuccess &&
                 (result.StandardOutput ?? string.Empty).IndexOf(
-                    ProxySelfTestSuccessMarker,
+                    FileTransferEnvironment.SelfTestSuccessMarker,
                     StringComparison.OrdinalIgnoreCase) >= 0;
             if (passed)
             {
