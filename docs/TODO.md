@@ -193,9 +193,16 @@
     **"scrcpy exited before its window was ready."** 뿐이라 원인을 알 수 없다.
   - 재현: 2026-09-10, tmux 서버가 오래된 환경(=`DOTNET_ROOT` 없음)을 물려준
     셸에서 `dotnet DXManager.Mac.dll --dex`. 환경변수를 주입하니 정상 동작.
-  - [ ] 포터블 패키지(자체 포함 게시)에서도 재현되는지 먼저 확인 — 개발 실행
-        전용 문제일 수 있다
-  - [ ] 프록시 실행 실패를 감지해 실제 원인을 로그·UI에 표시
+  - [x] 포터블 패키지(자체 포함 게시)에서도 재현되는지 확인 — **영향 없음.**
+        `scripts/Package-Mac-Release.sh`가 프록시를 `--self-contained`로 게시하고,
+        같은 스크립트의 스모크 테스트가 `PATH=/usr/bin:/bin`·깨끗한 `HOME`에서
+        `--self-test` 통과를 요구한다. **개발 실행 전용 문제**로 확정.
+  - [x] 프록시 실행 실패를 감지해 실제 원인을 표시 (PR #13) — 진단 화면의 프록시
+        점검이 파일 존재 확인에서 실제 실행으로 바뀌었다. 실패 시 프로세스가 낸
+        사유를 그대로 보여준다. `--diag`로 확인할 것.
+  - [ ] DeX 시작 실패 메시지 자체는 그대로다 — 진단을 돌리지 않은 사용자는 여전히
+        `scrcpy exited before its window was ready.`만 본다. 시작 경로에서도
+        원인을 짚어줄지는 별도 판단. **개발 전용 문제이므로 우선순위 낮음.**
 - [ ] adb 후보 프로브 체인 테스트를 가짜 `ProcessRunner`로 전환 (PR #10 후속)
   - 현상: `PathServiceCandidateRetryTests`의 체인 회귀 테스트가 실제
     프로세스 타임아웃 바닥(`Math.Max(timeoutMs, 3000)`)을 타서 약 20초,
