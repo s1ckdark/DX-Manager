@@ -590,6 +590,9 @@
   <data name="Environment.DeviceFolderFailed" xml:space="preserve"><value>Cannot write to the phone folder: {0}</value></data>
   <data name="Environment.DeviceQueryFailed" xml:space="preserve"><value>Could not query ADB devices: {0}</value></data>
   <data name="Environment.FileMissing" xml:space="preserve"><value>File not found: {0}</value></data>
+  <data name="Environment.HelperRunFailed" xml:space="preserve"><value>The file transfer helper cannot run: {0}</value></data>
+  <data name="Environment.HelperNoResponse" xml:space="preserve"><value>The file transfer helper did not respond and was stopped.</value></data>
+  <data name="Environment.HelperNoOutput" xml:space="preserve"><value>no output; exit code {0}</value></data>
   <data name="Environment.DeviceAuthorized" xml:space="preserve"><value>Connected and authorized: {0}</value></data>
   <data name="Environment.DeviceUnauthorized" xml:space="preserve"><value>Approve the RSA prompt on the phone: {0}</value></data>
   <data name="Environment.DeviceOfflineMessage" xml:space="preserve"><value>The device is offline. Reconnect USB.</value></data>

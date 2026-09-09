@@ -590,6 +590,9 @@
   <data name="Environment.DeviceFolderFailed" xml:space="preserve"><value>휴대폰 폴더에 쓸 수 없습니다: {0}</value></data>
   <data name="Environment.DeviceQueryFailed" xml:space="preserve"><value>ADB 장치 조회 실패: {0}</value></data>
   <data name="Environment.FileMissing" xml:space="preserve"><value>파일을 찾을 수 없습니다: {0}</value></data>
+  <data name="Environment.HelperRunFailed" xml:space="preserve"><value>파일 전송 보조 프로그램을 실행할 수 없습니다: {0}</value></data>
+  <data name="Environment.HelperNoResponse" xml:space="preserve"><value>파일 전송 보조 프로그램이 응답하지 않아 중단했습니다.</value></data>
+  <data name="Environment.HelperNoOutput" xml:space="preserve"><value>출력이 없습니다. 종료 코드 {0}</value></data>
   <data name="Environment.DeviceAuthorized" xml:space="preserve"><value>연결 및 승인됨: {0}</value></data>
   <data name="Environment.DeviceUnauthorized" xml:space="preserve"><value>휴대폰 RSA 인증창을 허용하십시오: {0}</value></data>
   <data name="Environment.DeviceOfflineMessage" xml:space="preserve"><value>장치가 offline 상태입니다. USB를 다시 연결하십시오.</value></data>
