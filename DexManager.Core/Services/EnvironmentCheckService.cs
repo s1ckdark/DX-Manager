@@ -326,9 +326,13 @@ namespace DexManager.Services
             // is kept because the exit code comes from an apphost this project
             // does not control, and an earlier session reported seeing exit 0
             // for the same failure. The marker is the shared constant the proxy
-            // itself prints (FileTransferEnvironment), so it cannot drift; it
-            // only appears after Main() starts, which is what separates "the
-            // process ran" from "the apphost died before any managed code".
+            // composes its output from (FileTransferEnvironment, compiled into
+            // both projects), so changing the wording here moves both sides at
+            // once - but nothing stops someone re-inlining a literal inside the
+            // proxy's Program.cs, which no test can see. That one stays a
+            // code-review boundary. The marker only appears after Main() starts,
+            // which is what separates "the process ran" from "the apphost died
+            // before any managed code".
             var passed = result.IsSuccess &&
                 (result.StandardOutput ?? string.Empty).IndexOf(
                     FileTransferEnvironment.SelfTestSuccessMarker,
