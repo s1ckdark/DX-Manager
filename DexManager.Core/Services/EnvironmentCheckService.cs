@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using DexManager.FileTransfer;
 using DexManager.Models;
 using DexManager.Utils;
 
@@ -56,11 +57,7 @@ namespace DexManager.Services
             if (!File.Exists(proxyCandidate)) proxyCandidate = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "DXMAdbProxy.dll");
             if (!File.Exists(proxyCandidate)) proxyCandidate = Path.Combine(proxyDir, "DXMAdbProxy.exe");
 
-            AddFileCheck(
-                results,
-                LocalizationService.Get(
-                    "Environment.FileTransferHelper"),
-                proxyCandidate);
+            AddFileTransferHelperCheck(results, proxyCandidate);
             AddAdbVersionCheck(results);
             results.Add(BuildScrcpyVersionCheck(
                 ResolveScrcpyRuntimeInfo(
@@ -225,6 +222,172 @@ namespace DexManager.Services
                     Message = ex.Message
                 });
             }
+        }
+
+        // Existence proves nothing on its own: the debug build is
+        // framework-dependent, and without a discoverable .NET runtime the
+        // apphost aborts before Main(). So the candidate is launched.
+        //
+        // The candidate comes from the same search chain FileTransferCoordinator
+        // uses for the path it hands scrcpy as the ADB environment variable, and
+        // no production caller passes that constructor an explicit proxyPath, so
+        // today the two resolve to the same file. The chains are duplicated, not
+        // shared - see docs/TODO.md. This check speaks for the file it launched.
+        private void AddFileTransferHelperCheck(
+            ICollection<EnvironmentCheckItem> results,
+            string path)
+        {
+            results.Add(BuildFileTransferHelperCheck(
+                path,
+                _settings.Timing.ProcessTimeoutMs,
+                (candidate, timeoutMs) => new ProcessRunner(_logService).Run(
+                    candidate,
+                    FileTransferEnvironment.SelfTestArgument,
+                    null,
+                    timeoutMs,
+                    false)));
+        }
+
+        /// <summary>
+        /// 자기진단 실행에 허용할 시간을 일반 프로세스 예산에서 유도한다.
+        /// </summary>
+        // A third of the general process budget - 5000ms at the 15000ms default.
+        // AppSettings.EnsureDefaults does not clamp ProcessTimeoutMs; NormalizeRange
+        // substitutes the 15000ms default whenever the stored value falls outside
+        // 1000..120000, so the value reaching this method is always in that range
+        // and the quotient never drops below 333ms. A working self-test measured
+        // 20ms on this machine, so even the floor leaves a wide margin.
+        //
+        // The bound this buys is not exactly this value: on a timeout
+        // ProcessRunner.Run waits a further 2000ms in TryTerminateProcess for the
+        // kill to land, so a wedged proxy holds the diagnostics page for up to
+        // timeoutMs + 2000ms - about 7s at the default, against 17s if the full
+        // ADB budget were used here.
+        internal static int ResolveSelfTestTimeoutMs(int processTimeoutMs)
+        {
+            return processTimeoutMs / 3;
+        }
+
+        // The general process budget is taken as a parameter rather than read
+        // from settings here so that a test can observe the timeout this check
+        // actually hands the runner, not just the arithmetic that derives it.
+        internal static EnvironmentCheckItem BuildFileTransferHelperCheck(
+            string path,
+            int processTimeoutMs,
+            Func<string, int, ProcessResult> selfTestRunner)
+        {
+            var name = LocalizationService.Get(
+                "Environment.FileTransferHelper");
+            if (string.IsNullOrWhiteSpace(path) || !File.Exists(path))
+            {
+                return new EnvironmentCheckItem
+                {
+                    Name = name,
+                    Status = EnvironmentCheckStatus.Failed,
+                    Message = LocalizationService.Format(
+                        "Environment.FileMissing",
+                        path)
+                };
+            }
+
+            ProcessResult result;
+            try
+            {
+                result = selfTestRunner(
+                    path,
+                    ResolveSelfTestTimeoutMs(processTimeoutMs));
+            }
+            catch (Exception ex)
+            {
+                // The exception is swallowed so one broken helper cannot end the
+                // whole diagnostics run, but the item stays Failed: reporting
+                // Passed after swallowing is the defect this check removes.
+                return BuildHelperFailure(name, ex.Message);
+            }
+
+            // A null result carries no evidence either way, which is the same
+            // situation as a run that never answered. This reason is a complete
+            // sentence and names its own subject, so it is not wrapped in
+            // Environment.HelperRunFailed the way a process-supplied reason is.
+            if (result == null || result.TimedOut)
+            {
+                return new EnvironmentCheckItem
+                {
+                    Name = name,
+                    Status = EnvironmentCheckStatus.Failed,
+                    Message = LocalizationService.Get(
+                        "Environment.HelperNoResponse")
+                };
+            }
+
+            // Both conditions are required. Measured on this machine, an apphost
+            // that cannot find the runtime exits 131 and prints nothing on
+            // stdout, so the exit code alone would already be enough; the marker
+            // is kept because the exit code comes from an apphost this project
+            // does not control, and an earlier session reported seeing exit 0
+            // for the same failure. The marker is the shared constant the proxy
+            // composes its output from (FileTransferEnvironment, compiled into
+            // both projects), so changing the wording here moves both sides at
+            // once - but nothing stops someone re-inlining a literal inside the
+            // proxy's Program.cs, which no test can see. That one stays a
+            // code-review boundary. The marker only appears after Main() starts,
+            // which is what separates "the process ran" from "the apphost died
+            // before any managed code".
+            var passed = result.IsSuccess &&
+                (result.StandardOutput ?? string.Empty).IndexOf(
+                    FileTransferEnvironment.SelfTestSuccessMarker,
+                    StringComparison.OrdinalIgnoreCase) >= 0;
+            if (passed)
+            {
+                return new EnvironmentCheckItem
+                {
+                    Name = name,
+                    Status = EnvironmentCheckStatus.Passed,
+                    Message = path
+                };
+            }
+
+            return BuildHelperFailure(name, DescribeHelperFailure(result));
+        }
+
+        private static EnvironmentCheckItem BuildHelperFailure(
+            string name,
+            string reason)
+        {
+            return new EnvironmentCheckItem
+            {
+                Name = name,
+                Status = EnvironmentCheckStatus.Failed,
+                Message = LocalizationService.Format(
+                    "Environment.HelperRunFailed",
+                    CollapseLines(reason))
+            };
+        }
+
+        // The apphost failure spans several lines and the diagnostics list
+        // prints one line per item, so the reason is joined with the separator
+        // the other Environment.* messages already use.
+        private static string CollapseLines(string value)
+        {
+            if (string.IsNullOrWhiteSpace(value)) return string.Empty;
+            return string.Join(
+                " · ",
+                value.Split(
+                    new[] { "\r\n", "\n", "\r" },
+                    StringSplitOptions.RemoveEmptyEntries)
+                    .Select(line => line.Trim())
+                    .Where(line => line.Length > 0));
+        }
+
+        private static string DescribeHelperFailure(ProcessResult result)
+        {
+            if (!string.IsNullOrWhiteSpace(result.StandardError))
+                return result.StandardError;
+            if (!string.IsNullOrWhiteSpace(result.StandardOutput))
+                return result.StandardOutput;
+            return LocalizationService.Format(
+                "Environment.HelperNoOutput",
+                result.ExitCode);
         }
 
         private void AddPcScreenshotFolderCheck(

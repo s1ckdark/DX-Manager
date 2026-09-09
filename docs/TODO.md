@@ -399,6 +399,18 @@
   - 브라질 ABNT/ABNT2 또는 AltGr 키보드에서 `?`, `@` 등 특수문자 회귀 확인
 - [x] 기기 인식 후 실제 Scrcpy 시작 전 대기 옵션(0~60초, 기본 1초)
 
+- [ ] ADB 프록시 경로 탐색이 두 곳에 복제돼 있다 — 한 곳으로 모을 것
+  - `EnvironmentCheckService.Run()`과 `FileTransferCoordinator` 생성자가
+    `tools/adb-proxy/DXMAdbProxy` → `.dll` → 베이스 디렉터리 `.dll` → `.exe`
+    순서를 각각 따로 적어 두고 있다. 후자에만 명시 경로 우선 분기와
+    `Path.GetFullPath`가 있다.
+  - 지금은 생산 호출부(`DeviceRuntimeServiceFactory`)가 `proxyPath`를 넘기지
+    않아 두 체인이 같은 파일로 수렴한다. 즉 "진단이 검사한 파일 = scrcpy가
+    `ADB=`로 받는 파일"이 **현재는** 참이다.
+  - 누가 `proxyPath`를 주입하거나 한쪽 체인만 고치면 그 등식이 조용히 깨지고,
+    `fix/proxy-runnable-check`가 없앤 결함("검사하지 않은 것을 Passed라 말한다")이
+    축소판으로 되살아난다. 탐색을 공유 헬퍼 하나로 뽑고 양쪽이 그것을 쓰게 한다.
+
 ## 배포 준비
 
 - [x] `dist\DX Manager` 폴더와 버전별 x64 ZIP 패키징 스크립트

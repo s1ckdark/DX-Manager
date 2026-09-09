@@ -17,6 +17,13 @@ namespace DexManager.FileTransfer
         internal const string RemoteDirectory = "DXM_TRANSFER_TARGET";
         internal const string Enabled = "DXM_TRANSFER_ENABLED";
         internal const string DefaultRemoteDirectory = "/sdcard/Download/";
+
+        // The proxy's runnability self-test is a contract between DXMAdbProxy
+        // (which prints the marker) and EnvironmentCheckService (which matches
+        // it). Both sides compile this file, so the argument and the marker
+        // cannot drift apart: a wording change is one edit that moves both.
+        internal const string SelfTestArgument = "--self-test";
+        internal const string SelfTestSuccessMarker = "self-test passed";
         internal const int ProtocolVersion = 1;
         internal const int MaximumMessageBytes = 64 * 1024;
     }
