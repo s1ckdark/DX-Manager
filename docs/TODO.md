@@ -51,7 +51,7 @@
     - [x] 기기 선택 뒤 탭이 USB serial·저장 방식·포트·자동 재연결을 표시하고 Prepare만 활성
     - [x] 호스트명 `z-fold8`로 Connect wirelessly → 무선 연결 성공, 프로필 Wireless로 저장
     - [ ] USB 연결 상태에서 Prepare → 기기의 `Transports`에 Wireless 항목이 추가로 표시되는가
-          (adbd 재시작으로 페이지가 사라지는 결함 때문에 결과를 보지 못함 — 아래 항목)
+          (첫 시도는 adbd 재시작으로 페이지가 사라져 결과를 못 봄 → 자리표시자 수정 후 재확인 필요)
     - [x] 케이블 분리 후 기기 행이 유지되고 DeX를 시작할 수 있는가 — 무선 transport로 DeX
           시작·Stop DeX, overlay `null` 회수 확인
     - [ ] Disconnect 뒤 저장 모드가 USB로 돌아가는가
@@ -60,14 +60,19 @@
   - [ ] 이연된 리뷰 minor: 연결 호출 중 Cancel/기기 선택 변경 시 호출이 끝나기 전에 idle로
         보고됨, 비운 NumericUpDown이 int `Port`로 바인딩되지 못함, placeholder 문구가 다른 탭처럼
         영어로 하드코딩됨, `OperationCanceledException` 경로 테스트 없음
-- [ ] **[실기 재현]** Connection 탭 "Prepare over USB" 도중 USB 재열거로 페이지가 사라진다 —
-      `adb tcpip 5555`가 adbd를 재시작해 USB transport가 잠시 빠지면 기기 목록이 선택을 비우고
-      `SettingsViewModel.LoadDevicePages("")`가 진행 중인 `ConnectionSettingsViewModel`을 폐기한다.
-      결과 메시지가 사라지고 `IsWirelessIdle` Save 게이트도 그 순간 풀린다(2026-10-31 SM-F971N,
-      `docs/KNOWN_ISSUES.md` 참조). 후보: (a) 기기 목록이 짧은 transport 공백 동안 선택 identity를
-      유지(재열거 후 같은 identity 행을 다시 선택), (b) 설정 창이 identity별 페이지를 기기 행이 아니라
-      마지막 선택 identity에 묶어 빈 선택에서도 유지, (c) 진행 중 명령이 끝날 때까지 페이지 교체를
-      미룸. 어느 쪽이든 복수 기기 불변 조건(명시적 identity)을 지켜야 한다.
+- [x] **[실기 재현 → 수정]** Connection 탭 "Prepare over USB" 도중 USB 재열거로 페이지가 사라진다 —
+      원인: `PhysicalDeviceRegistry.Reconcile`은 한 폴에서 빠진 기기를 유예 없이 제거하고,
+      `DeviceListViewModel.Apply`가 선택 행을 폐기한 뒤 `FirstOrDefault()`로 되돌려 휴대폰 한 대면
+      `SelectedIdentity`가 null이 되어 설정 창이 페이지를 폐기했다. 수정(`02ae027`, `9838874`):
+      선택된 identity의 행은 스냅샷에서 빠져도 같은 `DeviceViewModel` 인스턴스를 "Disconnected"
+      자리표시자로 유지하고(transport 없음, Start DeX·슬롯 Start 비활성, Stop은 그대로), 같은
+      identity가 돌아오면 같은 행을 갱신한다. 선택이 바뀌지 않으므로 설정 창 페이지가 살아남는다.
+      자리표시자는 `PlaceholderGrace`(10초) 이상 사라진 상태에서 **다른 연결된 휴대폰이 있을 때만**
+      제거되고 선택이 그쪽으로 넘어간다. 다른 휴대폰이 없으면 무기한 유지된다(의도). 레지스트리는
+      건드리지 않았다. 실기 재확인은 아래 체크리스트 항목.
+  - [ ] 사소한 보강: 자리표시자가 선택 해제된 채 제거되거나 선택되지 않은 상태로 돌아오면
+        `_selectedMissingSinceUtc` 스탬프가 남아, 나중에 그 기기를 다시 선택해 또 빠지면 유예 없이
+        만료될 수 있다. 선택 변경 시 스탬프를 지운다.
 - [ ] Connection 탭 포트 NumericUpDown 폭이 좁아 "5555" 마지막 자리가 잘려 보인다(실기 확인) —
       `MinWidth`를 늘린다.
 - [ ] 설정 저장 잠금 통합 — `ApplicationHost.UpdateSettings`(`_settingsLock`, live 객체 변경 후 Save)와 `SettingsService.UpdateAndSave`(`_saveSync`, CloneCore→mutate→SaveCore→CopySettings)가 같은 `AppSettings`를 서로 다른 잠금으로 쓴다. `UpdateAndSave`의 CloneCore와 CopySettings 사이에 들어온 UI 저장은 메모리와 디스크에서 조용히 덮어써진다. 수 ms 창이라 드물지만, `UpdateSettings`가 `_saveSync` 아래에서 변경+저장을 한 번에 하도록 바꾸면 이 부류가 사라지고 Connection 탭의 `IsWirelessIdle` Save 게이트는 UX 용도만 남는다. Core 동시성 변경이라 별도 PR로 진행한다.
