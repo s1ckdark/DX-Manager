@@ -632,6 +632,52 @@ public class SettingsViewModelTests
     }
 
     [Fact]
+    public void Dispose_DisposesConnectionPage()
+    {
+        var fake = new FakeWirelessConnectionGateway();
+        fake.Devices["phone-a"] = new PhysicalDeviceInfo { Identity = "phone-a" };
+        var deviceSelection = new FakeDeviceSelectionSource { SelectedIdentity = "phone-a" };
+        var settings = CreateSettings(new FakeSettingsGateway(), deviceSelection, wireless: fake);
+        var page = settings.Connection;
+        var summary = page.TransportSummary;
+
+        settings.Dispose();
+        fake.Devices["phone-a"].Transports.Add(new DeviceTransportInfo
+        {
+            Kind = DeviceTransportKind.Usb,
+            Serial = "USB-1",
+            Status = AdbDeviceStatus.Device
+        });
+        fake.RaiseDevicesChanged();
+
+        Assert.Equal(summary, page.TransportSummary);
+    }
+
+    [Fact]
+    public void Cancel_RecreatesConnectionPageAndDisposesOld()
+    {
+        var fake = new FakeWirelessConnectionGateway();
+        fake.Devices["phone-a"] = new PhysicalDeviceInfo { Identity = "phone-a" };
+        var deviceSelection = new FakeDeviceSelectionSource { SelectedIdentity = "phone-a" };
+        var settings = CreateSettings(new FakeSettingsGateway(), deviceSelection, wireless: fake);
+        var old = settings.Connection;
+        var oldSummary = old.TransportSummary;
+
+        settings.CancelCommand.Execute(null);
+        fake.Devices["phone-a"].Transports.Add(new DeviceTransportInfo
+        {
+            Kind = DeviceTransportKind.Usb,
+            Serial = "USB-1",
+            Status = AdbDeviceStatus.Device
+        });
+        fake.RaiseDevicesChanged();
+
+        Assert.NotNull(settings.Connection);
+        Assert.False(ReferenceEquals(old, settings.Connection));
+        Assert.Equal(oldSummary, old.TransportSummary);
+    }
+
+    [Fact]
     public async Task IsWirelessIdle_FalseWhileConnectionBusy()
     {
         var fake = new FakeWirelessConnectionGateway

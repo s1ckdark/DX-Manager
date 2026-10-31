@@ -25,6 +25,18 @@ public class ConnectionSettingsViewModelTests
         new DeviceWirelessConnectionProfile { DeviceIdentity = Id, Mode = AdbConnectionMode.Wireless, WirelessHost = host, WirelessPort = port, AutoReconnect = auto };
 
     [Fact]
+    public void Constructor_WithSavedPortOutOfRange_ShowsPortMessage()
+    {
+        var gw = new FakeWirelessConnectionGateway();
+        gw.Profiles[Id] = Wireless("192.168.0.5", 70000);
+
+        var vm = Create(gw);
+
+        Assert.Equal(LocalizationService.Get("Settings.Connection.PortOutOfRange"), vm.StatusMessage);
+        Assert.False(vm.ConnectCommand.CanExecute(null));
+    }
+
+    [Fact]
     public void Constructor_WithoutSavedProfile_UsesDefaults()
     {
         var vm = Create(new FakeWirelessConnectionGateway());
@@ -32,7 +44,7 @@ public class ConnectionSettingsViewModelTests
         Assert.Equal("", vm.Host);
         Assert.Equal(5555, vm.Port);
         Assert.True(vm.AutoReconnect);
-        Assert.Contains(LocalizationService.Get("Settings.Usb"), vm.SavedModeText);
+        Assert.Contains(LocalizationService.Get("Settings.Connection.ModeUsb"), vm.SavedModeText);
         Assert.Equal(LocalizationService.Get("Settings.Connection.NoTransport"), vm.TransportSummary);
         Assert.False(vm.HasUsbTransport);
         Assert.False(vm.CanDisconnect);
@@ -130,7 +142,7 @@ public class ConnectionSettingsViewModelTests
 
         Assert.Equal(new[] { "Disconnect:phone-a" }, gw.Calls);
         Assert.False(vm.CanDisconnect);
-        Assert.Contains(LocalizationService.Get("Settings.Usb"), vm.SavedModeText);
+        Assert.Contains(LocalizationService.Get("Settings.Connection.ModeUsb"), vm.SavedModeText);
     }
 
     [Fact]

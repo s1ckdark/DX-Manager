@@ -770,4 +770,6 @@
   <data name="Settings.Connection.NoUsbForPrepare" xml:space="preserve"><value>먼저 휴대폰을 USB로 연결하세요.</value></data>
   <data name="Settings.Connection.ActionsApplyImmediately" xml:space="preserve"><value>연결 동작은 즉시 실행되고 성공하면 저장됩니다. 저장·취소 버튼과는 무관합니다.</value></data>
   <data name="Settings.Connection.PortOutOfRange" xml:space="preserve"><value>포트는 1에서 65535 사이여야 합니다.</value></data>
+  <data name="Settings.Connection.ModeUsb" xml:space="preserve"><value>USB</value></data>
+  <data name="Settings.Connection.ModeWireless" xml:space="preserve"><value>무선</value></data>
 </root>

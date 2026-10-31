@@ -30,9 +30,11 @@ public sealed partial class ConnectionSettingsViewModel : ObservableObject, IDis
         _host = profile?.WirelessHost ?? string.Empty;
         _port = profile != null && profile.WirelessPort > 0 ? profile.WirelessPort : DefaultPort;
         _autoReconnect = profile?.AutoReconnect ?? true;
-        Refresh();
+        ApplyPortRangeMessage();
 
+        // 구독을 먼저 걸어 두 번째 Refresh 사이의 스냅샷 변경을 놓치지 않는다.
         _wireless.DevicesChanged += OnDevicesChanged;
+        Refresh();
     }
 
     /// <summary>대상 물리 기기 identity.</summary>
@@ -77,7 +79,9 @@ public sealed partial class ConnectionSettingsViewModel : ObservableObject, IDis
     /// <summary>포트가 1~65535 범위인지.</summary>
     public bool IsPortValid => Port is >= 1 and <= 65535;
 
-    partial void OnPortChanged(int value)
+    partial void OnPortChanged(int value) => ApplyPortRangeMessage();
+
+    private void ApplyPortRangeMessage()
     {
         var rangeMessage = LocalizationService.Get("Settings.Connection.PortOutOfRange");
         if (!IsPortValid)
@@ -108,11 +112,11 @@ public sealed partial class ConnectionSettingsViewModel : ObservableObject, IDis
         var savedWireless = profile != null && profile.Mode == AdbConnectionMode.Wireless;
         string mode;
         if (savedWireless && !string.IsNullOrWhiteSpace(profile.WirelessHost))
-            mode = LocalizationService.Get("Settings.Wireless") + " " + $"{profile.WirelessHost}:{profile.WirelessPort}";
+            mode = LocalizationService.Get("Settings.Connection.ModeWireless") + " " + $"{profile.WirelessHost}:{profile.WirelessPort}";
         else if (savedWireless)
-            mode = LocalizationService.Get("Settings.Wireless");
+            mode = LocalizationService.Get("Settings.Connection.ModeWireless");
         else
-            mode = LocalizationService.Get("Settings.Usb");
+            mode = LocalizationService.Get("Settings.Connection.ModeUsb");
         SavedModeText = LocalizationService.Format("Settings.Connection.SavedMode", mode);
 
         CanDisconnect = savedWireless || transports.Any(t => t.Kind == DeviceTransportKind.Wireless);
