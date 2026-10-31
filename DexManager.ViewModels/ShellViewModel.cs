@@ -68,7 +68,12 @@ public sealed partial class ShellViewModel : ObservableObject, IDisposable
         var handler = SettingsRequested;
 
         var gateway = new SettingsGateway(_host);
-        var settings = new SettingsViewModel(gateway, Devices, _host.RuntimeSessions, _dispatcher);
+        var settings = new SettingsViewModel(
+            gateway,
+            Devices,
+            _host.RuntimeSessions,
+            _dispatcher,
+            new WirelessConnectionGateway(_host));
 
         if (handler == null)
         {

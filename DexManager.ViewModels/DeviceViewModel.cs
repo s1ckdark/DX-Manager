@@ -41,6 +41,7 @@ public sealed partial class DeviceViewModel : ObservableObject, IDisposable
                 () => PrimarySerial,
                 _commands));
         }
+        foreach (var slot in Slots) slot.IsDeviceConnected = IsConnected;
 
         // DexOrchestrator에는 public event가 없다. 상태 변화를 실시간으로
         // 관측하는 유일한 경로가 이 레지스트리다.
@@ -58,7 +59,13 @@ public sealed partial class DeviceViewModel : ObservableObject, IDisposable
     private string _primarySerial = string.Empty;
 
     [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(StartDexCommand))]
     private bool _isConnected;
+
+    partial void OnIsConnectedChanged(bool value)
+    {
+        foreach (var slot in Slots) slot.IsDeviceConnected = value;
+    }
 
     [ObservableProperty]
     private string _transportSummary = string.Empty;
@@ -85,7 +92,11 @@ public sealed partial class DeviceViewModel : ObservableObject, IDisposable
 
     private bool CanRunCommand() => !_disposed && !IsBusy;
 
-    [RelayCommand(CanExecute = nameof(CanRunCommand))]
+    // 연결이 끊긴 자리표시자 행에서는 새로 시작하는 명령만 막는다. 중지는
+    // 남은 세션 정리를 위해 열어 둔다.
+    private bool CanStartDex() => CanRunCommand() && IsConnected;
+
+    [RelayCommand(CanExecute = nameof(CanStartDex))]
     private async Task StartDexAsync(CancellationToken cancellationToken)
     {
         IsBusy = true;

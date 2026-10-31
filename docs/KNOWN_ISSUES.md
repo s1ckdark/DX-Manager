@@ -421,6 +421,74 @@ Cancel 클릭, 슬롯 화면 확인)을 했으므로 **창 자체가 뜨고 탭�
 이 목록은 코드 검토와 자동 테스트(xUnit 284개 — Desktop 17 + ViewModels 112 +
 Core 155 — + 다중기기 39개)로만 뒷받침된다.
 
+## macOS GUI Connection 탭 실기 검증 범위
+
+설정 창 Connection 탭(기기별 USB→무선 전환·IP:포트 직접 연결·무선 해제)은 자동 테스트로만
+검증됐다(ViewModels.Tests 152, Desktop.Tests 26, Core Tests 281; 게이트웨이 테스트는
+`TempHostRoot`의 실제 `ApplicationHost`를 쓰지만 adb는 가짜다).
+
+2026-10-31 이 개발 환경에서 GUI 기동을 다시 시도한 결과, `DOTNET_ROOT=$HOME/.dotnet`을
+주고 `dotnet DXManager.Desktop.dll`로 실행하면 Avalonia 창이 정상적으로 뜬다(이전 기록의
+RenderTimer -6661은 재현되지 않았다). apphost `DXManager.Desktop`을 직접 실행하면
+`DXMAdbProxy`와 같은 이유로 "You must install .NET" 오류가 난다. 기기가 연결되지 않은
+상태에서 설정 창을 열어 Connection 탭이 다른 기기별 탭과 같은 자리에 나타나고 기기
+미선택 placeholder를 보이는 것, Cancel과 `Cmd+Q` 종료가 정상인 것까지 확인했다. 첫
+시도에서 Connection 탭을 클릭하자 설정 창이 사라진 일이 한 번 있었으나 다시 열어
+클릭했을 때는 재현되지 않았고 프로세스는 살아 있었으며 stderr에 아무것도 없었다.
+원인은 모른다.
+
+2026-10-31 SM-F971N(R5KL808ZQTP)을 USB로 연결해 같은 방식으로 실기 확인했다. 기기 선택 뒤
+Connection 탭은 `Usb: R5KL808ZQTP`, 저장된 방식 USB, 포트 5555, 자동 재연결 켬을 표시했고
+"Prepare over USB"만 활성, 나머지 둘은 비활성이었다. Prepare를 누르자 휴대폰에는
+`service.adb.tcp.port=5555`가 적용됐으나(USB transport_id 36→37로 재열거), 약 1초 뒤
+설정 창의 Connection 탭이 "Select a device…" placeholder로 바뀌었다. `adb tcpip`가 adbd를
+재시작하면서 USB transport가 잠시 사라지고, 기기 목록이 선택을 비우면서
+`LoadDevicePages("")`가 진행 중인 Connection 페이지를 폐기한 것이다. 그래서 결과 메시지를
+볼 수 없었고 Save 게이트도 그 순간 풀렸다. 프로필은 저장되지 않았다. 셸에서 직접
+`adb connect 192.168.1.86:5555`를 실행하니 `No route to host`였으므로 연결 실패 자체는 이
+Mac과 휴대폰 사이의 네트워크 경로 문제이지 앱 논리 문제가 아니다(몇 분 뒤 같은 대역에서
+5555 포트 도달이 확인됐다). "전환 도중 기기 재열거로 페이지가 사라져 결과를 잃는" 동작은 실제로
+재현된 결함이며, 같은 날 `DeviceListViewModel`에서 수정했다: 선택된 기기 행을 transport가 없는
+"Disconnected" 자리표시자로 유지하고 같은 identity가 돌아오면 같은 행을 갱신한다. 자리표시자는
+10초 이상 사라진 뒤 다른 연결된 휴대폰이 있을 때만 제거되며, 다른 휴대폰이 없으면 남는다.
+그래서 마지막 휴대폰을 영구히 뽑아도 목록은 비지 않고 "Disconnected" 행이 남는다(의도된 동작,
+`docs/TODO.md` 참조). 수정 뒤 Prepare 경로의 실기 재확인은 아직 하지 않았다. 포트 입력란(NumericUpDown)은 폭이 좁아 "5555"의 마지막 자리가 잘려
+보인다.
+
+같은 날 네트워크가 정상인 상태(Mac 192.168.1.19, 휴대폰 192.168.1.86, 5555 포트 도달)에서
+사용자가 GUI를 직접 조작해 확인한 결과: IP 입력란에 호스트명 `z-fold8`을 넣고 "Connect
+wirelessly"를 누르자 무선 연결이 성공했고, 프로필이 `Mode=Wireless`, `WirelessHost=z-fold8`,
+`WirelessPort=5555`, `AutoReconnect=true`로 저장됐다. 이후 USB를 분리한 상태에서 `adb devices`에는
+`z-fold8:5555`만 남았고, 그 transport로 DeX 시작과 **Stop DeX**가 정상 동작했다고 사용자가
+보고했다. Stop DeX 뒤 `overlay_display_devices`는 `null`, `stay_on_while_plugged_in`은 `0`,
+디스플레이는 내장 0·1만 남아 overlay 회수가 확인됐다(2026-10-31, SM-F971N). 호스트명 입력이
+동작한 것은 `NormalizeHost`가 IP 외 호스트명도 허용하기 때문이며, 로컬 DNS/mDNS 해석에 의존한다.
+아래 나머지 항목은 여전히 **미확인**이다.
+
+- USB 연결 상태에서 Prepare → 기기의 `Transports`에 Wireless 항목이 추가 표시되는가
+  (2026-10-31: 네트워크 미도달로 연결 단계가 실패해 확인하지 못함)
+- 케이블 분리 후 기기 행이 유지되고 DeX를 시작할 수 있는가 — **확인됨**(2026-10-31, 호스트명
+  `z-fold8:5555` 무선 transport로 DeX 시작·Stop DeX·overlay 회수)
+- Disconnect 뒤 저장 모드가 USB로 돌아가는가
+- IP를 잘못 입력하면 실패 메시지가 뜨고 버튼이 복귀하는가
+- 동작 중 Save 버튼이 비활성이고 끝나면 다시 활성화되는가
+- [ ] 포트 입력란을 비웠을 때 Port 값과 연결 버튼 상태(NumericUpDown null 바인딩 미확인)
+
+알려진 한계:
+
+- Android 11+ 6자리 페어링은 지원하지 않는다. Core `Pair(host, port, code)`는 기기 프로필을
+  건드리지 않는다(Windows 앱은 기기를 인식하는 자체 `Pair` 사본을 가진다).
+- 휴대폰을 재부팅하면 `adb tcpip` 모드가 풀린다. 무선 전환은 다시 USB로 해야 한다.
+- 동작 중 Save를 막는 이유: `WirelessAdbService`는 `SettingsService.UpdateAndSave`(잠금
+  `_saveSync`)로 저장하고, 설정 페이지는 `ApplicationHost.UpdateSettings`(잠금
+  `_settingsLock`)로 저장한다. 같은 살아 있는 `AppSettings`에 대해 잠금이 둘이라 서로를
+  배제하지 못하므로 `SettingsViewModel.IsWirelessIdle`이 false인 동안 Save를 비활성화한다.
+  다만 이 게이트는 창을 좁힐 뿐 닫지는 못한다(페이지 교체나 설정 창을 닫았다 다시 열면
+  Core 호출이 아직 도는 중에도 게이트가 풀린다). 근본 해결은 `TODO.md`에 기록한 설정 저장
+  잠금 통합이다.
+- TUI [5]-[1]의 `EnableFromUsb(device.Identity, 5555)` 호출(`InteractiveHost.cs:537`)은
+  identity를 호스트 자리에 넘긴다. 이 브랜치에서는 고치지 않았다(`TODO.md` 참조).
+
 ## 터미널 앱 신호 종료 실기 검증
 
 PR #9는 `DexManager.Mac`에 `PosixSignalRegistration`(SIGTERM/SIGINT/SIGHUP)을 넣어

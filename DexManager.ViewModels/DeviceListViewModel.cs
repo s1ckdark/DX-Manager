@@ -15,14 +15,28 @@ public sealed partial class DeviceListViewModel : ObservableObject, IDisposable,
     private readonly IUiDispatcher _dispatcher;
     private readonly IDeviceRuntimeCommands _commands;
     private bool _disposed;
+    private readonly Func<DateTime> _utcNow;
     private long _appliedGeneration = -1;
+    private string _selectedMissingIdentity;
+    private DateTime _selectedMissingSinceUtc;
+
+    /// <summary>
+    /// 선택된 기기가 스냅샷에서 사라진 뒤 자리표시자로 유지되는 최소 시간.
+    /// <c>adb tcpip</c> 는 adbd 를 1~2초 재시작하므로 그동안 USB transport 가
+    /// 한 번의 폴링에서 빠진다. 이 유예 안에서는 다른 휴대폰이 연결돼 있어도
+    /// 선택과 설정 페이지를 유지한다. 유예가 지나도 연결된 다른 기기가 없으면
+    /// 자리표시자("Disconnected")를 계속 남긴다 — 의도된 동작이다.
+    /// </summary>
+    public static readonly TimeSpan PlaceholderGrace = TimeSpan.FromSeconds(10);
 
     public DeviceListViewModel(
         PhysicalDeviceRegistry registry,
         DeviceRuntimeSessionRegistry sessions,
         IUiDispatcher dispatcher,
-        IDeviceRuntimeCommands commands)
+        IDeviceRuntimeCommands commands,
+        Func<DateTime> utcNow = null)
     {
+        _utcNow = utcNow ?? (() => DateTime.UtcNow);
         _registry = registry ?? throw new ArgumentNullException(nameof(registry));
         _sessions = sessions ?? throw new ArgumentNullException(nameof(sessions));
         _dispatcher = dispatcher ?? throw new ArgumentNullException(nameof(dispatcher));
@@ -94,11 +108,32 @@ public sealed partial class DeviceListViewModel : ObservableObject, IDisposable,
                 d.Identity, identity, StringComparison.OrdinalIgnoreCase));
             if (!stillPresent)
             {
+                // 선택된 행은 transport 가 잠깐 사라져도(adb tcpip 의 adbd
+                // 재시작 등) 연결 끊김 자리표시자로 남긴다. 행과 선택이
+                // 유지돼야 기기별 설정 페이지와 진행 중인 작업이 살아남고,
+                // 선택이 다른 휴대폰으로 미끄러지지 않는다.
+                if (ReferenceEquals(Devices[i], SelectedDevice) && !PlaceholderExpired(Devices[i].Identity, incoming))
+                {
+                    Devices[i].Update(new PhysicalDeviceInfo
+                    {
+                        Identity = Devices[i].Identity,
+                        DisplayName = Devices[i].DisplayName,
+                        Transports = new List<DeviceTransportInfo>()
+                    });
+                    continue;
+                }
+
                 // 행이 건 구독을 끊고 뽑는다. 순서를 바꾸면 뽑힌 행이
                 // 계속 이벤트를 받는다.
                 Devices[i].Dispose();
                 Devices.RemoveAt(i);
             }
+        }
+
+        if (SelectedDevice != null && incoming.Any(d => string.Equals(
+                d.Identity, SelectedDevice.Identity, StringComparison.OrdinalIgnoreCase)))
+        {
+            _selectedMissingIdentity = null;
         }
 
         foreach (var info in incoming)
@@ -138,6 +173,26 @@ public sealed partial class DeviceListViewModel : ObservableObject, IDisposable,
         }
 
         OnPropertyChanged(nameof(IsEmpty));
+    }
+
+    // 선택 행이 사라진 시각을 기록하고, 유예가 지났고 다른 연결된 기기가
+    // 있을 때만 자리표시자를 만료시킨다. 시각은 주입된 시계를 쓴다 —
+    // 레지스트리가 CapturedAtUtc 를 DateTime.UtcNow 로 직접 찍어 테스트가
+    // 스냅샷 시각을 정할 수 없기 때문이다.
+    private bool PlaceholderExpired(string identity, IList<PhysicalDeviceInfo> incoming)
+    {
+        var now = _utcNow();
+        if (!string.Equals(_selectedMissingIdentity, identity, StringComparison.OrdinalIgnoreCase))
+        {
+            _selectedMissingIdentity = identity;
+            _selectedMissingSinceUtc = now;
+        }
+
+        if (now - _selectedMissingSinceUtc < PlaceholderGrace) return false;
+        if (!incoming.Any(d => d.IsConnected)) return false;
+
+        _selectedMissingIdentity = null;
+        return true;
     }
 
     public void Dispose()

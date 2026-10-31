@@ -74,4 +74,27 @@ public static class SettingsWindowStrings
     public static string SlotsForceStopTip => LocalizationService.Get("Settings.Slots.ForceStopTip");
 
     public static string SlotsFlexDisplayTip => LocalizationService.Get("Settings.Slots.FlexDisplayTip");
+
+    // Connection tab (wireless ADB).
+    public static string Connection => LocalizationService.Get("Settings.Connection");
+
+    public static string CurrentStatus => LocalizationService.Get("Settings.CurrentStatus");
+
+    public static string PhoneIp => LocalizationService.Get("Settings.PhoneIp");
+
+    public static string ConnectPort => LocalizationService.Get("Settings.ConnectPort");
+
+    public static string AutoReconnect => LocalizationService.Get("Settings.AutoReconnect");
+
+    public static string PrepareWireless => LocalizationService.Get("Settings.PrepareWireless");
+
+    public static string ConnectWireless => LocalizationService.Get("Settings.ConnectWireless");
+
+    public static string Disconnect => LocalizationService.Get("Settings.Disconnect");
+
+    public static string ConnectionAutoDetectIp => LocalizationService.Get("Settings.Connection.AutoDetectIp");
+
+    public static string ConnectionActionsApplyImmediately => LocalizationService.Get("Settings.Connection.ActionsApplyImmediately");
+
+    public static string ConnectionNoUsbForPrepare => LocalizationService.Get("Settings.Connection.NoUsbForPrepare");
 }

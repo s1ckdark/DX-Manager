@@ -29,6 +29,56 @@
         `GetAwaiter().GetResult()`가 `--warnaserror`에서 `xUnit1031` 오류가 되어 PR #9 이후 main의
         모든 워크플로 실행이 실패했다. 테스트를 `async`/`await`로 바꿨다(아래 Phase 2 이연 항목의
         "[Task 3] 빌드 경고 신규 발생"과 같은 건).
+- [x] macOS GUI Phase 4 — 설정 창 Connection 탭(기기별 USB→무선 전환·IP 직접 연결·해제·
+      transport 상태)
+  - [x] `IWirelessConnectionGateway`/`WirelessConnectionGateway` — `ApplicationHost.WirelessAdb`의
+        기기별 API(`EnableFromUsbForDevice`·`ConnectForDevice`·`DisconnectForDevice`)를
+        `Task.Run`으로 감싸고 `FindDevice`·`GetProfile`·`DevicesChanged`를 노출
+  - [x] `ConnectionSettingsViewModel` — Host/Port(기본 5555)/AutoReconnect, transport 요약,
+        저장 모드 문구, 세 명령(USB→무선 전환·IP:포트 직접 연결·무선 해제), `IsBusy`,
+        `StatusMessage`. `HasChanges`/Save가 없다: 동작은 즉시 실행되고 성공 시
+        `WirelessAdbService`가 프로필을 직접 저장한다. USB serial은
+        `PhysicalDeviceInfo.SelectAuthorizedTransport(DeviceTransportKind.Usb, null)`로 얻는다.
+  - [x] `SettingsViewModel`에 5번째 생성자 인자(게이트웨이), identity별 `Connection` 페이지,
+        `IsWirelessIdle` 추가 — 동작 중 Save 버튼 비활성(잠금 사유는 `KNOWN_ISSUES.md`)
+  - [x] `SettingsWindow.axaml`에 Slots 뒤 Connection 탭, `SettingsWindowStrings`와 resx 두 파일에
+        `Settings.Connection.*` 키 6개
+  - [x] 자동 테스트: ViewModels.Tests 152(게이트웨이 4 + ConnectionSettingsViewModel 13 +
+        SettingsViewModel 통합 6 포함), Desktop.Tests 26, Tests 281.
+        `dotnet build DexManager.Mac.sln -c Release --warnaserror` 경고 0
+  - [ ] 실기 확인 현황(2026-10-31 SM-F971N; 이 환경에서도 `DOTNET_ROOT`를 주면 GUI가 뜬다 —
+        `docs/KNOWN_ISSUES.md` "macOS GUI Connection 탭 실기 검증 범위" 참조):
+    - [x] 기기 선택 뒤 탭이 USB serial·저장 방식·포트·자동 재연결을 표시하고 Prepare만 활성
+    - [x] 호스트명 `z-fold8`로 Connect wirelessly → 무선 연결 성공, 프로필 Wireless로 저장
+    - [ ] USB 연결 상태에서 Prepare → 기기의 `Transports`에 Wireless 항목이 추가로 표시되는가
+          (첫 시도는 adbd 재시작으로 페이지가 사라져 결과를 못 봄 → 자리표시자 수정 후 재확인 필요)
+    - [x] 케이블 분리 후 기기 행이 유지되고 DeX를 시작할 수 있는가 — 무선 transport로 DeX
+          시작·Stop DeX, overlay `null` 회수 확인
+    - [ ] Disconnect 뒤 저장 모드가 USB로 돌아가는가
+    - [ ] IP를 잘못 입력하면 실패 메시지가 뜨고 버튼이 복귀하는가
+    - [ ] 동작 중 Save가 비활성이고 끝나면 다시 활성화되는가
+  - [ ] 이연된 리뷰 minor: 연결 호출 중 Cancel/기기 선택 변경 시 호출이 끝나기 전에 idle로
+        보고됨, 비운 NumericUpDown이 int `Port`로 바인딩되지 못함, placeholder 문구가 다른 탭처럼
+        영어로 하드코딩됨, `OperationCanceledException` 경로 테스트 없음
+- [x] **[실기 재현 → 수정]** Connection 탭 "Prepare over USB" 도중 USB 재열거로 페이지가 사라진다 —
+      원인: `PhysicalDeviceRegistry.Reconcile`은 한 폴에서 빠진 기기를 유예 없이 제거하고,
+      `DeviceListViewModel.Apply`가 선택 행을 폐기한 뒤 `FirstOrDefault()`로 되돌려 휴대폰 한 대면
+      `SelectedIdentity`가 null이 되어 설정 창이 페이지를 폐기했다. 수정(`02ae027`, `9838874`):
+      선택된 identity의 행은 스냅샷에서 빠져도 같은 `DeviceViewModel` 인스턴스를 "Disconnected"
+      자리표시자로 유지하고(transport 없음, Start DeX·슬롯 Start 비활성, Stop은 그대로), 같은
+      identity가 돌아오면 같은 행을 갱신한다. 선택이 바뀌지 않으므로 설정 창 페이지가 살아남는다.
+      자리표시자는 `PlaceholderGrace`(10초) 이상 사라진 상태에서 **다른 연결된 휴대폰이 있을 때만**
+      제거되고 선택이 그쪽으로 넘어간다. 다른 휴대폰이 없으면 무기한 유지된다(의도). 레지스트리는
+      건드리지 않았다. 실기 재확인은 아래 체크리스트 항목.
+  - [ ] 사소한 보강: 자리표시자가 선택 해제된 채 제거되거나 선택되지 않은 상태로 돌아오면
+        `_selectedMissingSinceUtc` 스탬프가 남아, 나중에 그 기기를 다시 선택해 또 빠지면 유예 없이
+        만료될 수 있다. 선택 변경 시 스탬프를 지운다.
+- [ ] Connection 탭 포트 NumericUpDown 폭이 좁아 "5555" 마지막 자리가 잘려 보인다(실기 확인) —
+      `MinWidth`를 늘린다.
+- [ ] 설정 저장 잠금 통합 — `ApplicationHost.UpdateSettings`(`_settingsLock`, live 객체 변경 후 Save)와 `SettingsService.UpdateAndSave`(`_saveSync`, CloneCore→mutate→SaveCore→CopySettings)가 같은 `AppSettings`를 서로 다른 잠금으로 쓴다. `UpdateAndSave`의 CloneCore와 CopySettings 사이에 들어온 UI 저장은 메모리와 디스크에서 조용히 덮어써진다. 수 ms 창이라 드물지만, `UpdateSettings`가 `_saveSync` 아래에서 변경+저장을 한 번에 하도록 바꾸면 이 부류가 사라지고 Connection 탭의 `IsWirelessIdle` Save 게이트는 UX 용도만 남는다. Core 동시성 변경이라 별도 PR로 진행한다.
+- [ ] TUI [5]-[1]이 `EnableFromUsb(device.Identity, 5555)`로 identity를 호스트 자리에 넘긴다
+      (`DexManager.Mac/Hosting/InteractiveHost.cs:537`) — 메서드는 호스트 IP를 기대한다.
+      `EnableFromUsbForDevice`로 교체한다. Connection 탭 브랜치에서는 고치지 않았다.
 
 - [x] macOS GUI Phase 0 — 플랫폼 분리와 ApplicationHost 추출
   - [x] `IPathProvider.IsPortablePackage` 승격

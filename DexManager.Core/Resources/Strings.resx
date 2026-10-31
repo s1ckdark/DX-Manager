@@ -764,4 +764,12 @@
   <data name="Settings.Slots.HidMouseTip" xml:space="preserve"><value>Routes mouse input via HID instead of the default method. Windows only - has no effect on macOS.</value></data>
   <data name="Settings.Slots.ForceStopTip" xml:space="preserve"><value>Force-stops the app before launching it, so it always starts fresh instead of resuming its last state.</value></data>
   <data name="Settings.Slots.FlexDisplayTip" xml:space="preserve"><value>Lets you resize the virtual display by dragging the scrcpy window's edges. Requires scrcpy 4.0 or newer; ignored on older versions.</value></data>
+  <data name="Settings.Connection.NoTransport" xml:space="preserve"><value>No ADB transport is connected for this device.</value></data>
+  <data name="Settings.Connection.SavedMode" xml:space="preserve"><value>Saved connection: {0}</value></data>
+  <data name="Settings.Connection.AutoDetectIp" xml:space="preserve"><value>Leave empty to detect the phone's Wi-Fi IP over USB</value></data>
+  <data name="Settings.Connection.NoUsbForPrepare" xml:space="preserve"><value>Connect the phone over USB first.</value></data>
+  <data name="Settings.Connection.ActionsApplyImmediately" xml:space="preserve"><value>Connection actions run immediately and are saved when they succeed. Save and Cancel do not affect them.</value></data>
+  <data name="Settings.Connection.PortOutOfRange" xml:space="preserve"><value>Port must be between 1 and 65535.</value></data>
+  <data name="Settings.Connection.ModeUsb" xml:space="preserve"><value>USB</value></data>
+  <data name="Settings.Connection.ModeWireless" xml:space="preserve"><value>Wireless</value></data>
 </root>
