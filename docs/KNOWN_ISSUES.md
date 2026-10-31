@@ -421,6 +421,31 @@ Cancel 클릭, 슬롯 화면 확인)을 했으므로 **창 자체가 뜨고 탭�
 이 목록은 코드 검토와 자동 테스트(xUnit 284개 — Desktop 17 + ViewModels 112 +
 Core 155 — + 다중기기 39개)로만 뒷받침된다.
 
+## macOS GUI Connection 탭 실기 검증 범위
+
+설정 창 Connection 탭(기기별 USB→무선 전환·IP:포트 직접 연결·무선 해제)은 자동 테스트로만
+검증됐다(ViewModels.Tests 152, Desktop.Tests 26, Core Tests 281; 게이트웨이 테스트는
+`TempHostRoot`의 실제 `ApplicationHost`를 쓰지만 adb는 가짜다). 이 개발 환경은 Avalonia를
+띄우지 못하므로(RenderTimer -6661) 아래는 모두 **미확인**이다.
+
+- USB 연결 상태에서 Prepare → 기기의 `Transports`에 Wireless 항목이 추가 표시되는가
+- 케이블 분리 후 기기 행이 유지되고 DeX를 시작할 수 있는가
+- Disconnect 뒤 저장 모드가 USB로 돌아가는가
+- IP를 잘못 입력하면 실패 메시지가 뜨고 버튼이 복귀하는가
+- 동작 중 Save 버튼이 비활성이고 끝나면 다시 활성화되는가
+
+알려진 한계:
+
+- Android 11+ 6자리 페어링은 지원하지 않는다. Core `Pair(host, port, code)`는 기기 프로필을
+  건드리지 않는다(Windows 앱은 기기를 인식하는 자체 `Pair` 사본을 가진다).
+- 휴대폰을 재부팅하면 `adb tcpip` 모드가 풀린다. 무선 전환은 다시 USB로 해야 한다.
+- 동작 중 Save를 막는 이유: `WirelessAdbService`는 `SettingsService.UpdateAndSave`(잠금
+  `_saveSync`)로 저장하고, 설정 페이지는 `ApplicationHost.UpdateSettings`(잠금
+  `_settingsLock`)로 저장한다. 같은 살아 있는 `AppSettings`에 대해 잠금이 둘이라 서로를
+  배제하지 못하므로 `SettingsViewModel.IsWirelessIdle`이 false인 동안 Save를 비활성화한다.
+- TUI [5]-[1]의 `EnableFromUsb(device.Identity, 5555)` 호출(`InteractiveHost.cs:537`)은
+  identity를 호스트 자리에 넘긴다. 이 브랜치에서는 고치지 않았다(`TODO.md` 참조).
+
 ## 터미널 앱 신호 종료 실기 검증
 
 PR #9는 `DexManager.Mac`에 `PosixSignalRegistration`(SIGTERM/SIGINT/SIGHUP)을 넣어

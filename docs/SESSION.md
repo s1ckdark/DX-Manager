@@ -39,6 +39,27 @@
   `DisplayCleanupPermissionService`의 번들 Companion 상수가 2.0.0(versionCode 6) 기준이라는
   점은 `TODO.md`에 항목으로 남겼다.
 
+## 2026-10-31 macOS GUI Connection 탭 (무선 ADB)
+
+- 브랜치 `feature/gui-wireless-adb`(커밋 5ba4507, 0919aed, c10190d, e6057e1, cc287aa)가 설정
+  창에 기기별 Connection 탭을 추가했다. `IWirelessConnectionGateway`가
+  `ApplicationHost.WirelessAdb`의 `EnableFromUsbForDevice`·`ConnectForDevice`·
+  `DisconnectForDevice`를 `Task.Run`으로 감싸고, `ConnectionSettingsViewModel`이
+  Host/Port(기본 5555)/AutoReconnect, transport 요약, 저장 모드 문구, 세 명령,
+  `IsBusy`/`StatusMessage`를 제공한다. 동작은 즉시 실행되며 성공하면
+  `WirelessAdbService`가 프로필을 저장한다(페이지에 Save 없음).
+- `SettingsViewModel`은 게이트웨이를 5번째 생성자 인자로 받고 identity별 `Connection`
+  페이지를 만들고 해제한다. `WirelessAdbService`(`_saveSync`)와 설정 페이지(`_settingsLock`)가
+  같은 `AppSettings`를 서로 다른 잠금으로 저장하므로 연결 동작 중에는 Save를 비활성화한다.
+- 검증: ViewModels.Tests 152, Desktop.Tests 26, Tests 281 통과,
+  `dotnet build DexManager.Mac.sln -c Release --warnaserror` 경고 0.
+- 미확인: 실제 기기와 실행 중인 GUI에서의 동작 전부(이 환경은 Avalonia 기동 불가,
+  RenderTimer -6661). 체크리스트는 `TODO.md`와 `KNOWN_ISSUES.md`의 "macOS GUI Connection 탭
+  실기 검증 범위".
+- 범위 밖/한계: Android 11+ 6자리 페어링 미지원, 휴대폰 재부팅 시 `adb tcpip` 해제.
+  TUI [5]-[1]의 `EnableFromUsb(device.Identity, 5555)` 버그
+  (`InteractiveHost.cs:537`)는 고치지 않고 `TODO.md`에 남겼다.
+
 ## macOS GUI Phase 0 완료
 
 - `DexManager.Platform.Mac` 라이브러리를 분리해 macOS 플랫폼 서비스 5종을

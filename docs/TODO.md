@@ -29,6 +29,35 @@
         `GetAwaiter().GetResult()`가 `--warnaserror`에서 `xUnit1031` 오류가 되어 PR #9 이후 main의
         모든 워크플로 실행이 실패했다. 테스트를 `async`/`await`로 바꿨다(아래 Phase 2 이연 항목의
         "[Task 3] 빌드 경고 신규 발생"과 같은 건).
+- [x] macOS GUI Phase 4 — 설정 창 Connection 탭(기기별 USB→무선 전환·IP 직접 연결·해제·
+      transport 상태)
+  - [x] `IWirelessConnectionGateway`/`WirelessConnectionGateway` — `ApplicationHost.WirelessAdb`의
+        기기별 API(`EnableFromUsbForDevice`·`ConnectForDevice`·`DisconnectForDevice`)를
+        `Task.Run`으로 감싸고 `FindDevice`·`GetProfile`·`DevicesChanged`를 노출
+  - [x] `ConnectionSettingsViewModel` — Host/Port(기본 5555)/AutoReconnect, transport 요약,
+        저장 모드 문구, 세 명령(USB→무선 전환·IP:포트 직접 연결·무선 해제), `IsBusy`,
+        `StatusMessage`. `HasChanges`/Save가 없다: 동작은 즉시 실행되고 성공 시
+        `WirelessAdbService`가 프로필을 직접 저장한다. USB serial은
+        `PhysicalDeviceInfo.SelectAuthorizedTransport(DeviceTransportKind.Usb, null)`로 얻는다.
+  - [x] `SettingsViewModel`에 5번째 생성자 인자(게이트웨이), identity별 `Connection` 페이지,
+        `IsWirelessIdle` 추가 — 동작 중 Save 버튼 비활성(잠금 사유는 `KNOWN_ISSUES.md`)
+  - [x] `SettingsWindow.axaml`에 Slots 뒤 Connection 탭, `SettingsWindowStrings`와 resx 두 파일에
+        `Settings.Connection.*` 키 6개
+  - [x] 자동 테스트: ViewModels.Tests 152(게이트웨이 4 + ConnectionSettingsViewModel 13 +
+        SettingsViewModel 통합 6 포함), Desktop.Tests 26, Tests 281.
+        `dotnet build DexManager.Mac.sln -c Release --warnaserror` 경고 0
+  - [ ] 실기 미확인(이 환경은 Avalonia를 띄우지 못한다 — RenderTimer -6661):
+    - [ ] USB 연결 상태에서 Prepare → 기기의 `Transports`에 Wireless 항목이 추가로 표시되는가
+    - [ ] 케이블 분리 후 기기 행이 유지되고 DeX를 시작할 수 있는가
+    - [ ] Disconnect 뒤 저장 모드가 USB로 돌아가는가
+    - [ ] IP를 잘못 입력하면 실패 메시지가 뜨고 버튼이 복귀하는가
+    - [ ] 동작 중 Save가 비활성이고 끝나면 다시 활성화되는가
+  - [ ] 이연된 리뷰 minor: 연결 호출 중 Cancel/기기 선택 변경 시 호출이 끝나기 전에 idle로
+        보고됨, 비운 NumericUpDown이 int `Port`로 바인딩되지 못함, placeholder 문구가 다른 탭처럼
+        영어로 하드코딩됨, `OperationCanceledException` 경로 테스트 없음
+- [ ] TUI [5]-[1]이 `EnableFromUsb(device.Identity, 5555)`로 identity를 호스트 자리에 넘긴다
+      (`DexManager.Mac/Hosting/InteractiveHost.cs:537`) — 메서드는 호스트 IP를 기대한다.
+      `EnableFromUsbForDevice`로 교체한다. Connection 탭 브랜치에서는 고치지 않았다.
 
 - [x] macOS GUI Phase 0 — 플랫폼 분리와 ApplicationHost 추출
   - [x] `IPathProvider.IsPortablePackage` 승격

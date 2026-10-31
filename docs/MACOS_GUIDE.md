@@ -208,6 +208,7 @@ dotnet run --project DexManager.Mac
    - **1. USB를 무선 모드로 전환**: USB로 연결된 기기에 `tcpip 5555`를 자동 적용하고 무선 엔드포인트로 전환합니다.
    - **2. 무선 기기 직접 연결**: IP 주소와 포트(기본 5555)를 입력하여 Wi-Fi 경유로 연결합니다.
    - **3. 무선 연결 해제**: 활성화된 무선 세션을 정상 종료합니다.
+   - Avalonia GUI의 **설정 > Connection** 탭도 기기별로 같은 세 동작을 제공합니다. 페어링(Android 11+ 6자리 코드)은 지원하지 않으며, 휴대폰을 재부팅하면 `adb tcpip` 모드가 풀립니다.
 6. **`[6] File Transfer Coordinator`**:
    - Mac의 로컬 파일이나 디렉토리 경로를 스마트폰의 대상 폴더(기본: `/sdcard/Download`)로 전송(ADB Push)합니다.
 7. **`[7] Diagnostics & Environment`**:
