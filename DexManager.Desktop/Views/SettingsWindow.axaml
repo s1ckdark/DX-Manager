@@ -192,6 +192,62 @@
         </Grid>
       </TabItem>
 
+      <!-- Connection: per-device wireless ADB. Null when no device is selected;
+           same gating pattern as Display/Stream. -->
+      <TabItem Header="{x:Static local:SettingsWindowStrings.Connection}">
+        <Grid x:DataType="vm:SettingsViewModel">
+          <TextBlock Text="Select a device to edit its connection settings."
+                     HorizontalAlignment="Center"
+                     VerticalAlignment="Center"
+                     TextAlignment="Center"
+                     TextWrapping="Wrap"
+                     Opacity="0.6"
+                     Margin="24"
+                     IsVisible="{Binding Connection, Converter={x:Static ObjectConverters.IsNull}}" />
+
+          <ScrollViewer IsVisible="{Binding Connection, Converter={x:Static ObjectConverters.IsNotNull}}">
+            <StackPanel DataContext="{Binding Connection}"
+                        x:DataType="vm:ConnectionSettingsViewModel"
+                        Spacing="10"
+                        Margin="16">
+
+              <TextBlock Text="{x:Static local:SettingsWindowStrings.CurrentStatus}" FontWeight="SemiBold" />
+              <TextBlock Text="{Binding TransportSummary}" TextWrapping="Wrap" />
+              <TextBlock Text="{Binding SavedModeText}" TextWrapping="Wrap" />
+
+              <TextBlock Text="{x:Static local:SettingsWindowStrings.PhoneIp}" />
+              <TextBox Text="{Binding Host, Mode=TwoWay}"
+                       Watermark="{x:Static local:SettingsWindowStrings.ConnectionAutoDetectIp}" />
+
+              <TextBlock Text="{x:Static local:SettingsWindowStrings.ConnectPort}" />
+              <NumericUpDown Value="{Binding Port, Mode=TwoWay}"
+                             Minimum="1" Maximum="65535" Increment="1" FormatString="0"
+                             HorizontalAlignment="Left" />
+
+              <CheckBox IsChecked="{Binding AutoReconnect, Mode=TwoWay}"
+                        Content="{x:Static local:SettingsWindowStrings.AutoReconnect}" />
+
+              <StackPanel Orientation="Horizontal" Spacing="8">
+                <Button Content="{x:Static local:SettingsWindowStrings.PrepareWireless}"
+                        Command="{Binding PrepareWirelessCommand}" />
+                <Button Content="{x:Static local:SettingsWindowStrings.ConnectWireless}"
+                        Command="{Binding ConnectCommand}" />
+                <Button Content="{x:Static local:SettingsWindowStrings.Disconnect}"
+                        Command="{Binding DisconnectCommand}" />
+              </StackPanel>
+
+              <ProgressBar IsIndeterminate="True" IsVisible="{Binding IsBusy}" />
+              <TextBlock Text="{Binding StatusMessage}" TextWrapping="Wrap" />
+              <TextBlock Text="{x:Static local:SettingsWindowStrings.ConnectionActionsApplyImmediately}"
+                         Opacity="0.7" TextWrapping="Wrap" />
+              <TextBlock Text="{x:Static local:SettingsWindowStrings.ConnectionNoUsbForPrepare}"
+                         IsVisible="{Binding !HasUsbTransport}"
+                         Opacity="0.7" TextWrapping="Wrap" />
+            </StackPanel>
+          </ScrollViewer>
+        </Grid>
+      </TabItem>
+
       <!-- Paths: global, never null. -->
       <TabItem Header="Paths">
         <StackPanel DataContext="{Binding Paths}"
@@ -339,6 +395,7 @@
             <MultiBinding Converter="{x:Static BoolConverters.And}">
               <Binding Path="HasChanges" />
               <Binding Path="AreAllPagesValid" />
+              <Binding Path="IsWirelessIdle" />
             </MultiBinding>
           </Button.IsEnabled>
         </Button>
