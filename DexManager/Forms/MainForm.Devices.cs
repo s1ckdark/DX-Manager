@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Threading.Tasks;
@@ -25,6 +25,9 @@ namespace DexManager.Forms
             public bool WasConnected;
             public string ActiveSerial = string.Empty;
             public int ConnectionGeneration;
+            public int PendingSessionStarts;
+            public bool RequireManualStartAfterTransportLoss;
+            public string AutoStartBlockedSerial = string.Empty;
             public int SelectedMode;
             public bool[] ModeSettingsDirty = new bool[4];
         }
@@ -319,39 +322,10 @@ namespace DexManager.Forms
                 return null;
             }
 
-            var profile = _settings.FindDeviceWirelessConnection(
-                context.Identity);
-            var mode = profile == null
-                ? AdbConnectionMode.Usb
-                : profile.Mode;
-            var preferredSerial = context.ActiveSerial ?? string.Empty;
-            if (profile != null &&
-                profile.Mode == AdbConnectionMode.Wireless)
-            {
-                preferredSerial = WirelessAdbService.BuildEndpoint(
-                    profile.WirelessHost,
-                    profile.WirelessPort);
-            }
-            else if (profile == null &&
-                _settings.Connection != null &&
-                _settings.Connection.Mode ==
-                    AdbConnectionMode.Wireless)
-            {
-                var legacyEndpoint = WirelessAdbService.BuildEndpoint(
-                    _settings.Connection.WirelessHost,
-                    _settings.Connection.WirelessPort);
-                if (context.Device.FindTransport(legacyEndpoint) != null)
-                {
-                    mode = AdbConnectionMode.Wireless;
-                    preferredSerial = legacyEndpoint;
-                }
-            }
-
-            return context.Device.SelectAuthorizedTransport(
-                mode == AdbConnectionMode.Wireless
-                    ? DeviceTransportKind.Wireless
-                    : DeviceTransportKind.Usb,
-                preferredSerial);
+            var runtime = context.Runtime;
+            var hasSessions = context.PendingSessionStarts > 0 || (runtime != null &&
+                (runtime.Dex.IsRunning || runtime.SingleWindows.GetRunningSerials().Count > 0));
+            return context.Device.SelectRuntimeTransport(context.ActiveSerial, hasSessions);
         }
 
         private string GetConfiguredTransportWaitingText(

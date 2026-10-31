@@ -117,8 +117,16 @@ namespace DexManager.Services
             while (normalized.Contains("//"))
                 normalized = normalized.Replace("//", "/");
             normalized = normalized.TrimEnd('/');
-            if (!normalized.StartsWith(
+            if (!string.Equals(
+                    normalized,
+                    "/sdcard",
+                    StringComparison.Ordinal) &&
+                !normalized.StartsWith(
                     "/sdcard/",
+                    StringComparison.Ordinal) &&
+                !string.Equals(
+                    normalized,
+                    "/storage/emulated/0",
                     StringComparison.Ordinal) &&
                 !normalized.StartsWith(
                     "/storage/emulated/0/",
@@ -182,7 +190,12 @@ namespace DexManager.Services
         private static string GetTaskResult(
             System.Threading.Tasks.Task<string> task)
         {
-            try { return task.GetAwaiter().GetResult(); }
+            try
+            {
+                return task.Wait(OutputDrainTimeoutMs)
+                    ? task.GetAwaiter().GetResult()
+                    : string.Empty;
+            }
             catch { return string.Empty; }
         }
 

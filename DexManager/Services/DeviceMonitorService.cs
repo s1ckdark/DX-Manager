@@ -84,6 +84,13 @@ namespace DexManager.Services
             }
         }
 
+        public void RequestRefresh()
+        {
+            lock (_lifecycleLock)
+            {
+                if (_timer != null && !IsStopping) _timer.Change(0, _intervalMs);
+            }
+        }
         public void Stop()
         {
             lock (_lifecycleLock)
@@ -146,7 +153,9 @@ namespace DexManager.Services
                     eligibleDevices,
                     _wirelessAdbService.SelectedSerial);
                 if (preferred == null &&
-                    _wirelessAdbService.TryReconnect(false))
+                    _wirelessAdbService.TryReconnect(
+                        false,
+                        _physicalDeviceRegistry.Current))
                 {
                     if (!_adbService.TryGetDevices(false, out devices) ||
                         IsStopping)
@@ -474,7 +483,7 @@ namespace DexManager.Services
         {
             if (string.IsNullOrWhiteSpace(serial))
                 return DeviceTransportKind.Unknown;
-            if (serial.IndexOf(':') >= 0)
+            if (AdbService.IsWirelessSerial(serial))
                 return DeviceTransportKind.Wireless;
             if (serial.StartsWith(
                     "emulator-",

@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -57,6 +57,7 @@ namespace DexManager.Services
                     "adb-proxy",
                     "DXMAdbProxy.exe"));
             AddAdbVersionCheck(results);
+            AddScrcpyVersionCheck(results);
 
             results.Add(new EnvironmentCheckItem
             {
@@ -126,6 +127,27 @@ namespace DexManager.Services
             return results;
         }
 
+        private void AddScrcpyVersionCheck(ICollection<EnvironmentCheckItem> results)
+        {
+            try
+            {
+                results.Add(new EnvironmentCheckItem
+                {
+                    Name = LocalizationService.Get("Environment.ScrcpyVersion"),
+                    Status = EnvironmentCheckStatus.Passed,
+                    Message = _scrcpyService.ReadReportedVersion()
+                });
+            }
+            catch
+            {
+                results.Add(new EnvironmentCheckItem
+                {
+                    Name = LocalizationService.Get("Environment.ScrcpyVersion"),
+                    Status = EnvironmentCheckStatus.Warning,
+                    Message = LocalizationService.Get("Update.VersionUnavailable")
+                });
+            }
+        }
         private void AddAdbVersionCheck(
             ICollection<EnvironmentCheckItem> results)
         {

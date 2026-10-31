@@ -1,46 +1,18 @@
-# DX Companion
+# DX Companion source location
 
-Private Android companion utility for DX Manager. It can inspect and clean up:
+## English
 
-- Android's simulated-secondary-display setting (`overlay_display_devices`)
-- Developer options **Stay awake** (`stay_on_while_plugged_in`)
+The official Android project is now published under [companion/](../companion/README.md).
+It is the version-pinned public snapshot of the canonical shared component used by both PC editions.
+Current release: **2.1.6 / code13 / protocol1 / Android 13+**.
 
-The app provides separate actions for both settings and a combined action. Its
-Quick Settings tile and compact 2 × 1 home-screen widget clean both by default;
-their targets can be changed inside the app.
+The Windows source build uses the included snapshot when the maintainer's shared directory is absent.
+See [Building](../docs/BUILDING.md). Do not restore this old directory as a second editable Android project.
+Ordinary users install the verified APK included in the Windows ZIP through Settings > Companion.
+Private signing keys, passwords and local build configuration are not published.
 
-DX Companion 2.0.0 can also keep an authenticated loopback session with a
-verified DX Manager instance. When Windows announces a real session shutdown,
-DX Manager sends the cleanup request over that already-open session instead of
-starting a new ADB process. A broken USB/Wi-Fi session does not clean up
-immediately: the default grace period is five minutes, and the user can select
-immediate cleanup, one, five, ten or thirty minutes, or disable delayed cleanup.
+## 한국어
 
-## Safety boundary
-
-- Uses `WRITE_SECURE_SETTINGS` only for the two documented recovery settings.
-- Does not provide a shell, execute arbitrary commands, contact cloud services,
-  or collect data. Its network use is limited to authenticated local sessions
-  created through an ADB reverse tunnel by a verified DX Manager instance.
-- The permission is granted only through DX Manager after the exact package and
-  official signing certificate are verified.
-- Every cleanup operation is verified by reading the affected setting again.
-
-## Local build
-
-Run the repository build helper from PowerShell:
-
-```powershell
-powershell.exe -NoProfile -ExecutionPolicy Bypass `
-    -File .\scripts\Build-AndroidCleanup.ps1
-```
-
-The helper uses `JAVA_HOME` and `ANDROID_HOME` when set, or the ignored
-repository-local `.build-tools\android` toolchain. JDK 17 and Android SDK
-platform 36 are required. Never commit `signing.properties`, a keystore, or
-passwords. Back up the release keystore separately; it is required for future
-updates.
-
-Package ID: `io.github.mazemei.dxdisplaycleanup`
-
-The public signing certificate fingerprint is recorded in [SIGNING.md](SIGNING.md).
+정식 Android 소스·APK는 [companion 폴더](../companion/README.md)에 버전을 고정한 스냅샷으로 공개합니다.
+개발 원본은 공용 폴더 한곳에서 유지하며 이 옛 경로를 별도 원본으로 되살리지 않습니다.
+공개 저장소만 내려받은 Windows 빌드도 동봉 스냅샷을 사용합니다.

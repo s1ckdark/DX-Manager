@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Threading.Tasks;
@@ -203,6 +203,7 @@ namespace DexManager.Forms
         {
             _settingsService = settingsService;
             _settings = settings;
+            _lastAutoStartEnabled = settings.Features.AutoStartDexOnDeviceConnected;
             _logService = logService;
             _adbService = adbService;
             _wirelessAdbService = wirelessAdbService;
@@ -249,11 +250,13 @@ namespace DexManager.Forms
             Icon = AppIconProvider.Current;
             StartPosition = FormStartPosition.CenterScreen;
             BackColor = _theme.WindowBackground;
-            Font = UiFonts.Create(9.5F);
-            UiWindowStyle.ApplyFixedStandardSize(this);
+            Font = UiFonts.Pixels(14F);
+            AutoScaleMode = AutoScaleMode.Dpi;
+            AutoScaleDimensions = new SizeF(96F, 96F);
+            UiWindowStyle.ApplyStoreSize(this, 1200, 800);
             AutoScroll = false;
 
-            _pageTitle = new Label
+            _pageTitle = new UiLabel
             {
                 AutoSize = true,
                 Font = UiFonts.Create(22F, FontStyle.Bold),
@@ -279,7 +282,7 @@ namespace DexManager.Forms
             {
                 Location = new Point(33, 91)
             };
-            _indicatorStatus = new Label
+            _indicatorStatus = new UiLabel
             {
                 AutoSize = false,
                 Font = UiFonts.Create(15F, FontStyle.Bold),
@@ -288,14 +291,14 @@ namespace DexManager.Forms
                 Size = new Size(240, 31),
                 TextAlign = ContentAlignment.MiddleLeft
             };
-            _indicatorDetail = new Label
+            _indicatorDetail = new UiLabel
             {
                 AutoEllipsis = true,
                 ForeColor = _theme.TextTertiary,
                 Location = new Point(35, 130),
                 Size = new Size(570, 22)
             };
-            _deviceInfoLabel = new Label
+            _deviceInfoLabel = new UiLabel
             {
                 AutoEllipsis = true,
                 ForeColor = _theme.TextTertiary,
@@ -312,10 +315,10 @@ namespace DexManager.Forms
                 LocalizationService.Get("Main.Waiting"),
                 LocalizationService.Get("Main.PreparingAdb"));
 
-            _adbStatusValue = new Label { Visible = false };
-            _scrcpyStatusValue = new Label { Visible = false };
-            _dexStatusValue = new Label { Visible = false };
-            _deviceStatusValue = new Label { Visible = false };
+            _adbStatusValue = new UiLabel { Visible = false };
+            _scrcpyStatusValue = new UiLabel { Visible = false };
+            _dexStatusValue = new UiLabel { Visible = false };
+            _deviceStatusValue = new UiLabel { Visible = false };
             AddDivider(204);
 
             _displaySettingsTitle = AddSectionTitle(
@@ -354,6 +357,7 @@ namespace DexManager.Forms
             _maxFpsBox.TabIndex = 5;
             _maxFpsBox.Items.Add(30);
             _maxFpsBox.Items.Add(60);
+            _maxFpsBox.Items.Add(new ExperimentalFpsOption());
             _resolutionLabel = AddFieldLabel(
                 LocalizationService.Get("Main.Resolution"), 32, 269);
             _widthLabel = AddFieldLabel(LocalizationService.Get("Main.Width"), 240, 269);
@@ -385,7 +389,6 @@ namespace DexManager.Forms
             _startAppBox.SelectionChangeCommitted +=
                 StartAppBox_SelectionChangeCommitted;
             AddNoStartAppItem();
-            AddRememberedAppItems();
             _loadAppsButton = CreateThemedButton(
                 LocalizationService.Get("Main.LoadApps"),
                 false,
@@ -418,11 +421,12 @@ namespace DexManager.Forms
                 160);
             _appProfileButton.Size = new Size(160, 27);
             _appProfileButton.Visible = false;
-            _appProfileButton.Click += AppProfileButton_Click;
+            _appProfileButton.Click += SaveAppProfileButton_Click;
 
             _additionalArgumentsBox = CreateCustomText(32, 577, 440);
+            _additionalArgumentsBox.PlaceholderText = LocalizationService.IsKorean ? "예: --no-audio --video-codec=h264" : "e.g. --no-audio --video-codec=h264";
             _additionalArgumentsBox.Visible = false;
-            _advancedToggle = new LinkLabel
+            _advancedToggle = new UiLinkLabel
             {
                 AutoSize = true,
                 LinkColor = _theme.Accent,
@@ -433,6 +437,7 @@ namespace DexManager.Forms
             _advancedToggle.LinkClicked += delegate
             {
                 _additionalArgumentsBox.Visible = !_additionalArgumentsBox.Visible;
+                LayoutDesktopContent();
                 _advancedToggle.Text = _additionalArgumentsBox.Visible
                     ? LocalizationService.Get("Main.AdvancedOpen")
                     : LocalizationService.Get("Main.AdvancedClosed");
@@ -454,7 +459,7 @@ namespace DexManager.Forms
                 152);
             _stopButton.Click += StopButton_Click;
             _stopButton.Visible = false;
-            _applySettingsLink = new LinkLabel
+            _applySettingsLink = new UiLinkLabel
             {
                 AutoSize = true,
                 LinkBehavior = LinkBehavior.HoverUnderline,
@@ -489,7 +494,7 @@ namespace DexManager.Forms
             Controls.Add(_startButton);
             Controls.Add(_stopButton);
             Controls.Add(_applySettingsLink);
-            _modeHintLabel = new Label
+            _modeHintLabel = new UiLabel
             {
                 AutoEllipsis = true,
                 ForeColor = Color.FromArgb(107, 114, 128),
@@ -536,6 +541,17 @@ namespace DexManager.Forms
 
         private async void MainForm_Shown(object sender, EventArgs e)
         {
+            var onboarding = new PortableOnboardingService(System.IO.Path.GetDirectoryName(_settingsService.SettingsFilePath));
+            var existingInstallation = onboarding.HasAcceptedAnyFirstRunNotice;
+            if (onboarding.ShouldShowNoticeForLaunch())
+            {
+                if (!DesktopDialogs.ConfirmFirstRun(this)) { _allowExit = true; Close(); return; }
+                string error;
+                if (!onboarding.TryAccept(out error)) ShowDesktopNotice(StoreUiText.Get("FirstRunDialogSaveFailed", "The acknowledgement could not be saved; this notice may appear again.") + " " + error, DesktopNoticeKind.Warning);
+            }
+            if (_exitInProgress || IsDisposed) return;
+            ShowLocalUpdateNotice(existingInstallation, System.IO.Path.GetDirectoryName(_settingsService.SettingsFilePath));
+            if (_exitInProgress || IsDisposed) return;
             _logService.Info(
                 LocalizationService.Get("Log.Main.Shown"));
             try { _captureCoordinator.Start(); }
@@ -566,10 +582,11 @@ namespace DexManager.Forms
             _miniControlBarManager.Start();
             _interactiveServicesStarted = true;
 
+            BeginAutomaticUpdateCheck();
             await InitializeAdbAndMonitorAsync();
             if (_exitInProgress || IsDisposed) return;
             if (_isAutoRun && _settings.Features.StartMinimizedToTray)
-                BeginInvoke((Action)HideToTray);
+                BeginInvoke((Action)delegate { if (!_explicitShowRequested) HideToTray(); });
         }
     }
 }

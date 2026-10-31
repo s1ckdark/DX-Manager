@@ -1,10 +1,21 @@
-using System;
+﻿using System;
 using DexManager.Models;
 
 namespace DexManager.Forms
 {
     public sealed partial class MainForm
     {
+        private DeviceRunSettingsProfile CaptureSelectedRunSettings()
+        {
+            var source = GetSelectedDeviceRunSettings();
+            return new DeviceRunSettingsProfile
+            {
+                DeviceIdentity = source.DeviceIdentity,
+                VirtualDisplay = AppSettings.CloneVirtualDisplay(source.VirtualDisplay),
+                Scrcpy = AppSettings.CloneScrcpy(source.Scrcpy)
+            };
+        }
+
         private DeviceRunSettingsProfile GetSelectedDeviceRunSettings()
         {
             return GetDeviceRunSettings(

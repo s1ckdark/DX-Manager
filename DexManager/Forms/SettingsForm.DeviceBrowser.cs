@@ -20,7 +20,7 @@ namespace DexManager.Forms
             if (string.IsNullOrWhiteSpace(serial) ||
                 !_adbService.IsAuthorizedDeviceConnected(serial))
             {
-                MessageBox.Show(
+                DesktopDialogs.Show(
                     this,
                     LocalizationService.Get("DeviceFolder.NoDevice"),
                     LocalizationService.Get("DeviceFolder.Title"),
@@ -32,12 +32,18 @@ namespace DexManager.Forms
             using (var dialog = new DeviceFolderBrowserForm(
                 _adbService,
                 serial,
-                targetBox.Text))
+                targetBox.Text,
+                targetBox == _deviceScreenshotFolderBox ? (bool?)_pushCaptureBox.Checked : null))
             {
                 if (dialog.ShowDialog(this) == DialogResult.OK &&
                     !string.IsNullOrWhiteSpace(dialog.SelectedPath))
                 {
                     targetBox.Text = dialog.SelectedPath;
+                    if (targetBox == _deviceScreenshotFolderBox)
+                    {
+                        _pushCaptureBox.Checked = dialog.CaptureTransferEnabled;
+                        SaveStoreScope(settings => settings.Features.PushCaptureToDevice = dialog.CaptureTransferEnabled);
+                    }
                 }
             }
         }

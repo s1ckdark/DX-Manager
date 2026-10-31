@@ -1,0 +1,188 @@
+﻿[
+  {
+    "symbol": "Display",
+    "name": "Desktop",
+    "url": "https://raw.githubusercontent.com/microsoft/fluentui-system-icons/a563cf9166f4f91aa617557ed272612b7f0a2f72/assets/Desktop/SVG/ic_fluent_desktop_20_regular.svg",
+    "svg": "svg/Display.svg"
+  },
+  {
+    "symbol": "Launch",
+    "name": "Play",
+    "url": "https://raw.githubusercontent.com/microsoft/fluentui-system-icons/a563cf9166f4f91aa617557ed272612b7f0a2f72/assets/Play/SVG/ic_fluent_play_20_regular.svg",
+    "svg": "svg/Launch.svg"
+  },
+  {
+    "symbol": "Phone",
+    "name": "Phone",
+    "url": "https://raw.githubusercontent.com/microsoft/fluentui-system-icons/a563cf9166f4f91aa617557ed272612b7f0a2f72/assets/Phone/SVG/ic_fluent_phone_20_regular.svg",
+    "svg": "svg/Phone.svg"
+  },
+  {
+    "symbol": "Keyboard",
+    "name": "Keyboard",
+    "url": "https://raw.githubusercontent.com/microsoft/fluentui-system-icons/a563cf9166f4f91aa617557ed272612b7f0a2f72/assets/Keyboard/SVG/ic_fluent_keyboard_20_regular.svg",
+    "svg": "svg/Keyboard.svg"
+  },
+  {
+    "symbol": "Mouse",
+    "name": "Keyboard Mouse",
+    "url": "https://raw.githubusercontent.com/microsoft/fluentui-system-icons/a563cf9166f4f91aa617557ed272612b7f0a2f72/assets/Keyboard%20Mouse/SVG/ic_fluent_keyboard_mouse_20_regular.svg",
+    "svg": "svg/Mouse.svg"
+  },
+  {
+    "symbol": "Moon",
+    "name": "Weather Moon",
+    "url": "https://raw.githubusercontent.com/microsoft/fluentui-system-icons/a563cf9166f4f91aa617557ed272612b7f0a2f72/assets/Weather%20Moon/SVG/ic_fluent_weather_moon_20_regular.svg",
+    "svg": "svg/Moon.svg"
+  },
+  {
+    "symbol": "Close",
+    "name": "Dismiss Circle",
+    "url": "https://raw.githubusercontent.com/microsoft/fluentui-system-icons/a563cf9166f4f91aa617557ed272612b7f0a2f72/assets/Dismiss%20Circle/SVG/ic_fluent_dismiss_circle_20_regular.svg",
+    "svg": "svg/Close.svg"
+  },
+  {
+    "symbol": "Settings",
+    "name": "Settings",
+    "url": "https://raw.githubusercontent.com/microsoft/fluentui-system-icons/a563cf9166f4f91aa617557ed272612b7f0a2f72/assets/Settings/SVG/ic_fluent_settings_20_regular.svg",
+    "svg": "svg/Settings.svg"
+  },
+  {
+    "symbol": "Help",
+    "name": "Question Circle",
+    "url": "https://raw.githubusercontent.com/microsoft/fluentui-system-icons/a563cf9166f4f91aa617557ed272612b7f0a2f72/assets/Question%20Circle/SVG/ic_fluent_question_circle_20_regular.svg",
+    "svg": "svg/Help.svg"
+  },
+  {
+    "symbol": "Refresh",
+    "name": "Arrow Clockwise",
+    "url": "https://raw.githubusercontent.com/microsoft/fluentui-system-icons/a563cf9166f4f91aa617557ed272612b7f0a2f72/assets/Arrow%20Clockwise/SVG/ic_fluent_arrow_clockwise_20_regular.svg",
+    "svg": "svg/Refresh.svg"
+  },
+  {
+    "symbol": "List",
+    "name": "Document Bullet List",
+    "url": "https://raw.githubusercontent.com/microsoft/fluentui-system-icons/a563cf9166f4f91aa617557ed272612b7f0a2f72/assets/Document%20Bullet%20List/SVG/ic_fluent_document_bullet_list_20_regular.svg",
+    "svg": "svg/List.svg"
+  },
+  {
+    "symbol": "Link",
+    "name": "Link",
+    "url": "https://raw.githubusercontent.com/microsoft/fluentui-system-icons/a563cf9166f4f91aa617557ed272612b7f0a2f72/assets/Link/SVG/ic_fluent_link_20_regular.svg",
+    "svg": "svg/Link.svg"
+  },
+  {
+    "symbol": "Folder",
+    "name": "Folder Open",
+    "url": "https://raw.githubusercontent.com/microsoft/fluentui-system-icons/a563cf9166f4f91aa617557ed272612b7f0a2f72/assets/Folder%20Open/SVG/ic_fluent_folder_open_20_regular.svg",
+    "svg": "svg/Folder.svg"
+  },
+  {
+    "symbol": "Information",
+    "name": "Info",
+    "url": "https://raw.githubusercontent.com/microsoft/fluentui-system-icons/a563cf9166f4f91aa617557ed272612b7f0a2f72/assets/Info/SVG/ic_fluent_info_20_regular.svg",
+    "svg": "svg/Information.svg"
+  },
+  {
+    "symbol": "Power",
+    "name": "Power",
+    "url": "https://raw.githubusercontent.com/microsoft/fluentui-system-icons/a563cf9166f4f91aa617557ed272612b7f0a2f72/assets/Power/SVG/ic_fluent_power_20_regular.svg",
+    "svg": "svg/Power.svg"
+  },
+  {
+    "symbol": "Language",
+    "name": "Translate",
+    "url": "https://raw.githubusercontent.com/microsoft/fluentui-system-icons/a563cf9166f4f91aa617557ed272612b7f0a2f72/assets/Translate/SVG/ic_fluent_translate_20_regular.svg",
+    "svg": "svg/Language.svg"
+  },
+  {
+    "symbol": "Palette",
+    "name": "Dark Theme",
+    "url": "https://raw.githubusercontent.com/microsoft/fluentui-system-icons/a563cf9166f4f91aa617557ed272612b7f0a2f72/assets/Dark%20Theme/SVG/ic_fluent_dark_theme_20_regular.svg",
+    "svg": "svg/Palette.svg"
+  },
+  {
+    "symbol": "Usb",
+    "name": "USB Plug",
+    "url": "https://raw.githubusercontent.com/microsoft/fluentui-system-icons/a563cf9166f4f91aa617557ed272612b7f0a2f72/assets/USB%20Plug/SVG/ic_fluent_usb_plug_20_regular.svg",
+    "svg": "svg/Usb.svg"
+  },
+  {
+    "symbol": "Wifi",
+    "name": "WiFi 1",
+    "url": "https://raw.githubusercontent.com/microsoft/fluentui-system-icons/a563cf9166f4f91aa617557ed272612b7f0a2f72/assets/WiFi%201/SVG/ic_fluent_wifi_1_20_regular.svg",
+    "svg": "svg/Wifi.svg"
+  },
+  {
+    "symbol": "Menu",
+    "name": "Navigation",
+    "url": "https://raw.githubusercontent.com/microsoft/fluentui-system-icons/a563cf9166f4f91aa617557ed272612b7f0a2f72/assets/Navigation/SVG/ic_fluent_navigation_20_regular.svg",
+    "svg": "svg/Menu.svg"
+  },
+  {
+    "symbol": "Chevron",
+    "name": "Chevron Down",
+    "url": "https://raw.githubusercontent.com/microsoft/fluentui-system-icons/a563cf9166f4f91aa617557ed272612b7f0a2f72/assets/Chevron%20Down/SVG/ic_fluent_chevron_down_20_regular.svg",
+    "svg": "svg/Chevron.svg"
+  },
+  {
+    "symbol": "Options",
+    "name": "Play Settings",
+    "url": "https://raw.githubusercontent.com/microsoft/fluentui-system-icons/a563cf9166f4f91aa617557ed272612b7f0a2f72/assets/Play%20Settings/SVG/ic_fluent_play_settings_20_regular.svg",
+    "svg": "svg/Options.svg"
+  },
+  {
+    "symbol": "Apps",
+    "name": "Apps List",
+    "url": "https://raw.githubusercontent.com/microsoft/fluentui-system-icons/a563cf9166f4f91aa617557ed272612b7f0a2f72/assets/Apps%20List/SVG/ic_fluent_apps_list_20_regular.svg",
+    "svg": "svg/Apps.svg"
+  },
+  {
+    "symbol": "ScreenOff",
+    "name": "Phone Dismiss",
+    "url": "https://raw.githubusercontent.com/microsoft/fluentui-system-icons/a563cf9166f4f91aa617557ed272612b7f0a2f72/assets/Phone%20Dismiss/SVG/ic_fluent_phone_dismiss_20_regular.svg",
+    "svg": "svg/ScreenOff.svg"
+  },
+  {
+    "symbol": "ScreenOn",
+    "name": "Phone",
+    "url": "https://raw.githubusercontent.com/microsoft/fluentui-system-icons/a563cf9166f4f91aa617557ed272612b7f0a2f72/assets/Phone/SVG/ic_fluent_phone_20_regular.svg",
+    "svg": "svg/ScreenOn.svg"
+  },
+  {
+    "symbol": "Fullscreen",
+    "name": "Arrow Expand",
+    "url": "https://raw.githubusercontent.com/microsoft/fluentui-system-icons/a563cf9166f4f91aa617557ed272612b7f0a2f72/assets/Arrow%20Expand/SVG/ic_fluent_arrow_expand_20_regular.svg",
+    "svg": "svg/Fullscreen.svg"
+  },
+  {
+    "symbol": "ResetSize",
+    "name": "Arrow Autofit Content",
+    "url": "https://raw.githubusercontent.com/microsoft/fluentui-system-icons/a563cf9166f4f91aa617557ed272612b7f0a2f72/assets/Arrow%20Autofit%20Content/SVG/ic_fluent_arrow_autofit_content_20_regular.svg",
+    "svg": "svg/ResetSize.svg"
+  },
+  {
+    "symbol": "Capture",
+    "name": "Screenshot",
+    "url": "https://raw.githubusercontent.com/microsoft/fluentui-system-icons/a563cf9166f4f91aa617557ed272612b7f0a2f72/assets/Screenshot/SVG/ic_fluent_screenshot_20_regular.svg",
+    "svg": "svg/Capture.svg"
+  },
+  {
+    "symbol": "Manager",
+    "name": "Phone Desktop",
+    "url": "https://raw.githubusercontent.com/microsoft/fluentui-system-icons/a563cf9166f4f91aa617557ed272612b7f0a2f72/assets/Phone%20Desktop/SVG/ic_fluent_phone_desktop_20_regular.svg",
+    "svg": "svg/Manager.svg"
+  },
+  {
+    "symbol": "ChevronUp",
+    "name": "Chevron Up",
+    "url": "https://raw.githubusercontent.com/microsoft/fluentui-system-icons/a563cf9166f4f91aa617557ed272612b7f0a2f72/assets/Chevron%20Up/SVG/ic_fluent_chevron_up_20_regular.svg",
+    "svg": "svg/ChevronUp.svg"
+  },
+  {
+    "symbol": "Save",
+    "name": "Save",
+    "url": "https://raw.githubusercontent.com/microsoft/fluentui-system-icons/a563cf9166f4f91aa617557ed272612b7f0a2f72/assets/Save/SVG/ic_fluent_save_20_regular.svg",
+    "svg": "svg/Save.svg"
+  }
+]

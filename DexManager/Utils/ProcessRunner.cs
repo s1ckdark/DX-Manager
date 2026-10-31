@@ -12,6 +12,8 @@ namespace DexManager.Utils
 {
     public sealed class ProcessRunner
     {
+        private const int OutputDrainTimeoutMs = 2000;
+        private const int PostKillWaitTimeoutMs = 2000;
         private readonly LogService _logService;
         private readonly object _lifecycleSync = new object();
         private readonly HashSet<Process> _activeProcesses =
@@ -106,6 +108,8 @@ namespace DexManager.Utils
             var stopwatch = Stopwatch.StartNew();
             var output = new StringBuilder();
             var error = new StringBuilder();
+            var outputDrained = new TaskCompletionSource<bool>();
+            var errorDrained = new TaskCompletionSource<bool>();
             var encoding = outputEncoding ?? Encoding.UTF8;
 
             var startInfo = new ProcessStartInfo
@@ -134,17 +138,17 @@ namespace DexManager.Utils
             {
                 process.OutputDataReceived += delegate(object sender, DataReceivedEventArgs e)
                 {
-                    if (e.Data != null)
-                    {
+                    if (e.Data == null)
+                        outputDrained.TrySetResult(true);
+                    else
                         lock (output) output.AppendLine(e.Data);
-                    }
                 };
                 process.ErrorDataReceived += delegate(object sender, DataReceivedEventArgs e)
                 {
-                    if (e.Data != null)
-                    {
+                    if (e.Data == null)
+                        errorDrained.TrySetResult(true);
+                    else
                         lock (error) error.AppendLine(e.Data);
-                    }
                 };
 
                 lock (_lifecycleSync)
@@ -169,10 +173,12 @@ namespace DexManager.Utils
                         process = null;
                     }
                 }
-                else
-                {
-                    process.WaitForExit();
-                }
+
+                // A descendant may inherit stdout/stderr after the requested
+                // process exits. Wait for both readers only for a bounded time.
+                Task.WaitAll(
+                    new[] { outputDrained.Task, errorDrained.Task },
+                    OutputDrainTimeoutMs);
 
                 if (IsShutdownRequested)
                     return CreateCanceledResult(fileName, arguments);
@@ -256,14 +262,12 @@ namespace DexManager.Utils
             try
             {
                 if (!process.HasExited) process.Kill();
-                if (!process.WaitForExit(2000)) return false;
-                process.WaitForExit();
+                if (!process.WaitForExit(PostKillWaitTimeoutMs))
+                    return false;
                 return true;
             }
             catch (InvalidOperationException)
             {
-                try { process.WaitForExit(); }
-                catch (InvalidOperationException) { }
                 return true;
             }
             catch (Exception ex)

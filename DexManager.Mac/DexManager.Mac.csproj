@@ -43,7 +43,7 @@
     Build에서만 복사하고 Publish에는 관여하지 않는다.
   -->
   <ItemGroup>
-    <ProjectReference Include="..\DexManager.AdbProxy\DexManager.AdbProxy.csproj">
+    <ProjectReference Include="..\DexManager.AdbProxy.Mac\DexManager.AdbProxy.csproj">
       <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
     </ProjectReference>
   </ItemGroup>
@@ -52,7 +52,7 @@
           AfterTargets="Build"
           Condition="'$(CopyBundledMacTools)' == 'true'">
     <PropertyGroup>
-      <_AdbProxyOutDir>$(MSBuildThisFileDirectory)..\DexManager.AdbProxy\bin\$(Configuration)\net8.0\</_AdbProxyOutDir>
+      <_AdbProxyOutDir>$(MSBuildThisFileDirectory)..\DexManager.AdbProxy.Mac\bin\$(Configuration)\net8.0\</_AdbProxyOutDir>
     </PropertyGroup>
     <ItemGroup>
       <_AdbProxyFiles Include="$(_AdbProxyOutDir)DXMAdbProxy" />

@@ -1,6 +1,43 @@
 # Session Handoff
 
-마지막 갱신: 2026-09-03
+마지막 갱신: 2026-10-31
+
+## 2026-10-31 upstream v2.5.0 머지
+
+- upstream `maze-mei/DX-Manager` main(`f391baa`, 태그 `v2.5.0`)을 포크 main에 머지했다.
+  머지 베이스는 `2a1ec10`(2026-09-02)이고 upstream 쪽 변경은 7개 커밋·429개 파일이다.
+  대부분 Windows WinForms(`DexManager/`), 새 `companion/` 스냅샷, 문서와 PowerShell
+  스크립트이며 `DexManager.Core`는 upstream이 건드리지 않았다.
+- upstream 구조 변경을 그대로 받았다. Mac 전용 ADB proxy는 `DexManager.AdbProxy.Mac/`,
+  Mac 다중 기기 회귀 테스트는 `DexManager.MultiDeviceTests.Mac/`로 분리됐고, 기존
+  `DexManager.AdbProxy/`·`DexManager.MultiDeviceTests/`는 Windows .NET Framework
+  프로젝트가 됐다. Android 소스는 `DXDisplayCleanup/`에서 `companion/source/`로
+  옮겨졌고 정식 Companion 2.1.6 APK가 `companion/release/`에 동봉된다.
+- 포크 쪽 보정: PR #13의 `--self-test` 공유 마커 변경을 `DexManager.AdbProxy.Mac/Program.cs`에
+  재적용했다. `DexManager.Mac.csproj`의 ProjectReference와 proxy 출력 경로,
+  `DexManager.Mac.sln`, macOS 워크플로, `scripts/Package-Mac-Release.sh`,
+  `docs/MACOS_GUIDE.md`의 경로를 `.Mac`으로 바꿨다. 워크플로와 패키징 스크립트의
+  ViewModels 테스트 단계와 GUI 프로젝트 `paths:` 필터는 유지했다.
+- 문서 충돌 7건 처리 원칙: upstream의 Windows 2.5.0 기록과 포크의 macOS 기록을 모두
+  보존한다. `HANDOFF.md`·`PACKAGE_README.md`·`README.md`는 upstream 본문을 기준으로
+  삼고 포크의 macOS 절을 덧붙였다. `TODO.md`는 포크 작업 목록을 유지하고 upstream
+  2.5.0 범위를 별도 절로 옮겼다. `KNOWN_ISSUES.md`의 macOS 절은 upstream의 과거 기록
+  `<details>` 블록 밖 현행 절로 두었다. `DECISIONS.md`는 양쪽 결정을 모두 남겼다.
+  upstream이 삭제한 이 문서의 "macOS 포터블 배포 작업"·"macOS 크로스플랫폼 변환 작업
+  현황" 절은 포크 기록이므로 복원했다.
+- Windows 2.5.0의 scrcpy 5.0.1 `--hwdec=auto`, 실험적 120 FPS, 업데이트 알림은 WinForms
+  코드에만 있다. Core/Mac 포팅 여부는 `TODO.md`의 별도 항목으로 남겼다.
+- 검증: `DexManager.Mac.sln` Release 리빌드는 오류 0, 경고 1(기존 `xUnit1031`). xUnit은
+  Desktop.Tests 26, ViewModels.Tests 129, Tests 281로 모두 통과했고 다중 기기 회귀 테스트
+  39개도 통과했다. `DexManager.AdbProxy.Mac` 산출물의 `--self-test`는 공유 마커를 출력한다.
+  실제 Galaxy 기기 실기 검증은 이번 머지에서 수행하지 않았다.
+- 머지 후 리뷰에서 확인한 사항: 포크 main의 macOS 워크플로는 PR #9(2026-09-08) 이후 매번
+  실패하고 있었다. 원인은 `dotnet build --warnaserror`가 `ApplicationHostTests.cs`의
+  `xUnit1031` 경고를 오류로 바꾸기 때문이며, 이 PR의 첫 CI 실행도 같은 이유로 실패했다.
+  해당 테스트를 `async`/`await`로 바꾸는 별도 커밋을 같은 브랜치에 올렸다. 포크의
+  `DexManager.Desktop.Tests`(26개)는 CI와 패키징 스크립트가 실행하지 않는다는 점과,
+  `DisplayCleanupPermissionService`의 번들 Companion 상수가 2.0.0(versionCode 6) 기준이라는
+  점은 `TODO.md`에 항목으로 남겼다.
 
 ## macOS GUI Phase 0 완료
 
@@ -61,6 +98,260 @@
   - macOS 전용 가이드 문서 `docs/MACOS_GUIDE.md` 작성 및 `CHANGELOG.md` 갱신
   - 최종 릴리스 빌드 및 테스트 스위트 검증 완료
 
+아래 `2026-10-25`부터의 영문·한글 기록은 upstream Windows 2.5.0 작업 기록을 머지 시점
+그대로 옮긴 것이다. 포크의 macOS 작업 기록은 위 절과 `docs/TODO.md`를 따른다.
+
+## 2026-10-25 authorized Windows 2.5.0 publication
+
+The maintainer authorized the local final commit and GitHub upload. The final EXE has a maintainer-reported clean scan.
+Committed the refreshed docs/photos plus a verified official Companion source/APK export.
+Merged public main while preserving all Mac implementation/tooling; isolated its .NET 8 proxy/foundation projects
+from the tested Windows framework projects. Public Windows checkouts can use the included companion snapshot.
+Preserved scanned EXE/APK/ZIP bytes and all Store files. See PUBLICATION_v2.5.0.md for release boundaries.
+
+## 2026-10-24 GitHub documentation and approved image refresh
+
+The maintainer requested local updates to all GitHub-facing documents after code/package checkpoint ccc10a9.
+Compared fresh public main2a1ec107450d8755e3691e9fa52aa086ed034e8d,40 document/config paths and six historical releases.
+README/full EN-KO guides/35-question FAQs/release notes/current developer docs now reflect2.5.0, fixed archive naming,
+120 consent/screen preference rules, daily online and local changes notices, official Companion2.1.6 and real UI paths.
+Corrected obsolete None-in-single-window, device-list, apply/restart, hidden legacy switch/timing and capture-transfer directions.
+
+Approved16 actual user captures are linked with truthful initial/connected-state captions; no single-window photo.
+Six native Android examples remain. Ten unused old app images were backed up/retired; all user originals are unchanged.
+Preserved remote Mac guide/status and verbatim package template/runtime text/notices; code/workflow integration remains separate.
+Relative Markdown/HTML links, anchors, FAQ numbering, image integrity/source hashes and protected artifact hashes pass.
+No executable/resource/source-code changes, rebuilds, phone installs or new feature-test/antivirus claims.
+Final EXE/APK/ZIP hashes remain exactly as in VERIFICATION_v2.5.0.md; source docs/images stay outside the binary ZIP.
+No local documentation commit, merge, push, tag, GitHub release or old-asset rename was performed.
+Public shared-component source availability, macOS integration, exact-file AV evidence and publication approval remain gates.
+
+
+
+## 2026-10-24 local final package and authorized commit
+
+The maintainer authorized a local Git commit and final upload-file preparation, without GitHub publication.
+Final archive: E:\vs\dex system\dist\DX-Manager-win-x64.zip; one DX Manager v2.5.0 folder,39 verified files.
+ZIP SHA256: EBB91A332B603C4096B1B1FB6D179F4D45B55F5A63FC657F8B989BEA8DE08764.
+EXE SHA256: D3342F2A2B80DC5945D069CF408412A4DEDEBB6C0A54C78795485CB5DAD5FC19; identical to the702-check English UI preview, so functional/update checks were not repeated.
+First-run consent state, personal settings/logs/captures, source guides/screenshots, test binaries and signing material are excluded.
+Required runtime resources, notices and the short package README remain. Official Companion2.1.6 and scrcpy5.0.1 are unchanged.
+The old version-named ZIP was backed up under .build-tools/release250-ready and removed from dist to avoid duplicate delivery names.
+Existing source config/settings.json was checked as a tracked empty-default template and is not shipped in the ZIP.
+An obsolete font-lab helper's personal interpreter path was replaced with python.exe. No product executable changes.
+The user chose no single-window photos, diagnostics before the check, the newly captured Companion photos and the default-size connection image.
+Full README/guide/screenshot updates are deferred at the maintainer's request. Public-source shared-Companion closure and remote-main/macOS preservation remain pre-publication gates.
+No push/tag/merge/release, old GitHub asset renaming, external messages or Store changes.
+
+
+## 2026-10-24 English UI audit and preview
+
+- The maintainer found Korean initial diagnostics text and clipped English Help text while capturing screenshots.
+- Both diagnostics fallback calls and the14px Help font already exist in HEAD8b19906. The preceding header/button patch did not change them; English initial state was missing from the earlier fixture.
+- Added EN/KO diagnostics initial/report resources with English-safe fallbacks. The embedded English FAQ's Korean navigation label now reads Korean FAQ.
+- Only English Help uses13px instead of14px, before font fitting. Korean Help and other sidebar fonts retain their sizes.
+- Reviewed955 resource call sites,647 Store/792 general English resources, matched Korean keys and English embedded help. The only intentional Korean values are language-selector names.
+- Filled missing USB/Wi-Fi entries and the wireless-device-mismatch log resource; no connection/input logic changes.
+- Added the English UI fixture to the standard verifier: all main modes,7 expanded Settings pages before/after diagnostics,5 Help topics, guide/FAQ, transfers, logs, update outcomes and both themes.5458 resource/control texts scanned. English Help fits1184/1200/1600 widths; Korean font parity checked.
+- Release build0 warnings/errors;702 Windows checks passed, including36 English-localization checks. Internal captures visually reviewed.
+- Fixed preview updated;9 user files preserved. EXE SHA256: D3342F2A2B80DC5945D069CF408412A4DEDEBB6C0A54C78795485CB5DAD5FC19.
+- Prior diagnostics repair remains covered. October19 final EXE/ZIP, official APK and Store hashes unchanged. No commit/push/tag/publication; include both October24 fixes in final packaging.
+
+
+## 2026-10-24 diagnostics button preview fix
+
+- The maintainer reported a clipped Refresh button after Settings > Diagnostics > Environment check.
+- Reproduced with the actual pre-fix UI: full-width header labels covered the reparented header button.
+- StoreSettingCard now reserves the same header action space for expanded environment results; the result body keeps its full width. No font/rendering, ADB, Companion, Store or update-notification behavior changes.
+- Added long-path, 520/716/900-width, fully visible header button and repeated-click regression checks in both themes.
+- .NET Framework4.6.2 x64 Release:0 warnings/errors. Windows666 checks passed (desktop196). Actual UI captures were visually reviewed. These are internal fixtures, not real-phone documentation photos.
+- Fixed preview updated in place;9 user files preserved. Preview EXE SHA256: AF99EEA385F8E7CF84FF643AA597258983E7B75522FB226D6B5DE7856A10BF59.
+- Existing October19 final EXE/ZIP, Store upload and official APK hashes remain unchanged. The preview fix must be included when the maintainer later requests final release packaging. No commit/push/tag/publication.
+
+
+## 2026-10-19 portable 120 FPS preparation
+
+The maintainer authorized implementing the Store handoff in the portable product
+and rebuilding the fixed preview/final ZIP locally. Store is read-only; reference
+commit11050e7822c43ec409d7d943ece5d9884d997b99 is not merged.
+Added default60/experimental120, one fail-closed warning before every120 start,
+exact screen-off preference restoration, per-phone mixed-session screen policy
+and local version-scoped change notes. scrcpy5.0.1 and signed Companion2.1.6 are
+unchanged. No AI app detection, Android changes, commit/push/tag or publication.
+See PORTABLE_120FPS_2026-10-19.md for implementation and fresh verification.
+October16 scan evidence remains historical; the new EXE needs a fresh user scan.
+
+
+## 2026-10-01 Reported UI defects
+
+메이님이 9월 30일과 10월 1일에 지적한 UI 문제를 수정했다. 최종 크기 기준 창 중앙 배치,
+연결이 끊긴 폰의 선택기 제거 및 시작 비활성화, 설정 선택기의 이름만 표시, USB/Wi-Fi
+수직 중앙 정렬, 일반 글자 +2 DIP, 하단 도움말/설정 위치, 긴 옵션/버튼 공간을 조정했다.
+둥근 카드/버튼에 실제 Region을 적용했고 설정 펼침은 40px 클릭 영역과 그린 꺾쇠로 바꿨다.
+고급 인수 입력칸을 위로 옮기고 접을 때 스크롤 범위를 초기화한다. 메인/설정/도움말/문서
+패널의 스크롤은 Win7 호환 GDI 막대를 사용한다. 페이지 전환은 redraw/layout을 묶었다.
+사용 설명서/FAQ는 별도 스크롤 패널과 카드/머리말/닫기 버튼을 갖고 포터블 문서를 사용한다.
+진단 하위 패널의 테마 갱신 누락을 수정하고 Store 원본의 폰별 둥근 카드(14 padding,
+10 radius, 최소 높이 150)를 반영했다. Store 작업트리에는 쓰지 않았다.
+회귀 Debug/Release 59/59. 격리 UI에서 중앙 배치, 연결 해제, 이름 표시, 고급 접기,
+문서 스크롤 분리와 설정 저장을 확인했다. 실제 화면 캡처는 computer-use 앱 승인이
+시간 초과돼 확보하지 못했다. RichTextBox 본문은 DrawToBitmap에서 빠지는 제한이 있으며
+해당 빈 캡처를 실제 본문 누락으로 단정하지 않는다. Win7/실제 폰/다른 DPI 및 전환 시
+체감 깜빡임은 사용자 확인 필요. 이미지마다 별도 시간 폴더를 사용한다.
+빌드는 bin/Release의 검증용이며 커밋/업로드/배포는 수행하지 않았다.
+
+## 2026-10-01 Store UI fidelity correction
+
+메이님의 지시로 일부 GitHub 설정 UI를 섞었던 9월 30일 시도를 Store 소스 기준으로
+다시 구성했다. 기준은 Store 8b267c2의 Styles/SettingsWindow/MainPage/help.json이다.
+폰트는 같은 Pretendard 원본의 400/600 정적 인스턴스를 임베드하고, OFL 예약 이름
+규칙을 지키기 위해 내부 패밀리명만 DX Store UI로 바꿨다. GDI+/WinForms/.NET 4.6.2를 유지한다.
+버튼은 상태 라벨의 실제 겹침으로 깨지고 있었으며 배치와 아이콘 단독 표시를 수정했다.
+설정 49개 카드·펼침 항목을 재현하고 선택·토글은 범위별 즉시 저장, 주소·경로는
+작업/편집/닫기 경계에서 저장한다. 한/영과 Enter 입력 방식은 각각 저장한다.
+연결/Companion 선택기는 같은 대상이며, 과거 대상의 상태 응답을 현재 대상에 적용하지 않는다.
+도움말 6개 카드·단계·주의 블록과 설명서/FAQ 창, 메시지 유지 규칙, 첫 실행 안내
+(onboarding.json 버전 2, 설정 초기화와 독립)을 이식했다.
+Debug/Release 회귀 59개 통과. 명령을 차단한 UI 사본에서 페이지·저장·오류 메시지를
+검증했다. Windows 7·다른 DPI·실제 휴대폰을 쓰는 새 UI 검증은 아직 남아 있다.
+이미지는 .build-tools/ui-review/20261001-시간/ 폴더별로 보존하며 덮어쓰지 않는다.
+자세한 사항은 STORE_UI_BACKPORT_2026-10-01.md. Store 파일 및 Git 업로드는 변경하지 않았다.
+
+## 2026-09-30 Windows 7 호환 테마 UI 구현
+
+메이님이 밝음·다크 이미지 시안을 보고 실제 구현을 승인했다. UI는 WinForms 및 GDI+
+.NET Framework 4.6.2 API만 사용한다. 네이티브 제목 표시줄을 유지하며 카드 배경에만
+알파 색상 혼합을 적용한다. Windows 10/11의 Acrylic/Mica나 투명한 입력창은 사용하지 않는다.
+메인: 상단 물리 기기 선택, 기기 상태·시작/중지, 나란한 디스플레이·실행 옵션 카드,
+시작 앱 별도 카드, 오른쪽 아래 닫을 수 있는 앱 목록 알림. 작은 화면은 카드가 세로로
+배치되고 스크롤된다. 기존 identity별 선택·설정 저장·런타임 명령은 유지했다.
+설정: 일반·입력·연결·Companion·경로·진단·정보 메뉴. Companion 카드와 기존 핸들러를
+별도 페이지로 옮겼다. 저장 버튼으로 적용하는 기존 동작을 유지했다. 기본 동작을 행으로
+표시하고 전체 테마·대비를 조정했다. 도움말의 기본 안내 화면과 로그 화면도 테마를 적용했다.
+첫 실행 경고의 확인 저장·실행 차단 기능은 이번 이미지 시안의 테마 구현 범위에 넣지 않았다.
+검증: .NET 4.6.2 x64 Release, 회귀 57/57, 명령 실행을 차단한 UI 사본의 밝음·다크·
+단일창·920x696 스크롤 레이아웃·도움말·로그·알림 렌더링. 이미지의 기기 이름은 예시이다.
+Windows 7 실기, 다른 DPI와 실제 복수 휴대폰의 새 선택 UI는 아직 확인하지 않았다.
+사용자는 이 UI 변경 전 기기별 앱 목록 분리 동작을 실기 확인했다.
+Store 제품 파일은 변경하지 않았고 commit/push/tag/배포는 하지 않았다.
+
+## 2026-09-30 Companion 2.1.3 서명 APK 반영
+
+메이님이 대기 전송 종료 수정의 APK 반영과 Store 작업방 참고 메시지를 승인했다.
+이 결정은 앞선 Store 2.1.2 APK 그대로 재사용 결정을 대체한다.
+새 APK는 2.1.3/versionCode 10, minSdk 33/targetSdk 36이며 기존 공식 인증서를 유지한다.
+SHA-256: 790A0F830BA182A74D27628072ABB709CB77904690E3AFA8797DEAF480392A62.
+포터블 번들과 PC version/hash 검증 및 패키징 계약을 갱신했다.
+Android 테스트 13개, lintRelease/assembleRelease, 공식 v2 서명·권한·패키지 검증과
+.NET 4.6.2 x64 Release/회귀 57개가 통과했다. 실기 timeout 재현·업데이트 설치는 미확인이다.
+Store 등록 대기 산출물과 작업 트리는 변경하지 않는다. 다음 Store 작업 때 참고하도록
+문제 원인·변경 파일·새 APK 정보를 메시지로 전달한다. Git 커밋·업로드는 하지 않았다.
+
+마지막 갱신: 2026-09-30
+
+## 2026-09-30 이번 역이식 변경분 감사
+
+메이님이 보고한 공통 앱 목록 버그를 Store 구현과 대조해 수정했다. 조회 결과는
+물리 identity별로 캐시하고 기기·모드 전환 시 해당 목록을 복원한다. 늦은 A 응답은
+A 캐시에만 저장한다. 최근 앱은 기기별 프로필에 저장(schema 27)하며 출처를 알 수
+없는 기존 전역 최근 앱 데이터는 저장해 두되 여러 기기에 자동 배정하지 않는다.
+완료 시 불러온 개수를 포커스를 옮기지 않는 오버레이로 5초간 표시한다.
+
+감사 범위는 로컬 v2.0.1 이후 이번 변경·추가 파일과 필요한 기존 경계뿐이다.
+stale 무선 transport를 실제 연결·identity로 재검증하고 새 USB 정책·수정 endpoint를
+보존한다. 진단 로그의 scoped/raw IPv6·이름·identity 마스킹과 카드/font 정리를
+보강했고, Companion의 Pretendard 라이선스를 배포 구성에 넣었다.
+
+Android의 이전 소스 전용 수정과 실제 서명 APK 동작을 구분했다. Store 작업방이
+확인한 다중 대기 요청 timeout 문제는 요청별 소스 추적기로 보강했다. Debug 검증용
+소스 수정이며 기존 서명 2.1.2 APK에는 포함되지 않는다. 새 APK는 만들지 않았다.
+배포 반영에는 새 서명 버전과 PC hash/version 계약의 별도 결정이 필요하다.
+
+메이님은 일반 Release DeX·파일 전송·공유 저장소 최상위 경로·캡처·독립 미니바가
+정상이라고 확인했다. 새 앱 목록 수정은 재확인해야 한다. 격리 실행에서 나타난
+설정 임시 파일 문제는 사용자 지시로 감사에서 제외했다.
+상세 근거는 PORTABLE_BACKPORT_AUDIT_2026-09-30.md에 기록했다.
+검증은 .NET 4.6.2 x64 Debug/Release와 회귀 57개, Android 소스 테스트 13개·
+lintDebug·assembleDebug다. Store 제품 작업 트리와 기존 APK는 유지했다.
+
+## 2026-09-29 포터블 역이식 현재 상태
+
+로컬 공개 `v2.0.1` 태그 `2a4aff2`에서 분기한
+`feature/portable-backport-v2.0.1-20260928` 작업 폴더에서 공통 버그를
+먼저 처리했다. Store 작업 폴더와 Store APK는 계속 읽기 전용으로 두었다. 무선
+mDNS 작업은 다중 기기 진단 뒤, WinForms UI 개편은 맨 마지막이다.
+
+포터블 v2.0.1에서 코드로 확인한 전송 오류 세 가지를 보강했다. 공유 저장소 루트
+경로가 Download로 바뀌는 문제, 휴대폰→PC 하위 폴더에서 Windows 금지문자
+치환 후 이름이 충돌하는 문제, 긴 최종 파일명 뒤에 붙는 임시 파일 접미사
+문제다. 미니바 단축키는 live
+Scrcpy 프로세스의 PID와 HWND 및 실제 foreground를 확인하며, 전체 창 캡처는
+스크린 복사 직전에 HWND 소유 PID를 다시 확인한다. `ProcessRunner`와 관리형
+전송의 출력 읽기 대기에는 2초 상한을 두었다.
+
+포터블 설정 스키마를 26으로 올려 최근 사용자 지정 해상도 5개를 저장한다.
+목록 밖 해상도가 현재 슬롯이나 앱 프로필에 활성값으로 남아 있으면 UI에 임시
+선택 항목으로 복원한다. 단일창 기본 앱이 이미 선택된 상태로 `LoadRunSettings`에
+복원돼도, 기기·모드 전환과 앱 목록 갱신 뒤 해당 기기의 package 프로필을 확인해
+적용한다. 슬롯 값이 이미 프로필과 일치하면 중복 저장하지 않는다.
+
+PC→휴대폰 상태창은 전송 세션의 Scrcpy PID/HWND를 통해 같은 프로세스의 창을
+찾는다. HWND가 늦게 생성되면 다시 확인하며, 표시 중 타이머에서 대상 창의 위치를
+따라간다. 세션 대상 창이 사라지면 마지막 위치를 유지한다.
+
+이전 GitHub판 제작 채팅의 설계 기록을 확인한 뒤, DeX·단일창·wake-up
+Scrcpy와 직접 전송 ADB의 `Process.Start()` 직전에 종료 상태를 다시 확인하고
+`RequestShutdown()`과 짧은 시작 잠금으로 직렬화했다. 기존 세션 잠금과
+Scrcpy 창 준비 대기에는 이 잠금을 적용하지 않는다.
+
+.NET Framework 4.6.2 참조 어셈블리를 사용한 x64 Debug/Release 빌드와 다중 기기·
+전송 회귀 52/52이 통과했다. 앱 목록 응답은 요청 당시 캡처한 물리 identity가 현재
+선택 기기와 다르면 폐기한다. 진단 화면은 연결된 모든 기기의 version query를 사용하고,
+보고서에도 각 Android/One UI 버전을 기록하되 기기 이름·identity·serial·IP·경로를
+가린다. Windows 7/11 실제 기기의 파일 전송·프로필 적용·미니바·
+상태창 위치·캡처 검증은 남아 있다. 직접 ADB 전송의 `Kill()` 실패 뒤 유한 대기와 실제 Windows
+종료·취소 중 새 프로세스 차단은 추가 검증이 필요하다. 자세한 순서는
+`TODO.md` 첫 절에 기록했다.
+
+DX Companion 기준은 Android 13+ (`minSdk 33`), 2.1.2/versionCode 9다. Store에서
+사용한 서명 APK를 `DXDisplayCleanup/bundled/DX-Companion-v2.1.2.apk`로 복사했다.
+SHA-256 `D5B09491B2DDEE0358EC0A678994256E814A9434250650E11052A930A21D9854`,
+공식 인증서 지문과 package·버전을 검사하고 PC 런타임 검증값 및 Windows/Android
+패키징 스크립트를 이 APK에 고정했다. 새 서명 APK는 만들지 않는다.
+
+포터블 Android 소스는 API 33/versionCode 9이며 Store 2.1.2의 최근 전송 이력,
+연결 경과시간, Light/Dark 화면·위젯, Guardian cleanup 검증·재시도 동작을 반영했다.
+Android 15+ `dataSync` timeout callback과 일반 큐 완료 후 URI 해제가 있다.
+다중 요청 종료·URI grant 보강의 소스/서명 APK 구분은 위의 2026-09-30 기록을 따른다.
+DXMR 프레이밍은 v1 그대로다. trim/slash 형제 이름 충돌은 기존 APK의 남은 제약이다.
+
+포터블 PC→휴대폰 완료·실패·취소 뒤 선택 기기로 Store APK의
+`RECORD_TRANSFER_HISTORY` broadcast를 보낸다. .NET Release 빌드와 회귀 테스트 52/52이
+통과했다. Android 13+의 문서 제공자 전송, Guardian 복구, PC 양방향 이력은 실제 기기에서
+확인해야 하며 자세한 순서는 `TODO.md`에 남겼다.
+
+Android 11+ mDNS 코드도 구현했다. connect/pairing service parser와 wireless alias
+분류를 추가하고, saved endpoint 실패 뒤 stable serial identity가 일치하는 mDNS connect
+service만 선택한다. ADB 연결 뒤 phone identity를 다시 확인한 다음 host·port를 갱신하며,
+페어링 직후 endpoint를 발견하지 못하면 사용자가 수동 IP·connect port를 입력할 수 있다.
+복수 기기·동적 port 변경·multicast 차단의 실제 회귀 검증은 남아 있다.
+
+아래 내용은 v2.0.1 출시 당시의 인수인계 기록이다.
+
+## Git
+
+- 저장소 작업 사본: 현재 Codex 작업 폴더의 `v12-docs`
+- 원본 저장소: `E:\vs\dex system`
+- 브랜치: `feature/v2-multi-device`
+- 공개 태그: `v2.0.0` (`cec74a9`)
+- 공개 태그 뒤 대표 이미지 갱신: `e8e47e6`
+- 현재 작업: v2.0.1 DeX 설정 표시 회귀 수정과 GitHub 업로드 패키지 준비 완료
+
+새 작업에서는 먼저 `docs/HANDOFF.md`를 읽는다. 공개 v2.0.0 이후 v2.0.1의 DeX
+설정 표시 회귀 수정이 반영됐으며, 차기 작업은 `TODO.md`의 미완료 항목으로
+관리한다. 현재 브랜치와 HEAD는 이 문서가 다시 바뀔 수 있으므로 `git status`와
+`git log`로 확인한다.
+
 ## 2026-08-23 v2.0.1 DeX 설정 표시 회귀 수정
 
 프로그램 시작 시 UI가 물리 휴대폰 identity를 알기 전에 공통 기본 설정을 먼저
@@ -74,7 +365,8 @@ DX Companion은 기존의 검증된 2.0.0(versionCode 6)을 유지한다.
 
 최종 Release 재빌드는 경고 0, 오류 0이며 다중 기기 회귀 테스트 39개를 모두
 통과했다. GitHub 업로드용 ZIP은 64개 항목이고, PDB·사용자 설정·로그·스크린샷·
-서명 비밀 파일을 포함하지 않는다. upstream에서 검증한 ZIP SHA-256은
+서명 비밀 파일을 포함하지 않는다. 최종 산출물은 `E:\vs\dex system\dist`에
+배치했다. ZIP SHA-256은
 `5F9C5A6AF6199D38458F6266869DDBACC58722A3A915696FF02935CF8965B2C1`이다.
 
 ## 2026-08-22 v2.0.0 공개 및 작업 이관
@@ -565,3 +857,301 @@ Windows Release 빌드 출력 폴더에 이전 Companion APK가 남아 공식 RC
 개선 사항은 2.0.0 릴리스 내용에 섞지 않고 차기 버전 변경으로 관리한다. 정식
 릴리스 패키지의 생성·확인·전달 위치는 `E:\vs\dex system\dist`이며, C 드라이브의
 Codex 작업 폴더 산출물은 개발 및 검증용으로만 사용한다.
+
+## 2026-10-01 Follow-up UI corrections
+
+General text is now +1 DIP over the Store source sizes (the earlier +2 adjustment was reduced).
+Enabled labels have a measured safe width. Setting card widths follow each page's actual client
+width after scrollbar changes. The content viewport has an additional 12 DIP of footer clearance.
+Device diagnostics use a right-aligned 160x40 Refresh button in the header; the summary's old
+58-pixel minimum was reduced to 22, bringing the phone cards up. Help topic cards are 74 DIP
+high and fit the default window without vertical scrolling.
+The log buttons overlapped the description label by approximately five pixels. Their toolbar
+was moved up and brought to the front, and explicit button bounds replaced the flow layout.
+RichEdit keeps its native scrolling and hit testing while its non-client gutters are painted
+with the current theme. The scrollbar painter was checked using real control scroll metrics.
+Panel scrollbars cover the whole native gutter instead of repeatedly hiding/restoring it.
+The background bitmap is cached by size/theme, and child redraw composition is enabled on
+buffered panels using the Windows 7-compatible style. Actual perceived scrolling smoothness
+and removal of the user's live-screen white strip still require a fresh runtime check.
+Advanced options use a separate gray placeholder (examples: --no-audio --video-codec=h264).
+The Text value remains empty; the placeholder cannot enter saved settings or launch arguments.
+Guide/FAQ scroll offsets are now explicitly retained when switching tabs.
+The isolated harness passed label/menu/button geometry, non-overlap, placeholder separation,
+independent document scrolling, settings persistence and diagnostic rendering. New screenshots
+are under .build-tools/ui-review/20261001-201242. They use fixture phone data.
+## 2026-10-02 Settings editor geometry and consistent scrollbars
+
+The user's live screenshots exposed a regression in StoreSettingCard.Reflow: the stacked branch
+permanently overwrote every editor width, including toggles. Wider layouts did not restore their
+source dimensions. Each editor's intended rectangle is now registered before adding it to the
+host and restored during reflow. Only wide diagnostic flow content is stretched. The earlier
+preview checks omitted the narrow-to-wide layout transition; they were insufficient UI evidence.
+Wheel scrolling updated AutoScrollPosition without refreshing the custom thumb. Panel wheel
+paths now refresh it, and native window observations capture other programmatic changes.
+Scrollbar positioning uses WinForms ScrollProperties.Maximum-LargeChange+1 rather than
+DisplayRectangle.Height-ClientSize.Height, which omitted 16 pixels of bottom padding in the
+reproduced settings case (205 instead of 221). End-of-scroll checks confirm the last card fits.
+A single stable thin scrollbar now covers panel and RichEdit gutters. Native log scrollbar
+repainting was removed, eliminating two painters that could show different hover appearances.
+Both axes, empty horizontal gutters, help/docs, environment checks, notices and license viewer
+use the shared painter. Dropdown indicators use the same thin rounded thumb and theme color.
+Settings content ends at the footer boundary; log buttons and description have matching bottom
+bounds without overlapping. Help topic text is centered as a group; icons are 22 px and text
+starts at x44. Advanced arguments moved up 6 DIP. Its preview surface starts in front of the
+native editor; a native cue banner also handles the empty focused editor without changing Text.
+The cue API's Vista+ support and focus behavior were checked in Microsoft documentation:
+https://learn.microsoft.com/en-us/windows/win32/controls/em-setcuebanner
+Validation: final Release-linked harness includes editor shrink/restore, visible toggles, log
+scroll offset changes, thumb synchronization, placeholder separation, and end-of-scroll bounds.
+The 20261002-011420 folder records the exact tested executable SHA-256 in verified-build.txt.
+Computer-use captured an actual desktop fixture showing restored controls and a dark thin gutter.
+The fixture closed before injected wheel testing; no successful real wheel gesture is claimed.
+Offscreen DrawToBitmap still renders native gutters incorrectly and is not live-screen proof.
+Windows 7, non-96 DPI, and connected-phone asynchronous refresh remain user validation items.
+No Store worktree edits, commit, push, tag or distribution packaging were performed in this task.
+## 2026-10-02 Single-window preflight and shared rendering polish
+
+Single-window app selection is checked before ApplyRunSettings, operation-state changes,
+device delay, managed-screen tracking and the try/finally wake schedule. Missing selection
+shows a persistent notice and returns immediately. DeX remains app-optional. The primary
+button uses an ExecutionBlocked paint state rather than Enabled=false for this condition,
+retaining click feedback while preventing actual start work. App selection restores styling.
+The isolated harness checked immediate task completion, unchanged log entries and wake-timer
+state, DeX's optional app selection, and gray clickable styling with selection recovery.
+Rounded panels and buttons no longer use binary rounded window regions that cut antialiased
+edge pixels. They repaint their actual parent surface and use inset contours. Shared scrollbar
+layers repaint their parent surface at the same coordinates rather than a flat color strip.
+Error notices use a neutral dark rose / pale light rose palette, a matching border and opacity
+230/255; labels preserve the painted background. Native title bars remain unchanged.
+The two bundled executable paths now share the storage-folder field's starting edge and use
+496-pixel fields. Diagnostic body layout owns its current width/height and handles empty,
+one-phone and multiple-phone results without the fixed snapshot/minimum-height regression.
+Environment result labels can use a full-width measured body. Companion bundle/install rows
+are removed from presentation; verification logic remains, and status/refresh are consolidated.
+Dark-theme mail links use a readable lavender color.
+Release-linked UI harness passes the above checks plus previous settings/scroll tests. Debug
+and Release regression suites each pass 59. Preview artifacts are immutable per timestamp;
+20261002-201154/verified-build.txt records the exact executable hash. Notice and scrollbar
+layers are separately rendered to compensate for DrawToBitmap child-order/native-gutter limits.
+These are rendered control previews with fixture device data, not live phone test evidence.
+Computer-use live capture was attempted but app access approval timed out. Windows 7, other
+DPI, live device refresh and real single-window/DeX launching require user validation.
+No Store worktree edit, commit, push, tag, GitHub upload or release packaging was performed.
+## 2026-10-02 Resolution selection and stable settings width
+
+The custom editor action now follows the three fixed presets, with a separator and saved
+custom dimensions underneath. Accepting the editor stores the dimensions in memory and selects
+the matching numeric entry immediately. Recent numeric entries retain custom-resolution semantics
+for persistence; cancel restores the previous dimensions. Mode-switch persistence was checked.
+The topmost dropdown closes before dispatching selection. Its deferred focus callback skips
+disabled owners, so it cannot steal focus from a modal editor. The editor activates on Shown,
+selects the width number initially and retains select-all on a click in either numeric field.
+Settings reserve the native scrollbar gutter even when no scrollbar is present. The viewport
+extends to the right edge while cards retain one stable width derived from outer viewport width.
+Close-button right bounds match card right bounds. Expansion no longer changes card widths.
+The final Release-linked harness passed ordered resolution entries, immediate numeric display,
+mode-switch persistence, initial/click numeric selection, invariant expansion width, nested child
+right bounds and footer alignment, plus previous checks. Debug/Release regressions each passed 59.
+Control-rendered snapshots: .build-tools/ui-review/20261002-205452. Real desktop modal activation,
+other DPI and Windows 7 remain user validation items. No Store edit or Git publication occurred.
+## 2026-10-02 Custom resolution heading versus editor action
+
+Clarified by the user: after 4K, show a non-selectable "사용자 지정 해상도" heading;
+saved numeric custom entries follow; the final normal menu entry "사용자 지정..." opens
+the editor. The heading and command are distinct records. Keyboard arrows skip headings;
+mouse hover/click and committed selection cannot choose a heading. The numeric selected
+resolution still updates immediately and persists across mode changes.
+Release build, 59 regression tests, and the extended UI harness pass. Snapshot:
+.build-tools/ui-review/20261002-210817/resolution-order.png. No extra button control was added.
+## 2026-10-03 Main notice state, status copy and review onboarding
+
+The theme-refresh path still reapplied the old opaque notice label and green error border.
+It now uses the same ApplyDesktopNoticeTheme method as initial display. Notice corners restore
+the underlying app-card surface, including its parent gradient, rather than the form background
+alone. Missing-app notices carry their own reason, originating slot and physical identity;
+selecting an app in that context closes this notice while unrelated errors remain persistent.
+Idle authorized DeX says "DeX 실행 준비됨". Single-window slots distinguish "준비됨" with an
+app and "대기중" without one. Actual app selection refreshes the indicator. Running, failed,
+offline and unauthorized states keep their existing handling.
+The display/options/start-app descriptions are hidden and section labels use a fixed-height,
+vertically centered box matching their icon's center; AutoSize cannot override that alignment.
+PortableOnboardingService.RepeatNoticeForUiReview is enabled at the user's request. Startup shows
+the consent notice on every process launch until the user requests otherwise, without deleting
+acknowledgement or general settings. A lifecycle test verifies repeated display after persisted
+acceptance and unchanged acknowledgement data. This is a review-build preference, not a new UI
+setting; it must not be silently disabled by later tasks.
+The user's confirmed Galaxy S26 Ultra / SDK37 (Android17) / OneUI9.0 environment has a separate
+UserVerifiedEnvironment informational classification. Matching is scoped to that display name,
+SDK and version; other models and SDK/OneUI combinations remain unverified. This changes no
+launch or permission gates and relies on the user's reported physical test.
+Verification: .NET4.6.2 x64 Debug/Release, 60 regressions each. The final executable-linked
+UI harness passed notice transparency after theme changes, corner pixels against the actual
+underlying card, targeted dismissal versus unrelated errors, exact idle status copy, section
+alignment, and scoped compatibility matching. Previews: 20261003-011841; verified-build.txt
+records the executable hash. These are rendered fixtures, not fresh physical-phone evidence.
+No Store edits, APK changes, commits, push, tag or release packaging were performed.
+## 2026-10-05 USB launch priority and Companion 2.1.4
+
+User authorized both changes in the existing portable v2.0.1 backport. No Store code/package or submission was changed.
+Observed authorized USB/Wi-Fi transports now determine the main badge: USB, Wi-Fi, or USB + Wi-Fi, with independent vector icons and measured text width. Dark icon contrast follows theme updates.
+New manual DeX/single-window launches select authorized USB first, then Wi-Fi for that physical identity. Wireless profiles still configure endpoints/reconnect. Existing sessions retain captured serials when USB appears; launch-in-progress contexts are pinned too.
+Transport loss stops only sessions captured on that serial through serialized service methods. USB loss cannot trigger automatic Wi-Fi restart, including deferred cleanup with AutoStart enabled. A new explicit start clears the manual-start requirement. All observed authorized endpoints update availability without resetting their start-delay clock on every registry refresh; reconnected USB can be used while another Wi-Fi session remains running.
+Companion sibling segments are allocated before traversal. Trim/slash collisions get numbered names, existing natural suffix names are reserved, and directories propagate their unique path to descendants. Original URIs, content, top-level root IDs and DXMR v1 are unchanged.
+Signed APK: 2.1.4/versionCode11, minSdk33, package io.github.mazemei.dxdisplaycleanup, SHA256 95DAF4E734FD36FE07AD8388FE8E4C98D96D1EFA0A8E359D8C8E3E27383B6536. Certificate unchanged: AD615803C63760439750C36801E8152AB8664C60EE481EF1473F1DF5E80733BE.
+Fresh checks: Android20 tests, Release lint/assemble, package identity/permissions/certificate/hash; .NET4.6.2 x64 Release and62 foundation tests; independent connection UI/service harness.
+Final fixture previews: .build-tools/ui-review/20261005-201135. Harness uses the actual compiled controls, blocks phone commands, and starts owned sleeping helper processes to check DeX/single USB termination, Wi-Fi preservation and automatic restart suppression. This is not real-phone evidence.
+The older broad UI harness stopped at its independent-input-mode fixture assertion; it was not counted as passing. The scoped connection harness above passed. Real devices, document providers, Windows7 and high DPI still need field checks.
+Store follow-up is documented in STORE_COMPANION_FOLLOWUP_2026-10-05.md for a later update. No automatic APK install, commit, push, tag or GitHub Release was performed. RepeatNoticeForUiReview remains enabled.
+
+## 2026-10-05 reconnect auto-start correction
+
+The user supplied a fresh log: startup automatic USB DeX succeeded at20:32:20; after disconnect, USB returned at20:32:42 and deferred cleanup ran, but no automatic launch followed. The previous portable patch left RequireManualStartAfterTransportLoss sticky across reconnections; that was a regression introduced by this chat.
+Suppression now records its lost transport serial and lasts only while the same connection episode retains a fallback transport. A restored authorized original serial or a newly connected physical context clears it. Immediate USB-loss -> remaining Wi-Fi auto-start remains blocked. USB reconnect and full disconnect/reconnect resume the existing auto-start preference; OFF remains OFF.
+Automatic launch now captures SelectLaunchTransport, with its own identity/generation/authorized-serial validation, so USB is preferred even if another existing Wi-Fi session keeps the runtime context pinned to Wi-Fi. Session cleanup/presentation still uses the captured/context transport.
+Wi-Fi vector control changed from18x20 to22x18 DIP, with matching label spacing; USB and combined badges remain measured and tested in light/dark.
+Verification: .NET4.6.2 x64 Release,62 foundation regressions, and the scoped reconnect fixture. The fixture terminates owned USB DeX/single helpers while preserving Wi-Fi; checks offline USB cannot resume; reaches the auto-launch gate on restored USB and a fresh Wi-Fi connection; and confirms auto-start OFF. Phone commands remain blocked, so this is control/state/owned-process evidence, not physical DeX confirmation.
+Final previews: .build-tools/ui-review/20261005-204533, with verified-build.txt and verification.txt. Previous preview folders remain unchanged. Actual reconnect execution on the user's phone is still pending. APK2.1.4, repeat review consent, Store files and Git history are unchanged.
+## 2026-10-05 Fluent icon preview and mini-bar connection status
+
+User authorized a portable icon trial, with Store changes conditional on later acceptance. The prior reconnect fix was confirmed working by the user before this icon request.
+31 Microsoft Regular assets from pinned source a563cf9166f4f91aa617557ed272612b7f0a2f72 are embedded as transparent256px masks. Original SVGs/provenance and MIT license are retained. Runtime rendering uses only .NET4.6.2/System.Drawing and current theme tint. Product logo and original large phone illustration remain intact. Manual small-icon renderer is retained as a fallback, with internal comparison flag; original affected source snapshots: .build-tools/fluent-apply-20261005-212848/before.
+The official System Icons catalogue has Keyboard Mouse but no standalone physical Mouse. The Mouse resource retains the two official mouse contours from Keyboard Mouse20Regular, with a centered viewBox; the original combined SVG is preserved. This is a documented derivative, not a newly drawn contour or a claim of an official standalone Mouse glyph.
+A forwarded human request added mini-bar connection indicators. Each per-device MiniControlBarManager receives the registry's physical snapshot and updates its own existing forms, and new bars inherit cached observed authorized USB/Wi-Fi flags. Expanded bars show USB, Wi-Fi or the pair; collapsed44px behavior and command target handles remain unchanged. Disconnected/unauthorized transports are not shown as connected. The command buttons also use Fluent assets with their prior actions retained.
+Fresh Release build,62 foundation regressions, all31 embedded-resource/tint/transparency checks, all settings pages/help and light/dark renders passed. Owned-process reconnect regression and mini-bar status changes, unauthorized/disconnect, collapsed size and per-manager isolation passed. These fixtures block physical phone commands.
+Final valid previews: .build-tools/ui-review/20261005-215353;44 PNGs were decoded/verified. Earlier trial directories with failed/empty file exports are not final previews. This environment's direct GDI disk export produced empty files without surfacing an encoder error, so the final harness encoded to memory and exported bytes through PowerShell. Production icon resources are separately valid PNGs.
+Live mini-bar following and connection icons on the user's real sessions remain a field check. Windows7/high-DPI confirmation remains pending. Existing session/autostart/ADB behavior, APK2.1.4 and repeated consent remain unchanged. No Store code edits, phone APK install, commit, push, tag or GitHub release.
+The final icon preview also caught hidden-form badge layout using Control.Visible (which includes parent visibility). Header geometry now uses explicit observed-transport flags, so tray-hidden connection updates do not overlap the icon and label when shown again. A hidden/show regression covers USB/Wi-Fi/both in both themes. Auto-start fixture assertions count relevant start markers rather than unrelated asynchronous cleanup log entries.
+
+## 2026-10-05 Store 통합 인계 문서화
+
+사용자 요청으로 STORE_UPDATE_HANDOFF_2026-10-05.md를 작성해 Store docs에도 동일하게 보관하고 README/TODO/SESSION에서 찾을 수 있게 했다. APK2.1.4/2.1.3 수정, Fluent31종/파생 마우스, 미니바 및 최종 실행/재연결 요구와 UX 비교 항목을 포함한다. Store 제품 코드·APK·제출물은 이번 문서 작업에서 변경하지 않았다.
+
+## 2026-10-05 v2.5.0 final local release
+
+The user reported completing physical validation successfully and requested the final version2.5.0 and a local Git commit. This acceptance covers the tested user environment; no claim is added for every OS/DPI or an unreproduced ADB Kill failure.
+First-run review repetition is now disabled; CurrentNoticeVersion2 and existing config/onboarding.json are retained. Fresh/unaccepted profiles show consent; accepted profiles skip it on later launches, and general settings reset does not delete acknowledgement. The lifecycle regression was updated accordingly. Windows Assembly/File version is2.5.0.0, ProductVersion2.5.0; Companion remains the unchanged officially signed2.1.4/code11.
+Windows builds now take the pinned bundled APK, so a fresh source checkout does not require local Android build output or signing secrets to produce the verified Windows payload. Older local signed APKs remain on disk but are ignored; only the current2.1.4 bundle is selected for Git. Icon provenance uses relative SVG paths.
+Package-Release.ps1 supports explicit output/folder paths and no longer clears source-runtime user logs/captures. The final package is made from explicit payload files, excludes personal config/onboarding/logs/PDB/signing secrets, and preserves older release folders.
+Release62 tests passed, including persistent first-run consent. Package version and ZIP-entry executable/APK hashes match;63 payload files and required Scrcpy/legacy ADB/proxy/licenses are verified. User virus scan and explicit instruction are required before GitHub upload. No push, tag, external upload or publication has been performed.
+Final folder: E:\vs\dex system\dist\DX Manager v2.5.0
+Final ZIP: E:\vs\dex system\dist\DX-Manager-v2.5.0-win-x64.zip
+ZIP SHA256: B2064404BB45B65FA863558C82898C5B1BFFAC46CB7035BA5E55CEA2892765E0
+EXE SHA256: BACEA6027137EC0ACE770133034F258EF36F68CA977FD03FF9395F58717D3632
+APK SHA256: 95DAF4E734FD36FE07AD8388FE8E4C98D96D1EFA0A8E359D8C8E3E27383B6536
+Checksums: E:\vs\dex system\dist\DX-Manager-v2.5.0-SHA256.txt
+Local commit is the final action of this task; its hash is recorded by Git rather than embedded into its own commit.
+
+## 2026-10-06 scrcpy5.0 company test
+
+메이님 요청과 회사 Windows7 확인에 따라 독립 테스트 ZIP을 만들었다. 기존2.5.0 실행 파일/최종 ZIP과 Companion2.1.4는 해시가 유지된다. 01-software/02-auto는 디코딩 옵션만 다른 기본값이며 레거시 ADB를 포함한다. 공식5.0 파일 일치·프리셋 상속·Windows11 버전/도움말 검사·135개 ZIP 파일/개인정보 제외를 확인했다. 실제Win7/휴대폰 스트리밍 검증은 회사 확인을 기다린다. 상세 경로/해시는 SCRCPY_5_TEST_2026-10-06.md. 이번 테스트는 새 커밋/업로드 없이 준비했다.
+
+## 2026-10-06 independent font lab
+
+회사Win7 SP1/FHD/100%에서 메인·설정·도움말 글자 획이 깨지고 로그 본문만 정상이라는 사용자 보고가 있다. 원인은 미확정이며 실제 회사 화면 대신 그림판 예시를 받았다. 본체 재빌드 대신 독립 DXFontLab.exe를 요청받아 현재 Pretendard/GDI, 맑은 고딕/GDI, 정수 픽셀 크기, GDI+ 두 방식, 패널 합성 제외를 비교하도록 준비했다. 메인/도움말 크기·실제 페인팅 코드·글꼴/아이콘 리소스를 재사용한 샘플이며 휴대폰 명령/설정은 없다. Windows11에서36조합/실제 글꼴 선택/전환/캡처 및37 PNG 검증을 통과했다. 회사Win7 결과 대기. 결과는 임시 기록 후 복사하며 종료 전에 메모장에 저장한다. 상세: FONT_LAB_2026-10-06.md. 기존2.5.0 EXE/ZIP 해시, Store/APK와 제품 소스는 보존했고 커밋/업로드하지 않았다.
+
+## 2026-10-07 second font test
+
+회사Win7 실제 기록/캡처에서 맑은 고딕 B는 정상, 현재 Pretendard를 쓴 A/C/D/E/F는 깨짐으로 보고됐다.96DPI·ClearType·GDI 등록/글꼴 선택은 정상이며 작은 GDI+ 회색 AA가 특히 나쁘고 큰 글자는 회복된다. 내장 및 공식 정적 Pretendard 모두 힌팅/gasp가 없으므로 변환 중 유실로 단정하지 않는다. 사용자 요청으로 Font Lab2를 만들었다: 현재/공식 원본, gasp0x000A 표시 설정 보정, 보정 파일의 GDI+ 회색 AA, 현재 파일의 GDI+ AntiAlias(보정 제외), 맑은 고딕 기준. 수정 글꼴은 OFL 이름 변경과 원형/레이아웃 byte 보존 및 체크섬 검증을 수행했다. Windows11에서7조건42화면/49 PNG·실제 글꼴 선택 검증, ZIP23파일/8EXE 해시 확인. 본체/Store/APK/최종2.5.0은 그대로이며 Win7 품질은 내일 확인할 항목이다. 경로/해시/사용법: FONT_LAB2_2026-10-07.md. 커밋/업로드 없음.
+
+## 2026-10-08 F2 product UI preview
+
+사용자 회사 결과: A2~D2 깨짐, E2/F2/G2 정상이며 F2의 UI를 선호했다. 승인받아 실제 포터블 UI의 라벨/커스텀 텍스트 표시·측정을 F2 AntiAlias로 연결했다. 실행 버튼은 Store17px SemiBold/20px 아이콘/10px 간격을 한 그룹으로 중앙 정렬한다. 도움말 강조 상자는 내부 기본100px 높이를 제거해 검증된 한글/영문 주제의 아래 여백12px로 맞췄다. Release/62회귀/실제 UI53 PNG·숫자 편집·경로 선택/undo·드롭다운 검증 통과. Native TextBox 편집과 RichTextBox 본문은 Windows 렌더링을 유지하므로 통합 Win7/IME 품질은 추가 실기 확인 대상이다. 별도 F2 프리뷰를 만들고 최종2.5.0/Store/APK는 보존했다. Scrcpy는 기존4.1이며5.0 테스트는 분리돼 있다. 상세 경로/해시: F2_UI_PREVIEW_2026-10-08.md. 커밋/업로드 없음.
+## 2026-10-08 fixed preview / contrast / authorized dist cleanup
+
+메이님 지시대로 미니바는 제외하고 메인/설정 아이콘20px, 캡처/Wifi 매핑, Store 수준 글자 대비를 적용했다. Win7/8은F2, Win10/11은ClearType 표시/측정으로 분기했다. Release62 및 실제 UI53 PNG·편집/드롭다운·OS정책/아이콘 검증 통과. 고정 scripts/Build-PortablePreview.ps1이 DX Manager Preview 폴더를 관리 목록으로 덮어쓰며 설정/로그를 보존하고 ZIP을 만들지 않는다. 재실행에서4개 개인 설정파일 보존/62payload 일치 확인. 승인된 dist34항목을 경계/재분석지점 점검 후 삭제했다. 남은 것은 DX Companion(내부GitHub2.1.4 포함), DX Manager Store, 원본 DX Manager v2.5.0, DX Manager Preview. 오래된 설정/캡처는 .build-tools/dist-cleanup-20261008/user-data에 보관했고 과거F2설정은 고정폴더로 옮겼다. 원본2.5.0/Store 보존. 상세: FIXED_PREVIEW_2026-10-08.md. 커밋/업로드 없음.
+## 2026-10-08 ClearType regression correction
+
+메이님이 현대 Windows에서 큰 한글 제목의 획이 거칠어진 실제 화면을 보고했다. 이전 요청에서 추가한 ClearTypeGridFit 분기가 원인 후보이며, 안티앨리어싱을 끈 변경은 아니었다. 해당 픽셀 맞춤 분기를 제거하고 모든 지원 OS의 UiText 표시/측정을 검증된 F2 AntiAlias로 복원했다. 아이콘20px·색 대비·Store 캡처/Wifi 매핑·버튼 정렬·도움말 높이는 유지한다. Release와 실제 UI/경로 선택·undo/드롭다운/경고 상자 검증 통과. 고정 Preview 폴더만 갱신했고 ZIP은 만들지 않았다. 최신 EXE SHA256: 56D2D1AB00A4A2372F09E4E8CE4793528C4E60B655930AF8826ABF9F20AE1555. 이전 FIXED_PREVIEW 문서의 OS별 분기는 이 기록으로 대체한다. 집 PC에서 실제 제목 모양 재확인 필요. 커밋/업로드 없음.
+## 2026-10-11 local checkpoint
+
+메이님이 마지막 프리뷰에 반영된 버전을 로컬 Git에 커밋하도록 요청했고, 새 브랜치는 만들지 말고 커밋만 하라고 확인했다. 현재 코드의 Release 실행 파일과 고정 프리뷰 실행 파일 해시는56D2D1AB...로 일치한다. F2 AntiAlias 복원·20px 아이콘/대비·Store 실행 버튼/도움말 높이·고정 프리뷰 및 기존 테스트 도구/문서를 현재 브랜치의 체크포인트로 저장한다. 버전2.5.0 유지, Store/APK 및 미커밋 사용자 데이터/빌드 산출물은 포함하지 않는다. 새 브랜치/태그/푸시/업로드를 하지 않으며, 실제 커밋 해시는 Git 기록에서 확인한다.
+
+## 2026-10-12 shared official Companion migration
+User-approved GitHub workroom migration: official Android source/APK now in E:\vs\DX Companion Shared.
+2.1.5/code12 bytes/signature unchanged; common metadata and build/package wrappers integrated.
+Old source archived, signing materials preserved. See SHARED_COMPANION_2026-10-12.md.
+No product UI, submission, public upload or commit performed by this migration.
+
+## 2026-10-15 official2.5.0 acceptance and update notifications
+
+User authorized the official port after reporting the private test works. scrcpy5.0.1 full runtime,
+explicit auto decoding, accepted non-AI UI/tray/slot/TLS/wireless fixes and shared official APK2.1.5
+are included. Foreground accessibility/app caches/AI Enter/WebAPK rules/private identity are excluded.
+Official protocol1 and legacy Scroll Lock remain. Updates run automatically once per local day,
+with failed attempts persisted, a5-second overall background deadline, no retry loop, manual About
+button, themed banner/tray/manual result and full selected scrcpy version diagnostics.
+See OFFICIAL_250_UPDATE_2026-10-15.md for scope, verification, fixed output and field boundaries.
+No Store/private/shared-Android edits, commit or publication.
+
+Official2.5.0 fixed preview completed. Final Release0 warnings/errors;475 checks passed.
+Actual GitHub client returned Current in373ms. Both themed manual dialogs/main native banner,
+About action and full scrcpy diagnostics inspected. All16 runtime files match;11 preserved
+data/artifact hashes and Store status unchanged. No AI tracking types or private APK/ports.
+EXE SHA256: 49A409F2255971FBDF25252A5A1AA7A1BB4D915E5C8B3FA29E8B626407D2FBB2
+Current delivery is E:\vs\dex system\dist\DX Manager Preview\DXManager.exe.
+Offline actual-dialog preview is under .build-tools/official250/update-ui-preview.
+No commit/ZIP/upload. Final phone/Windows-shutdown validation and virus scan remain user checks.
+## 2026-10-16 About update action placement
+
+User requested the manual update button beside third-party notices. The About footer now
+places both 200x40 actions in one row with a12px gap, notices first and update check second.
+No update-check behavior changed: automatic available updates use the in-main banner
+(and a tray notification when hidden); manual checks use the themed result dialog.
+Automatic Current/Failed results show no result dialog. A previously known, undismissed
+newer release can retain its banner while offline.
+Release x64/net462:0 warnings/errors; existing actual-assembly desktop/UI checks176 passed.
+Light/dark About screenshots inspected. Fixed Preview replaced;6 configuration hashes
+preserved. EXE SHA256: 9FB35D153B8F515AC7616997DF810993B0FD0ABCFCF1025606818B8F96D239B4.
+No new dist folder/ZIP, commit or publication. Store/private/shared Android unchanged.
+
+## 2026-10-16 Automatic update banner lower-right placement
+
+User prefers the same lower-right area as action/error notices. The persistent update banner
+now uses the existing32/28 desktop-scaled right/bottom margins. While another notice is visible,
+it sits12 desktop-scaled pixels above it and returns when that notice closes or is hidden.
+It remains a nonmodal child panel: uncovered main controls remain usable. There is no expiry
+timer; X hides/dismisses this release, while the GitHub action only opens the release page.
+Release x64/net462:0 warnings/errors; existing actual-assembly desktop/UI checks176 passed.
+Native main-window light/dark captures inspected. Fixed Preview replaced;6 configuration
+hashes preserved. No Store/shared Android/private product changes, commit or publication.
+EXE SHA256: 58E53660113F94349B159181B1B8F2FD4FA33EC69B401CC24D12F47D3626241B
+## 2026-10-16 final2.5.0 distribution / Companion2.1.6
+
+User accepted key input and requested the final portable build and APK fix. Shared official2.1.6/code13
+now stops idle protection after PC disconnect when overlay/stay-awake are verified inactive; startup
+and stale-callback guards preserve live/new sessions. Android34 and signed Release/lint passed
+(lint0 errors/70 warnings). Official signature/package/protocol1 unchanged; phone notification check pending.
+Final Windows Release0 warnings/errors;505 checks passed, including30 real consent UI checks.
+The GUI fixture now carries the product's executable config to match .NET4.6.2 runtime semantics.
+Fresh39-file2.5.0 distribution has no docs/images, saved consent/settings, logs, PDBs or private test tools.
+Previous final (including user data) backed up under .build-tools/final250/previous-final; fixed Preview
+updated with6 config hashes preserved and obsolete managed docs/images removed. No ZIP/commit/upload.
+EXE SHA256: BBFFA0F93E82B7D535B4E049DD0DFB0E8A3C21A81FFD101F370550AFE13FC918
+APK SHA256: 904491111341D46458BB9CE9B342D9210A20BB923BC0F605484D6AF7B90DFCC9
+Current delivery: E:\vs\dex system\dist\DX Manager v2.5.0\DXManager.exe.
+Details and physical verification boundaries: FINAL_250_2026-10-16.md.
+## 2026-10-16 upload archive
+
+User requested confirmation of an upload-ready ZIP after the folder-only final build.
+Created E:\vs\dex system\dist\DX-Manager-v2.5.0-win-x64.zip (20,790,867 bytes).
+SHA256: 5DD69CD55157CA27DD9027BE5955DE60AAAEBA01B9BF1ABFF5B21A9F11616791
+All39 ZIP files match the verified final manifest; Companion2.1.6 is included.
+No personal settings, saved consent, logs, external guides/screenshots or developer files.
+The archive uses a single DX Manager v2.5.0 root folder. No GitHub upload/commit performed.
+Evidence: .build-tools/final250/upload-archive.json. Existing final/preview user state was not modified.
+## 2026-10-16 local GitHub documentation audit
+
+User explicitly stopped publication and then requested a complete GitHub document/screenshot review.
+No commit/push/tag/release or remote page edits are authorized by the scan result or this documentation task.
+Public main snapshot2a1ec107450d8755e3691e9fa52aa086ed034e8d:40 document/configuration paths,
+6 historical release descriptions, no wiki. Full read-only originals are in .build-tools/documentation-250.
+Updated README, both full guides, both FAQs and developer/source/resource guidance for2.5.0/5.0.1/2.1.6.
+Preserved historical release/license facts. Current local link/image/anchor check:40 Markdown files,
+104 local references,7 image references,0 issues before this status update.
+All9 provided Store originals at E:\vs\소스\스토어판 매뉴얼용 스샷 were visually inspected; app screenshots
+need current portable captures. Existing6 Android-setting examples can remain;17 old app images are
+kept on disk but detached from current instructions. No binaries or image pixels were changed.
+Open publication preparation: new screenshots, standalone public shared-Companion dependency/setup,
+and preservation of remote-only macOS material during future integration.
+See DOCUMENTATION_AUDIT_2026-10-16.md and SCREENSHOT_PLAN_v2.5.0.md for exact file actions and shot names.

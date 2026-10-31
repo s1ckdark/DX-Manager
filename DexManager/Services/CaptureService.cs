@@ -28,9 +28,12 @@ namespace DexManager.Services
 
         public CaptureResult CaptureWindow(
             IntPtr windowHandle,
-            string serial)
+            string serial,
+            int expectedProcessId)
         {
-            if (windowHandle == IntPtr.Zero)
+            if (!WindowBelongsToProcess(
+                    windowHandle,
+                    expectedProcessId))
                 throw new InvalidOperationException(
                     LocalizationService.Get(
                         "Error.Capture.ScrcpyWindowNotFound"));
@@ -50,13 +53,33 @@ namespace DexManager.Services
                 clientOrigin.Y,
                 clientRect.Right - clientRect.Left,
                 clientRect.Bottom - clientRect.Top);
-            return CaptureRectangle(rectangle, "DeX_Full", serial);
+            return CaptureRectangleCore(
+                rectangle,
+                "DeX_Full",
+                serial,
+                windowHandle,
+                expectedProcessId);
         }
 
         public CaptureResult CaptureRectangle(
             Rectangle rectangle,
             string prefix,
             string serial)
+        {
+            return CaptureRectangleCore(
+                rectangle,
+                prefix,
+                serial,
+                IntPtr.Zero,
+                0);
+        }
+
+        private CaptureResult CaptureRectangleCore(
+            Rectangle rectangle,
+            string prefix,
+            string serial,
+            IntPtr ownershipWindowHandle,
+            int expectedProcessId)
         {
             if (rectangle.Width <= 0 || rectangle.Height <= 0)
                 throw new ArgumentException(
@@ -80,6 +103,15 @@ namespace DexManager.Services
                 PixelFormat.Format32bppArgb))
             using (var graphics = Graphics.FromImage(bitmap))
             {
+                if (ownershipWindowHandle != IntPtr.Zero &&
+                    !WindowBelongsToProcess(
+                        ownershipWindowHandle,
+                        expectedProcessId))
+                {
+                    throw new InvalidOperationException(
+                        LocalizationService.Get(
+                            "Error.Capture.ScrcpyWindowNotFound"));
+                }
                 graphics.CopyFromScreen(
                     rectangle.Location,
                     Point.Empty,
@@ -110,6 +142,24 @@ namespace DexManager.Services
             }
 
             return new CaptureResult(localPath, remotePath, transferred);
+        }
+
+        private static bool WindowBelongsToProcess(
+            IntPtr windowHandle,
+            int expectedProcessId)
+        {
+            if (windowHandle == IntPtr.Zero ||
+                expectedProcessId <= 0 ||
+                !NativeMethods.IsWindow(windowHandle))
+            {
+                return false;
+            }
+
+            uint actualProcessId;
+            NativeMethods.GetWindowThreadProcessId(
+                windowHandle,
+                out actualProcessId);
+            return actualProcessId == (uint)expectedProcessId;
         }
 
         private void TransferToDevice(

@@ -1,6 +1,8 @@
-# DX Manager Frequently Asked Questions
+﻿# DX Manager 2.5.0 Frequently Asked Questions
 
-[English user guide](USER_GUIDE_EN.md) · [한국어 Q&A](FAQ_KO.md)
+Windows 2.5.0 documentation, reviewed 2026-10-24. Q1–24 retain their established numbering; Q25–35 cover updates, Companion, consent, input, experimental FPS and package changes.
+
+[English user guide](USER_GUIDE_EN.md) · [Korean FAQ](FAQ_KO.md)
 
 ## Q1. A small screen (secondary display) remains on the phone.
 
@@ -25,7 +27,7 @@ sequence forces Android to refresh the overlay setting, after which the
 remaining virtual screen disappears.
 
 If the bundled official **DX Companion** is installed and verified under
-**Settings > Diagnostics > DX Companion**, the leftover display can also be
+**Settings > Companion**, the leftover display can also be
 removed from the main app, Quick Settings tile, or home-screen widget. DX
 Companion can also
 turn off Developer options **Stay awake** after an interrupted session. See the
@@ -36,6 +38,8 @@ installation and usage details.
   <img src="images/en/simulate-secondary-display-en.png" width="45%" alt="Simulate secondary displays in Developer options">
   <img src="images/en/simulate-secondary-display-options-en.png" width="45%" alt="Simulate secondary displays selection menu">
 </p>
+<p align="center"><small>Android settings examples; device and firmware layouts can differ.</small></p>
+
 
 ## Q2. Why use Force-stop selected app when launching Samsung Internet automatically?
 
@@ -50,23 +54,18 @@ progress may be lost. Enable it for other apps only when needed.
 
 ## Q3. Which device is used when two or more phones are connected?
 
-DX Manager 2.0 manages multiple physical phones simultaneously. When two or
-more phones have been detected, select the target from the device list on the
-left. Each phone has independent DeX, Single-Window, connection, Companion,
-and file-transfer state, so starting or disconnecting one phone does not
-replace another phone's active session.
+Choose the phone in the device selector. DeX, all three single-window slots, app profiles, connection
+preferences and transfers are stored and run per physical phone. Choosing another phone does not
+stop the first one's sessions. USB/Wi-Fi connections belonging to one phone appear as one entry.
 
-USB and wireless ADB entries belonging to the same physical phone are merged.
-The saved USB/Wi-Fi policy for that phone decides which transport DX Manager
-uses; it does not silently fall back to the other connection. With only one
-phone detected at startup, the device list is hidden and appears when a second
-phone is found.
+The badge shows the observed USB, Wi-Fi or both state. For a new launch, an authorized USB connection
+takes priority; without one, an authorized wireless connection can be used. Existing windows retain
+the serial they started with and are not moved to another transport. Phone-to-PC files are grouped
+under a phone-name subfolder beneath the configured receive directory.
 
 ## Q4. Parts of the DeX interface are clipped below 1600×900.
 
-Samsung DeX has a standard minimum resolution of 1600×900. DX Manager can
-create smaller virtual resolutions, but some DeX elements may not adapt to
-the smaller screen. For example, the top of the app drawer may be clipped.
+In the tested Samsung DeX layouts, 1600×900 or higher is recommended for the complete desktop. DX Manager can create smaller virtual resolutions, but some DeX elements may not adapt to the smaller screen. For example, the top of the app drawer may be clipped.
 
 Apps themselves may still work, but 1600×900 or higher is recommended for the
 complete DeX interface. This is a Samsung DeX limitation at low resolutions;
@@ -135,6 +134,8 @@ Check the following in order:
 - Check guest Wi-Fi, AP/client isolation, VLAN rules, and corporate firewalls.
 - Make sure the pairing port is not being confused with the connection port.
 - Check whether the phone's IP address has changed.
+- If automatic mDNS discovery is blocked, enter the current connection port
+  shown on the Wireless debugging screen; do not reuse the pairing port.
 - After restarting the phone, prepare wireless ADB over USB again.
 - Pair Android 11+ wireless debugging again when necessary.
 
@@ -160,7 +161,7 @@ The physical right Shift delivery problem was reproduced with scrcpy 4.0/SDL3
 for Windows: Windows detected the key, but Android did not receive it. The same
 behavior was not observed with scrcpy 3.3.4/SDL2.
 
-For compatibility with SDL3-based scrcpy 4.x clients, DX Manager converts
+For compatibility with SDL3-based scrcpy clients, including the bundled 5.0.1, DX Manager converts
 right Shift to left Shift only while such a scrcpy window is active. Normal
 Shift input remains available, but Android apps cannot distinguish the two
 Shift sides during that session. The correction is not applied to other
@@ -181,16 +182,17 @@ device. A managed drag-and-drop file transfer is not limited to this duration;
 large ADB pushes continue until they finish, fail, are canceled, or the session
 ends.
 
+Start delay is exposed under **Settings > General > Start DeX when a phone connects**. Other timeout values are stored configuration and are not all exposed as controls on the current Diagnostics page.
+
 ## Q13. What happens if USB is unexpectedly disconnected during use?
 
-After confirming the disconnection, DX Manager cleans up the DeX and
-single-window sessions that were running on that phone. If the phone is no
-longer reachable, overlay, screen-state, and stay-awake restoration commands
-that cannot be sent immediately may be retried when the same phone reconnects.
+Windows using that USB transport stop and DX Manager attempts the applicable cleanup. If the phone
+is already unreachable, the PC cannot confirm that its virtual display or power settings were restored.
+A remaining Wi-Fi connection does not automatically inherit or restart those windows.
 
-When the original phone reconnects, DX Manager applies the configured start
-delay and restarts the session if automatic start is enabled. In v1, it does
-not switch to another connected phone.
+Reconnect the phone. The saved automatic DeX-start setting can apply on an actual reconnection;
+otherwise start manually. Installed, verified Companion can provide the configured fallback recovery.
+See Q1 for manual cleanup and Q26 for the 2.1.6 session-protection notification behavior.
 
 ## Q14. What is the difference between Turn phone screen off and Stay awake?
 
@@ -203,6 +205,8 @@ connection during a session. If any DeX or single-window session requests
 screen-off or stay-awake behavior, DX Manager manages it using the combined
 state of all sessions. When all related sessions stop, or DX Manager exits
 normally, it attempts to restore the phone screen and stay-awake state.
+
+At experimental120 FPS, screen-off is disabled automatically. Returning to 30/60 restores its prior value; see [Q30](#q30-why-is-turn-phone-screen-off-disabled-at-120-fps).
 
 ## Q15. The phone screen stays on while it is charging.
 
@@ -253,35 +257,15 @@ writable location where it can save settings, logs, and screenshots.
 
 ## Q17. How does drag-and-drop file transfer work, and can I disable it?
 
-Drop one or more files, or a complete folder, onto a running DeX or single-app
-scrcpy window. With the default DX Manager file transfer enabled, content is
-copied through a Windows 7 SP1 through 11-compatible path that preserves Korean, Japanese,
-and other Unicode names. The default destination is `/sdcard/Download/`; it can
-be changed under **Settings > Paths / ADB > Programs and storage paths**. The
-destination must be below `/sdcard/` or `/storage/emulated/0/`.
 
-Folders keep their top-level folder, subfolders, files, and empty folders.
-Junctions, symbolic links, and other reparse points are skipped. A standalone
-APK keeps scrcpy's install behavior, while an APK inside a dropped folder is
-copied as a regular file.
+Drop files or folders onto a running DeX/app scrcpy window. The default managed path preserves Unicode names,
+folder structure and empty folders, and reserves numbered names instead of overwriting destination items.
+The independent status window shows active/waiting/completed/failed items without a synthetic percentage/ETA.
 
-The independent, movable status window shows the active item and up to four
-waiting items, file size, elapsed time, completed/failed/waiting counts, and a
-cancel button. It does not show a percentage or ETA because reliable byte
-progress is not available on every supported Windows/ADB combination.
-
-Existing phone files and folders are not overwritten. If the same name already
-exists, DX Manager uses `name (1).ext`, `name (2).ext`, or `folder (1)`.
-Canceling stops the active and waiting transfers for that scrcpy window and
-also attempts to remove their temporary phone data. The button is briefly
-disabled while the final name is committed.
-
-To use scrcpy's original file-drop behavior, turn off **Use DX Manager file
-transfer (Unicode-compatible)** under **Settings > Paths / ADB > Programs and
-storage paths**. The change applies to newly opened DeX and single-app windows;
-already open windows keep the mode with which they were started. In original
-scrcpy mode, non-ASCII file names may not be preserved on every Windows
-environment.
+Change the destination under **Settings > Paths > PC → phone file transfer** and reopen scrcpy windows.
+The current Settings layout has no separate managed-mode toggle. For advanced configuration, fully exit the app,
+back up `config/settings.json` and set `Features.ManagedFileTransferEnabled` to `false`.
+Restart the app/open new scrcpy windows. scrcpy then handles file drops normally; standalone APK install behavior remains.
 
 ## Q18. The DeX window is black on an older One UI version.
 
@@ -302,8 +286,8 @@ support for that device or One UI release.
 printed by many different platform-tools releases. It does not identify the
 actual executable build.
 
-DX Manager 1.1.0 reads the following `Version ...` line instead. The bundled
-scrcpy ADB reports `37.0.0-14910828`, while the Windows 7/8.1 legacy ADB reports
+Since 1.1.0, DX Manager reads the following `Version ...` line instead. The bundled
+scrcpy ADB reports `37.0.1-15733141`, while the Windows 7/8.1 legacy ADB reports
 `34.0.1-9979309`. A manually selected ADB displays its own corresponding
 `Version ...` value.
 
@@ -337,44 +321,147 @@ reopen the DeX or single-app window. In this mode the mouse behaves more like
 touch input than a regular hardware mouse. For example, a side button may open
 Recent Apps and holding the left button may act as a touchscreen long press.
 
-## Q23. Why is the cleanup permission button under Diagnostics disabled?
+## Q23. Why is the cleanup permission button under Companion disabled?
 
-**Grant permission** is enabled only when the official **DX Companion** is
-installed on the selected phone and its APK signing certificate matches. If it
-is absent, use **Install DX Companion**; the button remains disabled when the
-bundled APK is missing or altered. DX Manager does not grant the permission
-when ADB is not authorized or another app uses the same package ID with a
-different signature. Check the status message below the buttons.
+Open **Settings > Companion**, select the correct phone and refresh its status. Installation and
+cleanup permission are managed here, rather than under Diagnostics.
 
-Select **Grant cleanup permission** to make DX Manager re-verify the app, grant
-`WRITE_SECURE_SETTINGS`, and confirm the resulting permission state. The button
-then displays **Permission granted**. The companion app has no arbitrary ADB
-command feature.
+The phone must be authorized over USB or wireless ADB. DX Manager checks the bundle and installed
+app's package, supported version, APK hash and official signing certificate. An absent, altered,
+unsupported or differently signed app cannot receive the cleanup permission. Follow the displayed
+status and install/update the bundled **Companion 2.1.6** when needed.
 
-The permission survives a reboot and an update signed with the same official
-certificate. Uninstalling and reinstalling the app removes its permission, so
-grant it again after a fresh installation. Once granted, the main app can clean
-the virtual display, turn off **Stay awake**, or do both. The Quick Settings
-tile and compact 2 × 1 widget clean both by default; their targets can be
-changed in the app.
-
-Without the companion app, open **Developer options > Simulate secondary
-displays**, select any resolution once, open the menu again, and select
-**None**.
+The cleanup permission is `WRITE_SECURE_SETTINGS`, limited by Companion's implementation to the
+virtual-display and Stay awake controls. It is normally retained through a same-signature update or
+phone reboot, and lost on uninstall. This is different from the file-transfer ready state: a failed
+cleanup-permission grant is not itself evidence that the transfer tunnel cannot work.
 
 ## Q24. DX Companion cannot send a file or folder to the PC.
 
-Start DX Manager first, connect the target phone through USB or wireless ADB,
-and check that DX Companion's **File transfer** tab reports that the PC receiver
-is ready. If it does not, open **Settings > Diagnostics > DX Companion** in DX
-Manager and verify the installed version, official signature, permission, and
-device connection before trying again.
+Start DX Manager, connect the intended phone and update the official Companion to **2.1.6** under
+**Settings > Companion**. Under **Settings > Paths > Phone → PC file transfer**, enable receiving
+and select **PC receive folder**. Check Companion's file-transfer page for the ready state.
 
-For ordinary files, use Gallery or My Files and choose **Send to DX Manager**
-from Android's Share menu. Android does not pass folders through that menu, so
-use **Send folder > Select folder** inside DX Companion for a complete folder.
+Use Gallery/My Files > Share > **Send to DX Manager** for files, and Companion's folder picker for
+folders. If several similarly named share entries exist, choose the official Companion connected to
+this PC. Old or separate test installations may be a different app.
 
-The PC destination is configured under **Settings > Paths / ADB > Phone-to-PC
-destination folder**. Existing items are not overwritten; DX Manager adds
-`(1)`, `(2)`, and later suffixes. A disconnection during transfer is reported
-as a failure, and the transfer must be started again after reconnecting.
+A dropped connection, unavailable PC, disabled receiver or unverified/old Companion prevents sending.
+Reconnect and start a failed transfer again. Existing names are preserved with numbered siblings;
+subfolders and empty folders are retained. The desktop window shows progress items/counts without
+an invented percentage or remaining time. The receiver creates a phone-name subfolder below the PC
+receive directory. Check that directory before concluding a file is missing.
+
+## Q25. How do update checks behave without Internet?
+
+The automatic check runs once on the first launch of each local day, in the background with an
+overall 5-second deadline. Failure is saved as that day's attempt; restarting offline does not retry
+in a loop. It does not block local USB/LAN use or show an automatic latest-version/offline dialog.
+
+Use **Settings > About > Check for updates**, beside third-party notices, for a manual result dialog.
+A new version found automatically uses a lower-right nonmodal banner or a tray notification. X dismisses
+that release; the GitHub button opens its page and leaves the banner visible. A previously cached
+new-version banner can still appear offline. Download and installation are manual.
+
+## Q26. Why does the Companion session-protection notification remain?
+
+It monitors the authenticated PC connection, so it can appear when DX Manager detects the phone,
+before DeX is started. Keeping this notification while the PC is connected is expected.
+
+Update Companion to **2.1.6**. Once a PC disconnect is detected and both the virtual display and Stay
+awake settings are verified inactive, it stops protection and removes the notification without waiting
+for the recovery timer. A fresh tunnel gets a brief setup grace. If recovery settings remain active
+or cannot be verified, the existing disconnect recovery policy remains. Losing a PC socket while the
+configured USB/Wi-Fi transport still appears present is not the same as confirmed transport removal.
+
+## Q27. Does the first-run consent appear every time?
+
+No. A fresh distribution shows it until the acknowledgement checkbox is checked and confirmation is
+saved. Declining exits without accepting; normal Enter cannot accept an unchecked notice.
+Later launches respect `config/onboarding.json`, which is separate from `config/settings.json` and
+is preserved by settings reset. A new extraction without that record, corrupted state or a folder
+that cannot save the record can cause the notice to appear again. Use a writable folder.
+
+The acknowledgement belongs to the portable config folder. Copy its history when migrating to a new version folder; a clean folder has fresh state.
+
+## Q28. Is hardware decoding actually active?
+
+The bundled scrcpy **5.0.1** receives `--hwdec=auto` for DeX and all three single-window slots.
+Automatic selection depends on the OS, GPU and driver; it does not promise hardware decoding on
+every PC. Check scrcpy's session output, for example **Video decoding: d3d11va**, rather than CPU
+usage alone. Windows 7 may choose differently from a newer Windows installation.
+
+**Settings > Diagnostics > Environment check** shows the selected scrcpy executable's full version.
+An explicit `--hwdec` selection in advanced arguments is respected instead of adding a duplicate.
+
+## Q29. How do Enter and Shift+Enter switching work?
+
+The public 2.5.0 release keeps optional **Scroll Lock** switching under **Settings > Keyboard**.
+With it disabled, ordinary Enter is unchanged. With it enabled, the saved mapping and Scroll Lock
+state apply while an eligible scrcpy window is active. They do not create automatic per-app AI rules.
+If Enter seems reversed, check that option and the Scroll Lock state first.
+
+
+## Q30. Why is Turn phone screen off disabled at 120 FPS?
+
+120 FPS is an **experimental maximum**, with 60 FPS still the default. The phone screen must stay on.
+Selecting 120 does not show a popup; **each actual 120 FPS start** requires a warning confirmation, including
+DeX, every single-window slot, saved settings, tray/automatic starts and apply-settings restarts.
+Cancel is the default action and cancels the launch.
+
+Heat and battery use increase. Static images on an OLED panel can cause permanent burn-in; avoid prolonged
+or unattended use and stop if the phone overheats. The option does not inject input or force Android refresh settings.
+
+Switching back to 30/60 restores the exact earlier screen-off preference, including a preference to keep it on.
+This is saved per phone, mode and app profile. If any 120 FPS session is running on a phone, other sessions on
+that phone defer their screen-off requests until the last 120 session ends. Other phones remain independent.
+
+## Q31. Why does the actual FPS remain below 120?
+
+The setting is a cap, not a promise of constant output. Device, app, activity, rendering/encoding/decoding
+capacity and transport conditions can limit the result. Low activity can reduce frame delivery.
+The phone panel must remain on; turning it off manually can also reduce FPS.
+Use 30/60 FPS when a higher cap is not useful or the phone becomes hot.
+
+The configured limit cannot be overridden with advanced `--max-fps` arguments, so the warning and screen rules remain consistent.
+
+## Q32. What is the What's new popup after an update?
+
+This local release-note dialog is separate from the daily online update check and mandatory safety/120 FPS consent.
+It uses no Internet and keeps its own `config/update-notice.json` checkpoint.
+
+An installation with earlier accepted safety-notice history shows an unseen newer version once, after safety consent
+and before device initialization/automatic starts. A fresh folder or installation with no earlier consent history
+shows the safety notice and establishes a baseline instead. Confirming the notes saves the current version.
+Closing/canceling or failing to save can make the notes reappear; settings reset does not clear their history,
+and running an older build does not lower the checkpoint.
+
+## Q33. Why does the ZIP no longer include a version in its filename?
+
+From Windows 2.5.0, every Windows release uses **`DX-Manager-win-x64.zip`** and a versioned inner folder,
+such as **`DX Manager v2.5.0`**. Extract the complete folder, not the EXE alone.
+
+Use the [latest release](https://github.com/maze-mei/DX-Manager/releases/latest) or
+[fixed latest Windows download](https://github.com/maze-mei/DX-Manager/releases/latest/download/DX-Manager-win-x64.zip).
+The latter works when the latest release includes that exact asset name. A URL containing a specific old tag/file
+does not automatically switch to a different version. Third-party servers may also keep older copies.
+
+## Q34. How do I retain settings when updating, and why does 2.0.1 not notify me?
+
+2.0.1 and earlier do not contain the new update-check feature. Download the newer version from the official release page.
+
+Fully exit the old app and wait for phone cleanup, then extract the new ZIP. With both copies closed,
+copy your personal **config** folder into the new version folder if you want to keep settings and consent/history.
+Preserve wanted captures, logs and received files separately. Keep those personal files out of public uploads.
+A clean new folder without consent history shows first-run safety guidance again.
+
+See [Updating an existing installation](USER_GUIDE_EN.md#updating-an-existing-installation).
+Future versions can notify you from the app, but downloading/installing is still manual.
+
+## Q35. Are the macOS implementation and this Windows ZIP the same release?
+
+No. The public repository has a separate .NET 8 macOS TUI/CLI implementation, with its own runtime, packaging
+and validation. The Windows 2.5.0 ZIP does not run on macOS; its scrcpy 5.0.1/702-check results are Windows-specific.
+
+At the 2026-10-24 review, published release assets were Windows ZIPs, not Mac ZIPs.
+Follow the [macOS guide](https://github.com/maze-mei/DX-Manager/blob/main/docs/MACOS_GUIDE.md) for source and packaging status.

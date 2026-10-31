@@ -617,6 +617,8 @@ namespace DexManager.Services
                 source.DeviceRunSettingsProfiles;
             target.DeviceWirelessConnectionProfiles =
                 source.DeviceWirelessConnectionProfiles;
+            target.RecentCustomResolutions =
+                source.RecentCustomResolutions;
         }
     }
 }

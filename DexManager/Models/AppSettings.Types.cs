@@ -1,4 +1,4 @@
-using System.ComponentModel;
+﻿using System.ComponentModel;
 using System.Collections.Generic;
 using System.Runtime.Serialization;
 
@@ -21,6 +21,8 @@ namespace DexManager.Models
             get;
             set;
         }
+        [DataMember(Order = 7)]
+        public List<RememberedAppSettings> RememberedApps { get; set; }
 
         public static DeviceRunSettingsProfile Create(
             string deviceIdentity,
@@ -40,7 +42,8 @@ namespace DexManager.Models
                 SingleWindowSlots = AppSettings.CloneSingleWindowSlots(
                     slots),
                 SingleWindowAppProfiles =
-                    AppSettings.CloneSingleWindowAppProfiles(appProfiles)
+                    AppSettings.CloneSingleWindowAppProfiles(appProfiles),
+                RememberedApps = new List<RememberedAppSettings>()
             };
         }
 
@@ -67,6 +70,13 @@ namespace DexManager.Models
     {
         [DataMember(Order = 1)] public string Name { get; set; }
         [DataMember(Order = 2)] public string PackageName { get; set; }
+    }
+
+    [DataContract]
+    public sealed class RecentCustomResolutionSettings
+    {
+        [DataMember(Order = 1)] public int Width { get; set; }
+        [DataMember(Order = 2)] public int Height { get; set; }
     }
 
     [DataContract]
@@ -186,6 +196,7 @@ namespace DexManager.Models
         [DataMember(Order = 9)] public string AdditionalArguments { get; set; }
         [DataMember(Order = 10)] public bool StayAwake { get; set; }
         [DataMember(Order = 11)] public string StartAppName { get; set; }
+        [DataMember(Order = 12)] public bool? TurnScreenOffBeforeHighFps { get; set; }
     }
 
     [DataContract]
@@ -209,6 +220,7 @@ namespace DexManager.Models
         [DataMember(Order = 15)] public int CustomWidth { get; set; }
         [DataMember(Order = 16)] public int CustomHeight { get; set; }
         [DataMember(Order = 17)] public bool FlexDisplay { get; set; }
+        [DataMember(Order = 18)] public bool? TurnScreenOffBeforeHighFps { get; set; }
     }
 
     [DataContract]
@@ -230,6 +242,7 @@ namespace DexManager.Models
         [DataMember(Order = 14)] public int CustomWidth { get; set; }
         [DataMember(Order = 15)] public int CustomHeight { get; set; }
         [DataMember(Order = 16)] public bool FlexDisplay { get; set; }
+        [DataMember(Order = 17)] public bool? TurnScreenOffBeforeHighFps { get; set; }
     }
 
     [DataContract]

@@ -1,5 +1,70 @@
 # Decision Log
 
+## 2026-10-01 Store UI fidelity correction
+
+메이님의 지시로 일부 GitHub 설정 UI를 섞었던 9월 30일 시도를 Store 소스 기준으로
+다시 구성했다. 기준은 Store 8b267c2의 Styles/SettingsWindow/MainPage/help.json이다.
+폰트는 같은 Pretendard 원본의 400/600 정적 인스턴스를 임베드하고, OFL 예약 이름
+규칙을 지키기 위해 내부 패밀리명만 DX Store UI로 바꿨다. GDI+/WinForms/.NET 4.6.2를 유지한다.
+버튼은 상태 라벨의 실제 겹침으로 깨지고 있었으며 배치와 아이콘 단독 표시를 수정했다.
+설정 49개 카드·펼침 항목을 재현하고 선택·토글은 범위별 즉시 저장, 주소·경로는
+작업/편집/닫기 경계에서 저장한다. 한/영과 Enter 입력 방식은 각각 저장한다.
+연결/Companion 선택기는 같은 대상이며, 과거 대상의 상태 응답을 현재 대상에 적용하지 않는다.
+도움말 6개 카드·단계·주의 블록과 설명서/FAQ 창, 메시지 유지 규칙, 첫 실행 안내
+(onboarding.json 버전 2, 설정 초기화와 독립)을 이식했다.
+Debug/Release 회귀 59개 통과. 명령을 차단한 UI 사본에서 페이지·저장·오류 메시지를
+검증했다. Windows 7·다른 DPI·실제 휴대폰을 쓰는 새 UI 검증은 아직 남아 있다.
+이미지는 .build-tools/ui-review/20261001-시간/ 폴더별로 보존하며 덮어쓰지 않는다.
+자세한 사항은 STORE_UI_BACKPORT_2026-10-01.md. Store 파일 및 Git 업로드는 변경하지 않았다.
+
+## 2026-09-30 Windows 7 호환 테마 UI 구현
+
+메이님이 밝음·다크 이미지 시안을 보고 실제 구현을 승인했다. UI는 WinForms 및 GDI+
+.NET Framework 4.6.2 API만 사용한다. 네이티브 제목 표시줄을 유지하며 카드 배경에만
+알파 색상 혼합을 적용한다. Windows 10/11의 Acrylic/Mica나 투명한 입력창은 사용하지 않는다.
+메인: 상단 물리 기기 선택, 기기 상태·시작/중지, 나란한 디스플레이·실행 옵션 카드,
+시작 앱 별도 카드, 오른쪽 아래 닫을 수 있는 앱 목록 알림. 작은 화면은 카드가 세로로
+배치되고 스크롤된다. 기존 identity별 선택·설정 저장·런타임 명령은 유지했다.
+설정: 일반·입력·연결·Companion·경로·진단·정보 메뉴. Companion 카드와 기존 핸들러를
+별도 페이지로 옮겼다. 저장 버튼으로 적용하는 기존 동작을 유지했다. 기본 동작을 행으로
+표시하고 전체 테마·대비를 조정했다. 도움말의 기본 안내 화면과 로그 화면도 테마를 적용했다.
+첫 실행 경고의 확인 저장·실행 차단 기능은 이번 이미지 시안의 테마 구현 범위에 넣지 않았다.
+검증: .NET 4.6.2 x64 Release, 회귀 57/57, 명령 실행을 차단한 UI 사본의 밝음·다크·
+단일창·920x696 스크롤 레이아웃·도움말·로그·알림 렌더링. 이미지의 기기 이름은 예시이다.
+Windows 7 실기, 다른 DPI와 실제 복수 휴대폰의 새 선택 UI는 아직 확인하지 않았다.
+사용자는 이 UI 변경 전 기기별 앱 목록 분리 동작을 실기 확인했다.
+Store 제품 파일은 변경하지 않았고 commit/push/tag/배포는 하지 않았다.
+
+## 2026-09-30 Companion 2.1.3 서명 APK 반영
+
+메이님이 대기 전송 종료 수정의 APK 반영과 Store 작업방 참고 메시지를 승인했다.
+이 결정은 앞선 Store 2.1.2 APK 그대로 재사용 결정을 대체한다.
+새 APK는 2.1.3/versionCode 10, minSdk 33/targetSdk 36이며 기존 공식 인증서를 유지한다.
+SHA-256: 790A0F830BA182A74D27628072ABB709CB77904690E3AFA8797DEAF480392A62.
+포터블 번들과 PC version/hash 검증 및 패키징 계약을 갱신했다.
+Android 테스트 13개, lintRelease/assembleRelease, 공식 v2 서명·권한·패키지 검증과
+.NET 4.6.2 x64 Release/회귀 57개가 통과했다. 실기 timeout 재현·업데이트 설치는 미확인이다.
+Store 등록 대기 산출물과 작업 트리는 변경하지 않는다. 다음 Store 작업 때 참고하도록
+문제 원인·변경 파일·새 APK 정보를 메시지로 전달한다. Git 커밋·업로드는 하지 않았다.
+
+## 2026-09-30 - 앱 목록은 물리 기기 소유로 보관한다
+
+Store판의 identity별 캐시·화면 projection 구조를 참고한다. 앱 조회 결과는 시작 시
+캡처한 기기에 저장하고 선택 기기를 바꿔도 원래 기기 소유를 유지한다. 기기·모드
+전환은 현재 기기의 목록과 저장된 시작 앱을 다시 구성한다. 같은 identity의 USB와
+Wi-Fi는 같은 캐시를 사용한다. 전체 목록 캐시는 현재 실행에만 유지하고 성공적으로
+시작한 최근 앱은 기기별 프로필에 저장한다(schema 27). 이전 전역 최근 앱은
+출처를 추측해 여러 기기로 복제하지 않고 원래 저장 데이터로 보존한다.
+완료 메시지는 Store처럼 5초 동안 포커스를 옮기지 않고 표시한다.
+
+## 2026-09-30 - 수정 소스와 재사용한 Companion APK를 구분한다
+
+기존 Store 2.1.2 APK를 그대로 사용하는 사용자 결정은 유지한다. 감사에서 확인한
+다중 요청 timeout·서비스 종료 수명주기 문제는 포터블 Android 소스와 Debug
+검증에 반영했다. 이 소스 수정이 고정된 서명 APK hash에 포함됐다고 기록하지 않는다.
+실제 배포 반영에는 새 서명 버전과 PC version/hash 검증값 갱신을 함께 결정해야 한다.
+문서 제공자의 trim/slash 이름 충돌에 대한 예전 소스 전용 완료 표시는 철회한다.
+
 ## .NET Framework 4.6.2
 
 64비트 Windows 7 SP1과 오프라인·폐쇄망 환경을 지원하기 위한 최소 대상
@@ -153,6 +218,24 @@ Companion은 범용 설정 편집기나 shell 도구로 만들지 않는다. 복
 사용자가 Android 공유 메뉴나 폴더 선택기에서 고른 항목만 현재 DX Manager의
 기기별 수신 세션으로 보낸다. Android 전역 overlay 설정 하나를 다루므로 DX
 Manager 생성 화면과 사용자가 직접 만든 시뮬레이션 화면을 구분하지 않는다.
+
+## 2026-09 - GitHub 포터블 Companion은 Android 13+ 지원
+
+메이님이 새 Companion의 하한을 Android 13 (API 33)으로 정했다. 포터블판은
+Store에서 사용한 2.1.2/versionCode 9 APK를 그대로 번들링하며 별도 Release APK를
+만들지 않는다. 복사한 바이너리의 package·minSdk·version·공식 인증서·SHA-256을
+확인해 PC 설치 검증 계약과 패키징 스크립트를 함께 고정한다. URI 권한과
+`dataSync` timeout 처리는 포터블 소스에서도 검증한다. DXMR 휴대폰→PC 소켓
+프로토콜은 별도 기능이 추가돼도 v1을 유지한다.
+
+## 2026-09 - mDNS endpoint는 기기 identity 검증 뒤 저장
+
+Android 11+ `_adb-tls-connect._tcp` 발견과 `_adb-tls-pairing._tcp`는 별개다.
+파서는 connect 후보만 연결 endpoint로 쓰며 첫 후보를 임의로 고르지 않는다. 저장
+profile의 stable serial identity와 mDNS instance가 일치해야 하며, ADB 연결 뒤 실제
+휴대폰 identity도 다시 맞을 때만 동적 host·port를 저장한다. mDNS를 쓸 수 없거나
+결과가 모호하면 저장 주소와 수동 IP·연결 포트 경로를 유지하고, 페어링 포트와
+연결 포트를 혼동하지 않는다.
 
 ## 휴대폰 경로는 Android 표기 유지
 
@@ -327,6 +410,116 @@ Scrcpy, DeX orchestrator, 단일창, 화면 OFF, Companion 수신기와 PC→휴
 보존하는 것이 우선이다. 공통화는 이 경로를 직접 검증하는 테스트가 생긴 뒤 별도
 작업으로 수행한다.
 
+## 2026-09 - Windows 종료와 도구 시작은 짧은 잠금에서 직렬화한다
+
+공개 v2.0.1은 DeX·단일창 시작 초기에 종료 상태를 검사하지만 준비 작업 뒤의
+`Process.Start()` 직전에는 다시 검사하지 않았다. 이전 제작 기록에는
+`Process.Start()`를 세션 잠금 밖에 둔 특별한 실기 사유가 없었다. 기존 세션
+잠금을 오래 유지하거나 Scrcpy 창 준비까지 잡는 공용 시작 직렬화기를 종료
+요청의 잠금으로 재사용하면 Windows 종료가 지연될 수 있다.
+
+각 서비스는 짧은 시작 잠금에서 종료 상태 최종 확인과 실제 프로세스 시작만
+처리한다. `RequestShutdown()`은 같은 잠금에서 종료 상태를 고정한다.
+DeX·단일창·wake-up Scrcpy와 관리형 전송의 직접 ADB 실행에 적용하며,
+기존 세션별 serial·프로세스·전송 토큰 정리 흐름은 유지한다. 실제 Windows
+종료·종료 취소 실기 검증은 아직 남아 있다.
+
+## 2026-09 - 저장된 단일창 앱 프로필은 선택 앱을 복원한 뒤 적용한다
+
+v2.0.1은 사용자가 앱을 직접 바꿀 때 `SelectionChangeCommitted`에서 package
+프로필을 적용했다. 저장된 기본 앱이 앱 목록 로드 전부터 선택돼 있으면 이 이벤트가
+발생하지 않아 프로필이 첫 표시와 실제 시작값에 적용되지 않을 수 있었다. 제작 채팅의
+Git 이력 확인에서는 `fe10609`의 첫 진입·앱 목록 갱신 호출이 `5596f4c`의 기기별 앱
+목록 변경 때 빠진 것으로 확인됐다. 당시 Store 코드와 테스트도 최초 선택 적용을
+일관되게 보장하지 않았지만, 역이식 계획에는 이미
+첫 진입 적용이 완료 항목으로 기록되어 있고 이를 의도적으로 지연 적용으로 바꿨다는
+결정 기록은 확인되지 않았다.
+
+포터블판은 설정 복원·단일창 진입·기기 전환·앱 목록 갱신 뒤 현재 기기의 선택 package
+프로필을 확인해 적용한다. 슬롯에 프로필 값이 이미 있으면 다시 저장하지 않는다.
+사용자 지정 해상도는 전역 최근 5개 목록에 보관하며, 그 목록에서 빠진 활성 슬롯·앱
+프로필 값은 현재 UI 선택 항목으로 임시 추가한다. 실제 기기에서 시작 앱과 해상도가
+적용되는지 확인은 남아 있다.
+
+## 2026-10-01 UI defect correction
+
+General text roles are increased by 2 DIP at the user's request; headings retain their Store sizes.
+Disconnected contexts and profiles remain in memory/configuration, while selectors expose only
+currently connected phones. Display names do not replace physical identities or command serials.
+Panel scrollbar overlays use GDI and the existing AutoScroll offsets on Windows 7. Documentation
+uses separate panels and wheel routing per tab. Native title bars remain under Windows control.
+## 2026-10-02 Start preflight and painted corners
+
+Missing app selection blocks only single-window slots, before any start side effects. DeX has no app requirement. The gray button retains click feedback. Painted rounded backgrounds replace hard window regions so antialiasing remains intact; native .NET 4.6.2/Win7 controls and existing device recovery logic are retained.
+
+## 2026-10-05 Launch transport and Companion name collisions
+
+By explicit user request, new DeX/single-window execution chooses authorized USB before Wi-Fi within the selected physical identity, regardless of the wireless profile's reconnect mode. Existing running or starting sessions retain their captured serial; transport selection never rewrites their commands/cleanup target. Losing USB stops its sessions and suppresses automatic Wi-Fi execution until the user presses Start again.
+Companion keeps the DXMR v1 contract and Android13 minimum. Name normalization is retained, but a per-parent allocator reserves existing normalized names and assigns unique numbered segments before traversing folder descendants. This addresses the rare provider/API filename edge case without changing ordinary names such as spaces before an extension. A new officially signed APK2.1.4 is bundled into portable; Store is a later update, not a resubmission now.
+
+### 2026-10-05 clarified reconnect behavior
+
+The earlier manual-start-only interpretation after transport loss was too broad. The user's correction requires retaining DeX auto-start on a real reconnect. Suppress only the immediate fallback within a still-connected physical episode; restore automatic execution eligibility when the lost authorized transport returns or a new physical connection begins, subject to the existing feature setting. Auto-start captures the USB-first launch serial independently of an existing session's pinned runtime serial. This supersedes the prior manual-start-only wording above.
+## 2026-10-05 Microsoft icon trial
+
+Use a pinned MIT-licensed Fluent UI System Icons subset for portable small icons, with the original renderer retained for comparison/recovery. Keep the large custom phone artwork and logo. Original SVGs are retained; embedded transparent masks avoid Windows-version icon-font dependency and new runtime libraries. Document the standalone mouse as a derivative of Keyboard Mouse rather than an official separately named icon. Mini-bar connection display follows authorized observed transports per physical-device manager and never chooses a launch transport or changes session command targets. Store remains unchanged until the user accepts the appearance.
+
+## Official update checks and private-feature exclusion (2026-10-15)
+
+Port the accepted private UI/lifecycle fixes without its accessibility, app caches, AI keymaps,
+package identities or protocol. Use the shared signed official2.1.5 APK and original Guardian1.
+Keep runtime files in the source bundle and verify every generated copy against the pinned release.
+
+Automatic update checks run once on the first launch of each local calendar day. Persist each
+attempt before networking; offline/error results never cause an automatic retry. If state cannot
+be persisted, skip automatic networking. Manual checks are explicit and remain available.
+Separate update-check.json preserves existing application settings and schema.
+Use a5-second overall background deadline plus request/read limits and a physical-request gate,
+so slow DNS/proxy/TLS cannot queue unlimited requests or block the UI/shutdown path.
+Only numeric newer stable versions and this repository's HTTPS release links are accepted.
+
+Automatic information uses a themed main banner or tray notification; manual results use an
+owner-centered themed dialog. Closing Main-to-tray closes pending dialogs and late results are ignored.
+A separate development-only preview demonstrates real dialog classes offline, using example versions.
+## 2026-10-16 documentation and publication boundary
+
+The maintainer explicitly clarified that a clean antivirus result is not permission to publish.
+README/FAQ/guides and screenshot preparation are local-only until an explicit release instruction.
+Keep the exact scanned EXE/APK/ZIP bytes. A GitHub-only documentation edit is not an embedded-help rebuild.
+The approved portable branch started from localv2.0.1 and lacks remote-main macOS additions; preserve them
+when preparing a future integration rather than replacing remote main with this branch wholesale.
+The external canonical Companion remains one maintained source. Its public dependency/snapshot must be
+included or obtainable for a standalone source checkout before publishing2.5.0 source; do not restore
+an older per-product APK/tree or duplicate ongoing Android maintenance to hide this gap.
+Store screenshots were compared with the actual portable UI. New app screenshots will use the current
+portable build; Android system-setting examples can remain, and no fixture mock will masquerade as a phone run.
+
+## 2026-10-19 portable 120 FPS preparation
+
+The maintainer authorized implementing the Store handoff in the portable product
+and rebuilding the fixed preview/final ZIP locally. Store is read-only; reference
+commit11050e7822c43ec409d7d943ece5d9884d997b99 is not merged.
+Added default60/experimental120, one fail-closed warning before every120 start,
+exact screen-off preference restoration, per-phone mixed-session screen policy
+and local version-scoped change notes. scrcpy5.0.1 and signed Companion2.1.6 are
+unchanged. No AI app detection, Android changes, commit/push/tag or publication.
+See PORTABLE_120FPS_2026-10-19.md for implementation and fresh verification.
+October16 scan evidence remains historical; the new EXE needs a fresh user scan.
+
+
+## Documentation alignment — 2026-10-24
+
+Use one fixed Windows asset name with a versioned inner folder; old tagged links do not become latest links.
+Separate online update availability, local version notes and safety/120 consent. Describe preserved portable config explicitly.
+Retain Q1–24 numbering and field-tested recovery/input caveats; add2.5.0 questions without advertising private features.
+Use actual reviewed portable/official-Companion captures and honest initial/connected captions. Omit single-window photos as requested.
+Current Settings catalog controls determine UI directions; do not invent controls from legacy model fields.
+Keep the exact final EXE/APK/ZIP unchanged while updating GitHub docs. Embedded resource changes belong to a separate product build.
+Preserve remote macOS text and identify its independent runtime, test and publication state.
+
+
+## macOS implementation decisions retained from public main
+
 ## 2026-08 - macOS는 아키텍처별 self-contained ZIP으로 배포한다
 
 macOS 사용자가 저장소를 clone하거나 .NET, Homebrew, scrcpy와 ADB를 직접
@@ -409,3 +602,6 @@ adb 타임아웃 분량의 종료 지연이다.
 더 좁은 조건—예를 들어 `runtime.Dex.HasDeferredDisplayCleanup || runtime.Dex.CurrentSession != null`—으로
 제한하는 것은 기술적으로 가능하며, 이전에 검토되었다. 가능성 제약으로 인해
 선택되지 않았고 위의 비용-편익 판단으로 인해 거부되었다.
+## 2026-10-25 public source integration
+
+Keep the Windows .NET Framework proxy/foundation projects intact. Preserve the public .NET 8 Mac versions in sibling .Mac directories, with Mac solution/package/workflow references updated. Preserve all remote-only Mac code/tools and the scanned Windows release bytes. Export a pinned official Companion snapshot while keeping one canonical Android source.

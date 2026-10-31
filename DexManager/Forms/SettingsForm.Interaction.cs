@@ -36,7 +36,7 @@ namespace DexManager.Forms
                 }
             }
 
-            if (page == null || !page.VerticalScroll.Visible)
+            if (page == null || page.DisplayRectangle.Height <= page.ClientSize.Height)
                 return false;
 
             var delta = unchecked((short)(
@@ -45,8 +45,7 @@ namespace DexManager.Forms
 
             var maximum = Math.Max(
                 0,
-                page.VerticalScroll.Maximum -
-                page.VerticalScroll.LargeChange + 1);
+                page.VerticalScroll.Maximum - page.VerticalScroll.LargeChange + 1);
             var current = Math.Max(
                 0,
                 Math.Min(maximum, -page.AutoScrollPosition.Y));
@@ -61,6 +60,7 @@ namespace DexManager.Forms
                 Math.Min(maximum, current - notches * step));
 
             page.AutoScrollPosition = new Point(0, target);
+            ThemedScrollBar.RefreshFor(page);
             return true;
         }
     }

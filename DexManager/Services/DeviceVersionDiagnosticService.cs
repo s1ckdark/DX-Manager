@@ -26,6 +26,9 @@ namespace DexManager.Services
         {
             var result = new DeviceVersionDiagnostic
             {
+                DeviceIdentity = device == null
+                    ? string.Empty
+                    : device.Identity ?? string.Empty,
                 Serial = serial ?? string.Empty,
                 DisplayName = device == null
                     ? string.Empty
@@ -82,7 +85,15 @@ namespace DexManager.Services
             result.Compatibility = AssessCompatibility(
                 result.AndroidSdk,
                 result.OneUiVersion);
+            if(IsUserVerifiedEnvironment(result.DisplayName,result.AndroidSdk,result.OneUiVersion))
+                result.Compatibility=DeviceCompatibilityAssessment.UserVerifiedEnvironment;
             return result;
+        }
+        internal static bool IsUserVerifiedEnvironment(string displayName,int sdk,string oneUiVersion)
+        {
+            Version version;
+            return string.Equals((displayName??string.Empty).Trim(),"Galaxy S26 Ultra",StringComparison.OrdinalIgnoreCase)
+                && sdk==37 && Version.TryParse(oneUiVersion,out version) && version.Major==9 && version.Minor==0;
         }
 
         internal static IDictionary<string, string> ParseProperties(

@@ -43,14 +43,14 @@ namespace DexManager.Forms
                 Dock = DockStyle.Top,
                 Height = 104
             };
-            _titleLabel = new Label
+            _titleLabel = new UiLabel
             {
                 AutoSize = true,
                 Font = UiFonts.Create(20F, FontStyle.Bold),
                 Location = new Point(28, 20),
                 Text = LocalizationService.Get("Licenses.Title")
             };
-            _guideLabel = new Label
+            _guideLabel = new UiLabel
             {
                 AutoEllipsis = true,
                 Location = new Point(30, 63),
@@ -122,6 +122,7 @@ namespace DexManager.Forms
                 TabStop = false
             };
             _contentCard.Controls.Add(_contentBox);
+            ThemedScrollBar.Attach(_contentBox);
             _contentCard.Controls.Add(_tabPanel);
             _contentHost.Controls.Add(_contentCard);
 

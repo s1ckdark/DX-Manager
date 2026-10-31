@@ -1,0 +1,60 @@
+plugins {
+    id "com.android.application"
+}
+
+def externalSigningProperties = providers.gradleProperty("dxSigningPropertiesFile").orNull
+def signingPropertiesFile = externalSigningProperties
+        ? new File(externalSigningProperties) : rootProject.file("signing.properties")
+def signingProperties = new Properties()
+if (signingPropertiesFile.exists()) {
+    signingPropertiesFile.withInputStream { signingProperties.load(it) }
+}
+
+android {
+    namespace "io.github.mazemei.dxdisplaycleanup"
+    compileSdk 36
+
+    defaultConfig {
+        applicationId "io.github.mazemei.dxdisplaycleanup"
+        minSdk 33
+        targetSdk 36
+        versionCode 13
+        versionName "2.1.6"
+    }
+
+    signingConfigs {
+        if (signingPropertiesFile.exists()) {
+            release {
+                def keyFile = new File(signingProperties["storeFile"])
+                storeFile keyFile.isAbsolute() ? keyFile : new File(
+                        new File(signingPropertiesFile.parentFile, "app"), signingProperties["storeFile"])
+                storePassword signingProperties["storePassword"]
+                keyAlias signingProperties["keyAlias"]
+                keyPassword signingProperties["keyPassword"]
+            }
+        }
+    }
+
+    buildTypes {
+        debug {
+            applicationIdSuffix ".debug"
+            versionNameSuffix "-debug"
+        }
+        release {
+            minifyEnabled false
+            shrinkResources false
+            if (signingPropertiesFile.exists()) {
+                signingConfig signingConfigs.release
+            }
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+}
+
+dependencies {
+    testImplementation "junit:junit:4.13.2"
+}

@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Drawing;
 using System.Windows.Forms;
 using DexManager.Utils;
@@ -38,6 +38,7 @@ namespace DexManager.Services
                 Visible = true
             };
             _notifyIcon.DoubleClick += delegate { showMainWindow(); };
+            _notifyIcon.BalloonTipClicked += delegate { showMainWindow(); };
         }
 
         public void ShowBalloon(string title, string message)

@@ -1,0 +1,12 @@
+
+# Preserve the canonical Companion manifest hashes across checkouts.
+companion/source/** -text
+companion/integration/** -text
+companion/release/** -text
+companion/licenses/** -text -whitespace
+
+*.sh text eol=lf
+*.command text eol=lf
+
+# Official scrcpy hashes include the original license bytes.
+DexManager/tools/scrcpy/** -text -whitespace

@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <dimen name="screen_horizontal_padding">20dp</dimen>
+    <dimen name="hero_card_height">176dp</dimen>
+    <dimen name="card_corner_radius">22dp</dimen>
+    <dimen name="content_bottom_padding">28dp</dimen>
+</resources>

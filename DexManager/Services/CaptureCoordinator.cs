@@ -26,6 +26,7 @@ namespace DexManager.Services
         private bool _mouseDragCandidate;
         private IntPtr _captureWindowHandle;
         private string _captureSerial;
+        private int _captureProcessId;
         private bool _started;
         private bool _disposed;
 
@@ -130,12 +131,14 @@ namespace DexManager.Services
 
             var captureWindow = _captureWindowHandle;
             var captureSerial = _captureSerial;
+            var captureProcessId = _captureProcessId;
             EndCaptureMode();
             RunCaptureAsync(delegate
             {
                 return _captureService.CaptureWindow(
                     captureWindow,
-                    captureSerial);
+                    captureSerial,
+                    captureProcessId);
             });
         }
 
@@ -154,19 +157,29 @@ namespace DexManager.Services
                 return;
             }
 
+            string captureSerial;
+            int captureProcessId;
+            if (!TryResolveWindowTarget(
+                    windowHandle,
+                    out captureSerial,
+                    out captureProcessId))
+            {
+                return;
+            }
             _captureWindowHandle = windowHandle;
-            _captureSerial = ResolveWindowSerial(windowHandle);
+            _captureSerial = captureSerial;
+            _captureProcessId = captureProcessId;
             if (NativeMethods.IsIconic(windowHandle))
                 NativeMethods.ShowWindow(
                     windowHandle,
                     NativeMethods.SwRestore);
             NativeMethods.SetForegroundWindow(windowHandle);
-            var captureSerial = _captureSerial;
             RunCaptureAsync(delegate
             {
                 return _captureService.CaptureWindow(
                     windowHandle,
-                    captureSerial);
+                    captureSerial,
+                    captureProcessId);
             });
         }
 
@@ -213,29 +226,39 @@ namespace DexManager.Services
                 return false;
             }
 
+            string captureSerial;
+            int captureProcessId;
+            if (!TryResolveWindowTarget(
+                    handle,
+                    out captureSerial,
+                    out captureProcessId))
+            {
+                _logService.Warning(LocalizationService.Get(
+                    "Log.Capture.ScrcpyWindowMissing"));
+                return false;
+            }
             _captureWindowHandle = handle;
-            _captureSerial = ResolveWindowSerial(handle);
+            _captureSerial = captureSerial;
+            _captureProcessId = captureProcessId;
             if (NativeMethods.IsIconic(handle))
                 NativeMethods.ShowWindow(handle, NativeMethods.SwRestore);
             NativeMethods.SetForegroundWindow(handle);
             return true;
         }
 
-        private string ResolveWindowSerial(IntPtr handle)
+        private bool TryResolveWindowTarget(
+            IntPtr handle,
+            out string serial,
+            out int processId)
         {
-            var dexSession = _scrcpyService.GetSessionSnapshot();
-            if (dexSession.IsRunning &&
-                handle == _scrcpyService.MainWindowHandle)
-            {
-                return dexSession.Serial;
-            }
-
-            string serial;
-            return _singleWindowService.TryGetSerialForWindow(
+            return _scrcpyService.TryGetWindowTarget(
                 handle,
-                out serial)
-                ? serial
-                : string.Empty;
+                out serial,
+                out processId) ||
+                _singleWindowService.TryGetWindowTarget(
+                    handle,
+                    out serial,
+                    out processId);
         }
 
         private IntPtr GetPreferredScrcpyWindow()

@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.Drawing;
 using System.IO;
@@ -17,14 +18,21 @@ namespace DexManager.Forms
         private readonly Label _itemLabel;
         private readonly Label _countLabel;
         private readonly Label _byteLabel;
-        private readonly ProgressBar _progressBar;
+        private readonly Label _deviceLabel;
+        private readonly Label _destinationLabel;
+        private readonly Label[] _queueLabels;
+        private readonly RoundedPanel _contentCard;
+        private readonly List<string> _items = new List<string>();
+        private Guid _batchId;
+        private string _activeItem;
+        private readonly TransferProgressBar _progressBar;
         private readonly ThemedButton _openFolderButton;
         private readonly ThemedButton _closeButton;
         private readonly Timer _autoHideTimer;
         private string _destinationFolder;
         private DateTime _hideAtUtc;
 
-        public PhoneTransferStatusForm(AppTheme theme)
+        public PhoneTransferStatusForm(AppTheme theme, string deviceName = null)
         {
             var palette = ThemeColors.Use(theme);
             Text = LocalizationService.Get("PhoneTransfer.WindowTitle");
@@ -36,44 +44,53 @@ namespace DexManager.Forms
             MinimizeBox = false;
             ShowInTaskbar = false;
             TopMost = false;
-            ClientSize = new Size(430, 184);
+            ClientSize = new Size(560, 370);
             BackColor = palette.WindowBackground;
             Font = UiFonts.Create(9.5F);
+            DoubleBuffered = true;
+            _contentCard = new RoundedPanel { Radius = 12, BackColor = Color.Transparent,
+                FillColor = palette.CardBackground, BorderColor = palette.CardBorder,
+                Location = new Point(20, 86), Size = new Size(520, 214) };
+            Controls.Add(_contentCard);
 
-            _statusLabel = new Label
+            _statusLabel = new UiLabel
             {
                 AutoSize = false,
-                Font = UiFonts.Create(12F, FontStyle.Bold),
+                BackColor = Color.Transparent,
+                Font = UiFonts.Pixels(20, true),
                 ForeColor = palette.TextPrimary,
-                Location = new Point(18, 14),
-                Size = new Size(394, 28),
+                Location = new Point(20, 16),
+                Size = new Size(520, 30),
                 Text = LocalizationService.Get("PhoneTransfer.Receiving")
             };
-            _itemLabel = new Label
+            _itemLabel = new UiLabel
             {
+                BackColor = Color.Transparent,
                 AutoEllipsis = true,
                 ForeColor = palette.TextSecondary,
-                Location = new Point(18, 48),
-                Size = new Size(394, 21)
+                Location = new Point(16, 30),
+                Size = new Size(488, 24), Font = UiFonts.Pixels(15, true)
             };
-            _progressBar = new ProgressBar
+            _progressBar = new TransferProgressBar
             {
-                Location = new Point(18, 76),
-                Size = new Size(394, 12),
+                Location = new Point(16, 16),
+                Size = new Size(488, 4),
                 Style = ProgressBarStyle.Marquee,
                 MarqueeAnimationSpeed = 28
             };
-            _countLabel = new Label
+            _countLabel = new UiLabel
             {
+                BackColor = Color.Transparent,
                 ForeColor = palette.TextSecondary,
-                Location = new Point(18, 98),
-                Size = new Size(190, 22)
+                Location = new Point(16, 155),
+                Size = new Size(230, 22), Font = UiFonts.Pixels(14)
             };
-            _byteLabel = new Label
+            _byteLabel = new UiLabel
             {
+                BackColor = Color.Transparent,
                 ForeColor = palette.TextSecondary,
-                Location = new Point(220, 98),
-                Size = new Size(192, 22),
+                Location = new Point(258, 155),
+                Size = new Size(246, 22), Font = UiFonts.Pixels(14),
                 TextAlign = ContentAlignment.TopRight
             };
             _openFolderButton = new ThemedButton
@@ -81,8 +98,9 @@ namespace DexManager.Forms
                 Text = LocalizationService.Get(
                     "PhoneTransfer.OpenFolder"),
                 Primary = false,
-                Location = new Point(212, 136),
-                Size = new Size(112, 32),
+                Location = new Point(290, 314),
+                Size = new Size(128, 36),
+                Font = UiFonts.Pixels(14),
                 Enabled = false
             };
             _openFolderButton.Click += delegate { OpenDestination(); };
@@ -90,22 +108,57 @@ namespace DexManager.Forms
             {
                 Text = LocalizationService.Get("Common.Close"),
                 Primary = false,
-                Location = new Point(328, 136),
-                Size = new Size(84, 32)
+                Location = new Point(430, 314),
+                Size = new Size(110, 36), Font = UiFonts.Pixels(14)
             };
             _closeButton.Click += delegate { Hide(); };
 
             Controls.Add(_statusLabel);
-            Controls.Add(_itemLabel);
-            Controls.Add(_progressBar);
-            Controls.Add(_countLabel);
-            Controls.Add(_byteLabel);
+            _contentCard.Controls.Add(_itemLabel);
+            _contentCard.Controls.Add(_progressBar);
+            _contentCard.Controls.Add(_countLabel);
+            _contentCard.Controls.Add(_byteLabel);
+            _deviceLabel = new UiLabel { Location = new Point(20, 52), Size = new Size(520, 22),
+                BackColor = Color.Transparent,
+                Font = UiFonts.Pixels(14), ForeColor = palette.TextSecondary, AutoEllipsis = true,
+                Text = string.IsNullOrWhiteSpace(deviceName) ? StoreUiText.Get("CommonConnectedPhone", "Connected phone") : deviceName };
+            _destinationLabel = new UiLabel { Location = new Point(16, 176), Size = new Size(488, 20),
+                BackColor = Color.Transparent,
+                Font = UiFonts.Pixels(13), ForeColor = palette.TextSecondary, AutoEllipsis = true };
+            Controls.Add(_deviceLabel);
+            _contentCard.Controls.Add(_destinationLabel);
+            _queueLabels = new Label[4];
+            for (var i = 0; i < _queueLabels.Length; i++)
+            {
+                _queueLabels[i] = new UiLabel { Location = new Point(16, 54 + i * 24), Size = new Size(488, 23),
+                    BackColor = Color.Transparent,
+                    Font = UiFonts.Pixels(14), ForeColor = palette.TextSecondary, AutoEllipsis = true };
+                _contentCard.Controls.Add(_queueLabels[i]);
+            }
             Controls.Add(_openFolderButton);
             Controls.Add(_closeButton);
 
             _autoHideTimer = new Timer { Interval = 250 };
             _autoHideTimer.Tick += AutoHideTimer_Tick;
             _autoHideTimer.Start();
+        }
+
+        protected override void OnPaintBackground(PaintEventArgs e)
+        {
+            DesktopSurface.Paint(e.Graphics, ClientRectangle);
+        }
+
+        public void ApplyCurrentTheme()
+        {
+            var palette = ThemeColors.Current;
+            BackColor = palette.WindowBackground;
+            _statusLabel.ForeColor = palette.TextPrimary;
+            _itemLabel.ForeColor = palette.TextPrimary;
+            _deviceLabel.ForeColor = _countLabel.ForeColor =
+                _byteLabel.ForeColor = _destinationLabel.ForeColor = palette.TextSecondary;
+            foreach (var label in _queueLabels) label.ForeColor = palette.TextSecondary;
+            _contentCard.FillColor = palette.CardBackground; _contentCard.BorderColor = palette.CardBorder;
+            Invalidate(true);
         }
 
         protected override bool ShowWithoutActivation
@@ -128,9 +181,23 @@ namespace DexManager.Forms
             if (progress == null || IsDisposed) return;
             _hideAtUtc = DateTime.MinValue;
             _destinationFolder = progress.DestinationFolder;
+            _destinationLabel.Text = progress.DestinationFolder;
+            if (_batchId != progress.BatchId)
+            {
+                _batchId = progress.BatchId; _items.Clear(); _activeItem = null;
+            }
+            if (!string.IsNullOrWhiteSpace(progress.CurrentItem) && progress.Stage != PhoneTransferStage.Failed &&
+                !string.Equals(_activeItem, progress.CurrentItem, StringComparison.Ordinal))
+            {
+                _items.Add(progress.CurrentItem); _activeItem = progress.CurrentItem;
+                if (_items.Count > 5) _items.RemoveAt(0);
+            }
+            for (var i = 0; i < _queueLabels.Length; i++)
+                _queueLabels[i].Text = i + 1 < _items.Count ? "•  " + _items[i] : string.Empty;
             _itemLabel.Text = progress.Stage == PhoneTransferStage.Failed
                 ? progress.Error
-                : progress.CurrentItem;
+                : string.IsNullOrWhiteSpace(_activeItem) ? string.Empty :
+                    (progress.Stage == PhoneTransferStage.Completed ? "✓  " : "▶  ") + _activeItem;
             _countLabel.Text = LocalizationService.Format(
                 "PhoneTransfer.Items",
                 progress.CompletedItems,
@@ -246,6 +313,53 @@ namespace DexManager.Forms
                 _autoHideTimer.Tick -= AutoHideTimer_Tick;
                 _autoHideTimer.Dispose();
             }
+            base.Dispose(disposing);
+        }
+    }
+
+    // Store-style accent track with the same known-byte/marquee decisions as the original form.
+    internal sealed class TransferProgressBar : Control
+    {
+        private readonly Timer _timer;
+        private ProgressBarStyle _style;
+        private int _value, _phase, _speed = 28;
+        public TransferProgressBar()
+        {
+            SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint |
+                ControlStyles.OptimizedDoubleBuffer | ControlStyles.SupportsTransparentBackColor, true);
+            BackColor = Color.Transparent;
+            _timer = new Timer { Interval = 28 };
+            _timer.Tick += delegate { _phase = (_phase + 3) % 200; Invalidate(); };
+        }
+        public ProgressBarStyle Style { get { return _style; } set { _style = value; RefreshAnimation(); Invalidate(); } }
+        public int Value { get { return _value; } set { _value = Math.Max(0, Math.Min(100, value)); Invalidate(); } }
+        public int MarqueeAnimationSpeed { get { return _speed; } set { _speed = value; RefreshAnimation(); } }
+        protected override void OnVisibleChanged(EventArgs e) { base.OnVisibleChanged(e); RefreshAnimation(); }
+        private void RefreshAnimation()
+        {
+            if (_timer == null) return;
+            _timer.Interval = Math.Max(15, _speed);
+            _timer.Enabled = Visible && _style == ProgressBarStyle.Marquee && _speed > 0;
+        }
+        protected override void OnPaint(PaintEventArgs e)
+        {
+            if (Width < 1 || Height < 1) return;
+            DesktopSurface.PaintBehind(e.Graphics, this);
+            e.Graphics.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+            var bounds = new Rectangle(0, 0, Width, Height);
+            using (var track = new SolidBrush(ThemeColors.Current.ControlBorder)) e.Graphics.FillRectangle(track, bounds);
+            Rectangle fill;
+            if (_style == ProgressBarStyle.Marquee)
+            {
+                var start = (int)((Width + Width / 3F) * _phase / 200F) - Width / 3;
+                fill = new Rectangle(Math.Max(0, start), 0, Math.Max(0, Math.Min(Width, start + Width / 3) - Math.Max(0, start)), Height);
+            }
+            else fill = new Rectangle(0, 0, Width * _value / 100, Height);
+            using (var accent = new SolidBrush(ThemeColors.Current.Accent)) e.Graphics.FillRectangle(accent, fill);
+        }
+        protected override void Dispose(bool disposing)
+        {
+            if (disposing) { _timer.Stop(); _timer.Dispose(); }
             base.Dispose(disposing);
         }
     }

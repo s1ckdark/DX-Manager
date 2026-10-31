@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Threading.Tasks;
 using DexManager.Models;
 using DexManager.Services;
@@ -79,10 +79,10 @@ namespace DexManager.Forms
             if (_exitInProgress || IsDisposed ||
                 IsSerialMarkedDisconnected(serial) ||
                 (context == null && !string.Equals(
-                    GetSelectedDeviceSerial(),
+                    GetSelectedLaunchSerial(),
                     serial,
                     StringComparison.OrdinalIgnoreCase)) ||
-                (context != null && !IsContextConnectionCurrent(
+                (context != null && !IsContextLaunchCurrent(
                     context,
                     serial,
                     generation)))
@@ -112,13 +112,25 @@ namespace DexManager.Forms
                 !IsSerialMarkedDisconnected(serial) &&
                 (context == null
                     ? string.Equals(
-                        GetSelectedDeviceSerial(),
+                        GetSelectedLaunchSerial(),
                         serial,
                         StringComparison.OrdinalIgnoreCase)
-                    : IsContextConnectionCurrent(
+                    : IsContextLaunchCurrent(
                         context,
                         serial,
                         generation));
+        }
+
+        private string GetSelectedLaunchSerial()
+        {
+            var context = _selectedDeviceContext;
+            if (context != null && !string.IsNullOrWhiteSpace(context.Identity))
+            {
+                var transport = context.Device == null ? null :
+                    context.Device.SelectLaunchTransport(context.ActiveSerial);
+                return transport == null ? string.Empty : transport.Serial;
+            }
+            return GetSelectedDeviceSerial();
         }
 
         private string GetSelectedDeviceSerial()

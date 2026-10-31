@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <root>
   <resheader name="resmimetype"><value>text/microsoft-resx</value></resheader>
   <resheader name="version"><value>2.0</value></resheader>
@@ -22,8 +22,8 @@
   <data name="Main.Waiting" xml:space="preserve"><value>연결 대기 중</value></data>
   <data name="Main.PreparingAdb" xml:space="preserve"><value>ADB 서버를 준비하고 있습니다.</value></data>
   <data name="Main.WaitingPhone" xml:space="preserve"><value>휴대폰 연결을 기다립니다.</value></data>
-  <data name="Main.DisplaySettings.Dex" xml:space="preserve"><value>DeX 화면 설정</value></data>
-  <data name="Main.DisplaySettings.Single" xml:space="preserve"><value>단일창 {0} 화면 설정</value></data>
+  <data name="Main.DisplaySettings.Dex" xml:space="preserve"><value>디스플레이 설정</value></data>
+  <data name="Main.DisplaySettings.Single" xml:space="preserve"><value>디스플레이 설정 · {0}</value></data>
   <data name="Main.Resolution" xml:space="preserve"><value>해상도</value></data>
   <data name="Main.Width" xml:space="preserve"><value>가로</value></data>
   <data name="Main.Height" xml:space="preserve"><value>세로</value></data>
@@ -53,8 +53,8 @@
   <data name="Main.AppProfile.ApplyFailed" xml:space="preserve"><value>저장된 앱 프로필을 적용하지 못했습니다.{0}{0}{1}</value></data>
   <data name="Main.AppProfile.SaveFailed" xml:space="preserve"><value>앱 프로필을 저장하지 못했습니다.{0}{0}{1}</value></data>
   <data name="Main.AppProfile.DeleteFailed" xml:space="preserve"><value>앱 프로필을 삭제하지 못했습니다.{0}{0}{1}</value></data>
-  <data name="Main.AdvancedClosed" xml:space="preserve"><value>▶  고급 옵션 (추가 인자)</value></data>
-  <data name="Main.AdvancedOpen" xml:space="preserve"><value>▼  고급 옵션 (추가 인자)</value></data>
+  <data name="Main.AdvancedClosed" xml:space="preserve"><value>› 고급 옵션</value></data>
+  <data name="Main.AdvancedOpen" xml:space="preserve"><value>⌄ 고급 옵션</value></data>
   <data name="Main.StartDex" xml:space="preserve"><value>DeX 시작</value></data>
   <data name="Main.StopDex" xml:space="preserve"><value>DeX 중지</value></data>
   <data name="Main.StartSingle" xml:space="preserve"><value>단일창 시작</value></data>
@@ -93,7 +93,7 @@
   <data name="Main.DeviceOfflineDetail" xml:space="preserve"><value>휴대폰 연결 또는 ADB 상태를 확인하세요.</value></data>
   <data name="Main.ConnectedDevice" xml:space="preserve"><value>{0}  ·  {1}</value></data>
   <data name="Main.ConnectedDeviceFallback" xml:space="preserve"><value>Android 장치  ·  {0}</value></data>
-  <data name="Main.SingleReady" xml:space="preserve"><value>단일창 {0} 준비</value></data>
+  <data name="Main.SingleReady" xml:space="preserve"><value>단일창 {0} 준비됨</value></data>
   <data name="Main.SelectApp" xml:space="preserve"><value>실행할 앱을 선택하세요.</value></data>
   <data name="Main.PressStart" xml:space="preserve"><value>시작 버튼을 누르면 선택한 앱을 새 가상화면에서 실행합니다.</value></data>
   <data name="Main.ApplyStatus" xml:space="preserve"><value>설정 적용 중</value></data>
@@ -124,17 +124,19 @@
   <data name="Error.StartSingle" xml:space="preserve"><value>단일창 {0}을 시작하지 못했습니다.</value></data>
   <data name="Error.StopSingle" xml:space="preserve"><value>단일창 {0}을 중지하지 못했습니다.</value></data>
   <data name="Status.ShuttingDown" xml:space="preserve"><value>종료 정리 중</value></data>
-  <data name="Capture.Hint" xml:space="preserve"><value>F8 다시 누름: Scrcpy 전체 캡처&#xD;&#xA;마우스 드래그: 선택 영역 캡처&#xD;&#xA;ESC: 취소</value></data>
+  <data name="Capture.Hint" xml:space="preserve"><value>F8 다시 누름: Scrcpy 전체 캡처
+마우스 드래그: 선택 영역 캡처
+ESC: 취소</value></data>
   <data name="Capture.Saved" xml:space="preserve"><value>✓ 스크린샷 저장 완료</value></data>
   <data name="Settings.SavedInline" xml:space="preserve"><value>설정을 저장했습니다. 언어, 프로그램 경로, 장치 감시 주기 또는 프로세스 제한 시간 변경은 다시 시작한 뒤 적용됩니다.</value></data>
   <data name="Settings.SaveFailedInline" xml:space="preserve"><value>저장 실패: {0}</value></data>
   <data name="Settings.SavedApplyFailedInline" xml:space="preserve"><value>설정은 저장했지만 즉시 런타임 반영에 실패했습니다: {0}</value></data>
   <data name="Settings.Title" xml:space="preserve"><value>DX Manager · 설정 및 진단</value></data>
-  <data name="Settings.Description" xml:space="preserve"><value>해상도와 Scrcpy 실행 옵션은 메인 창에서 변경합니다. 연결, 경로와 고급 동작은 이 창에서 관리합니다.</value></data>
-  <data name="Settings.General" xml:space="preserve"><value>기본</value></data>
+  <data name="Settings.Description" xml:space="preserve"><value>DX Manager의 기본 동작과 연결을 관리합니다.</value></data>
+  <data name="Settings.General" xml:space="preserve"><value>일반</value></data>
   <data name="Settings.Connection" xml:space="preserve"><value>연결</value></data>
-  <data name="Settings.Paths" xml:space="preserve"><value>경로 / ADB</value></data>
-  <data name="Settings.Keyboard" xml:space="preserve"><value>키 입력</value></data>
+  <data name="Settings.Paths" xml:space="preserve"><value>경로</value></data>
+  <data name="Settings.Keyboard" xml:space="preserve"><value>입력</value></data>
   <data name="Settings.Diagnostics" xml:space="preserve"><value>진단</value></data>
   <data name="Settings.About" xml:space="preserve"><value>정보</value></data>
   <data name="Settings.AboutVersion" xml:space="preserve"><value>DX Manager v{0}</value></data>
@@ -227,6 +229,7 @@
   <data name="Log.Main.SettingsImmediateApplyFailed" xml:space="preserve"><value>실행 설정은 저장했지만 즉시 적용하지 못했습니다.</value></data>
   <data name="Main.ApplyFailedShort" xml:space="preserve"><value>실행 설정 즉시 적용 실패: {0}</value></data>
   <data name="Log.Main.AppListDisplayed" xml:space="preserve"><value>Scrcpy 앱 목록을 메인 화면에 표시했습니다.</value></data>
+  <data name="Log.Main.StaleAppListDiscarded" xml:space="preserve"><value>앱 조회 결과를 원래 휴대폰에 저장하고 현재 선택된 휴대폰의 목록은 유지했습니다.</value></data>
   <data name="Log.Main.AppListLoadFailed" xml:space="preserve"><value>Scrcpy 앱 목록을 불러오지 못했습니다.</value></data>
   <data name="Log.Main.AppIdentitySaveFailed" xml:space="preserve"><value>선택한 앱을 저장하지 못했습니다.</value></data>
   <data name="Log.Main.RememberedAppSaveFailed" xml:space="preserve"><value>세션은 시작했지만 앱을 기억된 앱 목록에 추가하지 못했습니다.</value></data>
@@ -408,13 +411,16 @@
   <data name="Log.Wireless.DeviceEnableFromUsb" xml:space="preserve"><value>기기 {0}을 USB 연결 {1}로 무선 ADB 준비합니다. port={2}</value></data>
   <data name="Log.Wireless.DeviceDisconnected" xml:space="preserve"><value>기기 {0}의 무선 ADB 연결을 해제했습니다: {1}</value></data>
   <data name="Log.Wireless.RetryDetectedAddress" xml:space="preserve"><value>기기 {0}의 저장된 주소로 연결하지 못해 USB에서 확인한 주소로 다시 시도합니다: {1}</value></data>
+  <data name="Log.Wireless.MdnsEndpointUpdated" xml:space="preserve"><value>기기 {0}의 mDNS identity를 확인하고 무선 endpoint를 갱신했습니다: {1} → {2}</value></data>
+  <data name="Log.Wireless.MdnsNoMatch" xml:space="preserve"><value>기기 {0}에 맞는 mDNS 연결 endpoint를 하나로 확인하지 못해 저장 주소 또는 수동 주소를 유지합니다: {1}</value></data>
+  <data name="Log.Wireless.MdnsPairEndpointFound" xml:space="preserve"><value>기기 {0} 페어링 후 무선 연결 endpoint를 찾아 저장했습니다: {1}</value></data>
   <data name="Wireless.NoResult" xml:space="preserve"><value>결과 없음</value></data>
   <data name="Settings.Language" xml:space="preserve"><value>표시 언어</value></data>
   <data name="Settings.LanguageRestart" xml:space="preserve"><value>언어 변경은 DX Manager를 다시 시작한 뒤 적용됩니다.</value></data>
   <data name="Settings.Theme" xml:space="preserve"><value>앱 테마</value></data>
   <data name="Settings.ThemeAuto" xml:space="preserve"><value>Windows 설정 사용</value></data>
-  <data name="Settings.ThemeLight" xml:space="preserve"><value>라이트</value></data>
-  <data name="Settings.ThemeDark" xml:space="preserve"><value>다크</value></data>
+  <data name="Settings.ThemeLight" xml:space="preserve"><value>밝게</value></data>
+  <data name="Settings.ThemeDark" xml:space="preserve"><value>어둡게</value></data>
   <data name="Settings.ThemeRestart" xml:space="preserve"><value>테마 변경은 저장 즉시 적용됩니다.</value></data>
   <data name="Settings.GroupMiniControlBar" xml:space="preserve"><value>미니 컨트롤바</value></data>
   <data name="Settings.MiniControlBar" xml:space="preserve"><value>Scrcpy 창 옆에 미니 컨트롤바 표시</value></data>
@@ -430,12 +436,20 @@
   <data name="Settings.OpenEnvironment" xml:space="preserve"><value>환경 점검 실행</value></data>
   <data name="Settings.DiagnosticsGuide" xml:space="preserve"><value>로그를 열거나 ADB, Scrcpy와 장치 연결 상태를 점검합니다.</value></data>
   <data name="Settings.SaveDiagnosticReport" xml:space="preserve"><value>진단 보고서 저장</value></data>
-  <data name="Settings.SelectedDeviceDiagnostics" xml:space="preserve"><value>선택한 기기 버전</value></data>
-  <data name="Settings.DeviceDiagnosticsWaiting" xml:space="preserve"><value>연결된 휴대폰을 선택하면 Android와 One UI 버전을 확인합니다.</value></data>
-  <data name="Settings.DeviceDiagnosticsChecking" xml:space="preserve"><value>선택한 휴대폰에서 버전 정보를 읽는 중입니다...</value></data>
-  <data name="Settings.RefreshDeviceDiagnostics" xml:space="preserve"><value>선택한 기기 새로 고침</value></data>
-  <data name="Settings.DeviceDiagnosticsFailed" xml:space="preserve"><value>기기 버전 정보를 읽지 못했습니다.&#x0A;{0}</value></data>
-  <data name="Settings.DeviceDiagnosticsSummary" xml:space="preserve"><value>{0} · {1}&#x0A;Android {2} · One UI {3} · 보안 패치 {4}&#x0A;{5}</value></data>
+  <data name="Settings.SelectedDeviceDiagnostics" xml:space="preserve"><value>연결된 기기 버전</value></data>
+  <data name="Settings.ConnectedDeviceDiagnostics" xml:space="preserve"><value>연결된 기기 버전</value></data>
+  <data name="Settings.DeviceDiagnosticsWaiting" xml:space="preserve"><value>새로 고침을 눌러 연결된 모든 휴대폰의 Android와 One UI 버전을 확인하세요.</value></data>
+  <data name="Settings.DeviceDiagnosticsChecking" xml:space="preserve"><value>연결된 모든 휴대폰에서 버전 정보를 읽는 중입니다...</value></data>
+  <data name="Settings.DeviceDiagnosticsComplete" xml:space="preserve"><value>연결된 휴대폰 {0}대의 진단을 갱신했습니다.</value></data>
+  <data name="Settings.DeviceDiagnosticsNone" xml:space="preserve"><value>진단할 수 있는 연결된 휴대폰이 없습니다.</value></data>
+  <data name="Settings.DeviceDiagnosticsNoActiveTransport" xml:space="preserve"><value>현재 활성화된 인증 연결 경로를 찾을 수 없습니다.</value></data>
+  <data name="Settings.DeviceDiagnosticsNotConnected" xml:space="preserve"><value>선택한 휴대폰이 연결 기기 목록에 없습니다.</value></data>
+  <data name="Settings.RefreshDeviceDiagnostics" xml:space="preserve"><value>연결된 휴대폰 모두 새로 고침</value></data>
+  <data name="Settings.DeviceDiagnosticsFailed" xml:space="preserve"><value>기기 버전 정보를 읽지 못했습니다.
+{0}</value></data>
+  <data name="Settings.DeviceDiagnosticsSummary" xml:space="preserve"><value>{0}
+Android {1} · One UI {2} · 보안 패치 {3}
+{4}</value></data>
   <data name="Settings.Transport.Unknown" xml:space="preserve"><value>연결 방식 확인 안 됨</value></data>
   <data name="Settings.Transport.Usb" xml:space="preserve"><value>USB</value></data>
   <data name="Settings.Transport.Wireless" xml:space="preserve"><value>Wi-Fi ADB</value></data>
@@ -446,7 +460,8 @@
   <data name="Settings.Compatibility.NewerUnverified" xml:space="preserve"><value>더 새로운 소프트웨어 버전은 아직 충분히 확인되지 않았습니다. 실행은 차단하지 않습니다.</value></data>
   <data name="Settings.DiagnosticReportFilter" xml:space="preserve"><value>텍스트 파일 (*.txt)|*.txt|모든 파일 (*.*)|*.*</value></data>
   <data name="Settings.DiagnosticReportSaved" xml:space="preserve"><value>진단 보고서를 저장했습니다. 저장 폴더를 엽니다.</value></data>
-  <data name="Settings.DiagnosticReportFailed" xml:space="preserve"><value>진단 보고서를 저장하지 못했습니다.&#x0A;{0}</value></data>
+  <data name="Settings.DiagnosticReportFailed" xml:space="preserve"><value>진단 보고서를 저장하지 못했습니다.
+{0}</value></data>
   <data name="Settings.StartWithWindows" xml:space="preserve"><value>Windows 시작 시 자동 실행</value></data>
   <data name="Settings.StartMinimized" xml:space="preserve"><value>자동 실행 시 트레이로 시작</value></data>
   <data name="Settings.WakeUpMode" xml:space="preserve"><value>ADB Wake-up 방식</value></data>
@@ -551,6 +566,8 @@
   <data name="Wireless.InvalidPairCode" xml:space="preserve"><value>페어링 코드는 휴대폰에 표시된 6자리 숫자입니다.</value></data>
   <data name="Wireless.PairFailed" xml:space="preserve"><value>무선 페어링에 실패했습니다: {0}</value></data>
   <data name="Wireless.Paired" xml:space="preserve"><value>페어링되었습니다. 휴대폰의 무선 디버깅 화면에 표시된 연결 포트로 연결하세요.</value></data>
+  <data name="Wireless.PairedAndConnected" xml:space="preserve"><value>페어링 후 연결 endpoint를 찾고 이 휴대폰의 설정에 저장했습니다.</value></data>
+  <data name="Wireless.PairedManualFallback" xml:space="preserve"><value>페어링되었지만 연결 endpoint를 찾지 못했습니다. 휴대폰 IP와 연결 포트를 직접 입력하세요.</value></data>
   <data name="Wireless.Disconnected" xml:space="preserve"><value>무선 연결을 해제했습니다.</value></data>
   <data name="Wireless.HostEmpty" xml:space="preserve"><value>무선 ADB IP 주소가 비어 있습니다.</value></data>
   <data name="Wireless.HostInvalid" xml:space="preserve"><value>무선 ADB 주소 형식이 올바르지 않습니다.</value></data>
@@ -729,4 +746,96 @@
   <data name="MiniBar.Collapse" xml:space="preserve"><value>컨트롤바 접기</value></data>
   <data name="MiniBar.Expand" xml:space="preserve"><value>컨트롤바 펼치기</value></data>
   <data name="Log.MiniBar.CommandFailed" xml:space="preserve"><value>미니 컨트롤바 명령을 보내지 못했습니다.</value></data>
+  <data name="Main.AppsLoaded" xml:space="preserve"><value>{0}개의 앱을 불러왔습니다.</value></data>
+  <data name="Main.DeviceAppsLoaded" xml:space="preserve"><value>{0}: {1}개의 앱을 불러왔습니다.</value></data>
+  <data name="Desktop.Always" xml:space="preserve"><value>항상 사용</value></data>
+  <data name="Desktop.AppSubtitle" xml:space="preserve"><value>선택한 모드와 함께 열 앱을 선택합니다</value></data>
+  <data name="Desktop.CloseBehavior" xml:space="preserve"><value>닫기 버튼 동작</value></data>
+  <data name="Desktop.CloseBehaviorHint" xml:space="preserve"><value>닫으면 시스템 트레이로 숨깁니다.</value></data>
+  <data name="Desktop.DisplaySubtitle" xml:space="preserve"><value>가상 화면의 화질과 크기</value></data>
+  <data name="Desktop.GeneralSubtitle" xml:space="preserve"><value>창, 자동 실행과 미니 컨트롤바를 설정합니다.</value></data>
+  <data name="Desktop.GeneralTitle" xml:space="preserve"><value>기본 동작</value></data>
+  <data name="Desktop.Help" xml:space="preserve"><value>도움말 · 문제 해결</value></data>
+  <data name="Desktop.HideToTray" xml:space="preserve"><value>시스템 트레이에 숨기기</value></data>
+  <data name="Desktop.LogBottom" xml:space="preserve"><value>맨 아래로</value></data>
+  <data name="Desktop.LogFooter" xml:space="preserve"><value>세션 로그는 메모리에 보관되며, 저장 버튼 또는 정상 종료 시 파일로 저장됩니다.</value></data>
+  <data name="Desktop.LogSubtitle" xml:space="preserve"><value>기기 연결, 세션 실행·종료와 오류처럼 필요한 동작만 표시합니다.</value></data>
+  <data name="Desktop.OptionsSubtitle" xml:space="preserve"><value>입력과 휴대폰 동작</value></data>
+  <data name="Desktop.Refresh" xml:space="preserve"><value>기기 표시 새로 고침</value></data>
+  <data name="Desktop.SingleInstance" xml:space="preserve"><value>중복 실행 방지</value></data>
+  <data name="Desktop.SingleInstanceHint" xml:space="preserve"><value>실행 중이면 기존 창을 엽니다.</value></data>
+  <data name="Desktop.StartupHint" xml:space="preserve"><value>Windows 로그인 시 자동으로 실행합니다.</value></data>
+  <data name="Desktop.TrayHint" xml:space="preserve"><value>Windows 자동 실행 시 메인 창을 숨깁니다.</value></data>
+  <data name="Help.Body0" xml:space="preserve"><value>DX Manager는 Android 개발자 옵션과 ADB를 사용해 연결한 Galaxy 휴대폰의 DeX 및 단일창을 실행합니다. 휴대폰에서 개발자 옵션과 USB 디버깅을 먼저 켜세요.
+
+첫 연결
+
+① 휴대폰을 USB로 연결하고 USB 디버깅을 켭니다.
+
+② 휴대폰을 잠금 해제하고 USB 디버깅 허용 창에서 허용을 누릅니다.
+
+③ DX Manager 상단의 휴대폰 목록에서 연결된 기기를 선택합니다.
+
+휴대폰이 승인되지 않은 경우
+
+잠금을 풀고 USB 디버깅 승인 창을 확인하세요. 여러 휴대폰은 각각 승인해야 합니다. 기기를 선택해도 다른 휴대폰의 실행 중인 세션은 유지됩니다.</value></data>
+  <data name="Help.Body1" xml:space="preserve"><value>DeX는 데스크톱 화면을, 단일창 1~3은 각각의 앱 창을 실행합니다.
+
+해상도·DPI·입력 옵션·시작 앱은 휴대폰별, 모드별로 저장됩니다. 설정을 바꾸기 전에 대상 휴대폰을 확인하세요.
+
+앱 목록 불러오기는 선택한 휴대폰의 앱을 가져옵니다. 휴대폰을 바꾸면 해당 휴대폰의 앱 목록과 최근 앱을 표시합니다.
+
+고급 옵션에서 추가 scrcpy 인수를 지정할 수 있습니다. 현장 환경을 위한 기존 키보드 보정은 유지됩니다.</value></data>
+  <data name="Help.Body2" xml:space="preserve"><value>휴대폰이 보이지 않으면 USB 케이블, 디버깅 승인, 설정 &gt; 연결의 기기별 USB·Wi-Fi 정책을 확인하세요.
+
+무선 페어링 포트와 연결 포트는 서로 다릅니다. 대상 휴대폰을 선택하고 그 휴대폰에 표시된 페어링 코드를 사용하세요.
+
+이전 One UI 환경에서 DeX 화면이 검게 보이면 단일창 모드를 사용하세요.
+
+설정 &gt; 진단에서 세션 로그와 환경 검사를 열거나 진단 보고서를 저장할 수 있습니다.</value></data>
+  <data name="Help.Body3" xml:space="preserve"><value>PC → 휴대폰: 대상 휴대폰의 scrcpy 창으로 파일이나 폴더를 끌어다 놓습니다. 관리형 전송과 저장 경로는 설정 &gt; 경로에서 지정합니다.
+
+휴대폰 → PC: DX Companion에서 파일이나 폴더를 선택해 전송합니다. 전송 세션과 PC 수신 경로는 휴대폰별로 분리됩니다.
+
+DX Companion은 선택 기능이며 선택한 휴대폰에만 설치됩니다. Android 13 이상이 필요합니다. 설치·업데이트·권한은 설정 &gt; Companion에서 관리합니다.</value></data>
+  <data name="Help.Body4" xml:space="preserve"><value>창의 닫기 버튼은 DX Manager를 시스템 트레이로 숨깁니다. 정상 종료는 트레이 메뉴의 종료 또는 설정한 종료 단축키를 사용하세요.
+
+케이블 분리나 비정상 종료 후 가상 화면 또는 변경된 절전모드 설정이 남을 수 있습니다. DX Companion의 정리 기능으로 보조 디스플레이와 절전모드 해제 설정을 복구할 수 있습니다.
+
+정상 종료에서는 관리 중인 각 휴대폰의 상태를 독립적으로 복원합니다. 연결이 끊긴 휴대폰은 즉시 복구되지 않을 수 있습니다.</value></data>
+  <data name="Help.Body5" xml:space="preserve"><value>포터블 배포 폴더의 docs 안에 USER_GUIDE_KO.md와 FAQ_KO.md가 있습니다. 영문 설명서와 FAQ도 함께 제공됩니다.
+
+연결 설정, 키보드·마우스 동작, USB·무선 선택, 캡처, 파일 전송과 복구 방법을 확인할 수 있습니다.
+
+DX Manager는 독립적으로 개발된 프로그램이며 Samsung의 공식 애플리케이션이 아닙니다. ADB와 개발자 옵션을 사용해 가상 화면을 만들고 선택한 휴대폰 설정을 일시적으로 변경합니다. DX Companion은 사용자가 요청한 경우에만 설치합니다.</value></data>
+  <data name="Help.Topic0" xml:space="preserve"><value>처음 사용하기</value></data>
+  <data name="Help.Topic1" xml:space="preserve"><value>DeX와 단일창</value></data>
+  <data name="Help.Topic2" xml:space="preserve"><value>연결과 실행 문제</value></data>
+  <data name="Help.Topic3" xml:space="preserve"><value>파일 전송과 DX Companion</value></data>
+  <data name="Help.Topic4" xml:space="preserve"><value>종료와 휴대폰 화면 복구</value></data>
+  <data name="Help.Topic5" xml:space="preserve"><value>전체 사용 설명서 · FAQ</value></data>
+  <data name="Main.DexReady" xml:space="preserve"><value>DeX 실행 준비됨</value></data>
+  <data name="Main.SingleWaiting" xml:space="preserve"><value>단일창 {0} 대기중</value></data>
+  <data name="Settings.Compatibility.UserVerifiedEnvironment" xml:space="preserve"><value>정상 동작이 확인된 환경입니다.</value></data>
+<data name="Update.BusyTitle" xml:space="preserve"><value>이미 업데이트를 확인 중입니다</value></data>
+<data name="Update.OpenRelease" xml:space="preserve"><value>GitHub 릴리스 열기</value></data>
+<data name="Update.FailedTitle" xml:space="preserve"><value>업데이트를 확인하지 못했습니다</value></data>
+<data name="Update.BusyDetail" xml:space="preserve"><value>잠시 후 다시 확인해 주세요.</value></data>
+<data name="Update.CurrentVersion" xml:space="preserve"><value>현재 버전: {0}</value></data>
+<data name="Update.CheckingDetail" xml:space="preserve"><value>GitHub의 최신 정식 버전을 확인하고 있습니다.</value></data>
+<data name="Update.FailedDetail" xml:space="preserve"><value>인터넷 연결 또는 GitHub 응답을 확인할 수 없었습니다. DX Manager는 계속 사용할 수 있습니다.</value></data>
+<data name="Update.AvailableDetail" xml:space="preserve"><value>GitHub 릴리스 페이지에서 변경 내용과 다운로드를 확인하세요.</value></data>
+<data name="Update.CurrentTitle" xml:space="preserve"><value>새 업데이트가 없습니다</value></data>
+<data name="Update.Checking" xml:space="preserve"><value>업데이트 확인 중</value></data>
+<data name="Update.CheckButton" xml:space="preserve"><value>업데이트 확인</value></data>
+<data name="Environment.ScrcpyVersion" xml:space="preserve"><value>scrcpy 버전</value></data>
+<data name="Update.TrayMessage" xml:space="preserve"><value>DX Manager {0}이 있습니다. DX Manager를 열어 업데이트를 확인하세요.</value></data>
+<data name="Update.VersionUnavailable" xml:space="preserve"><value>버전 확인 실패</value></data>
+<data name="Update.DialogTitle" xml:space="preserve"><value>업데이트 확인</value></data>
+<data name="Update.CurrentDetail" xml:space="preserve"><value>현재 버전보다 새로운 정식 버전이 없습니다.</value></data>
+<data name="Update.VersionPair" xml:space="preserve"><value>현재 버전: {0}    새 버전: {1}</value></data>
+<data name="Update.OpenFailed" xml:space="preserve"><value>릴리스 페이지를 열지 못했습니다.</value></data>
+<data name="Update.NewVersion" xml:space="preserve"><value>새 버전 {0}</value></data>
+<data name="Update.AvailableTitle" xml:space="preserve"><value>새 버전이 있습니다</value></data>
+  <data name="Log.Wireless.DeviceMismatch" xml:space="preserve"><value>무선 ADB 주소가 선택한 휴대폰과 일치하지 않습니다: {0}</value></data>
 </root>

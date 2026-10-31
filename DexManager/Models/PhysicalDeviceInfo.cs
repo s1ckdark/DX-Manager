@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 
 namespace DexManager.Models
@@ -85,6 +85,20 @@ namespace DexManager.Models
             }
 
             return FindFirstAuthorized(requiredKind);
+        }
+
+        // Reconnect preferences must not override the cable for a new launch.
+        public DeviceTransportInfo SelectLaunchTransport(string preferredSerial)
+        {
+            return SelectAuthorizedTransport(DeviceTransportKind.Usb, preferredSerial)
+                ?? SelectAuthorizedTransport(DeviceTransportKind.Wireless, preferredSerial);
+        }
+
+        public DeviceTransportInfo SelectRuntimeTransport(string activeSerial, bool hasSessions)
+        {
+            var active = FindTransport(activeSerial);
+            if (hasSessions && active != null && active.IsAuthorized) return active;
+            return SelectLaunchTransport(activeSerial);
         }
 
         public PhysicalDeviceInfo Clone()

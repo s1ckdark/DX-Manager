@@ -11,9 +11,11 @@ namespace DexManager.Forms
     {
         private readonly LogService _logService;
         private readonly RichTextBox _logTextBox;
-        private readonly FlowLayoutPanel _toolbar;
+        private readonly Panel _toolbar;
         private readonly Button _saveButton;
         private string _lastDisplayedMessage;
+        private readonly RoundedPanel _logSurface;
+        private readonly Label _heading, _description, _footer;
 
         public LogForm(LogService logService)
         {
@@ -22,35 +24,57 @@ namespace DexManager.Forms
             Text = LocalizationService.Get("Log.Title");
             Icon = AppIconProvider.Current;
             StartPosition = FormStartPosition.CenterParent;
-            UiWindowStyle.ApplyFixedStandardSize(this);
+            Font = UiFonts.Pixels(14F);
+            DoubleBuffered = true;
+            AutoScaleMode = AutoScaleMode.Dpi;
+            AutoScaleDimensions = new SizeF(96, 96);
+            UiWindowStyle.ApplyStoreSize(this, 1040, 680);
 
+            FormBorderStyle = FormBorderStyle.Sizable;
+            MaximizeBox = true;
+            MinimumSize = new Size(760, 480);
             _logTextBox = new RichTextBox
             {
                 Dock = DockStyle.Fill,
                 ReadOnly = true,
                 BackColor = Color.White,
-                Font = new Font("Consolas", 9F),
+                Font = new Font("Consolas", 13F * 0.75F),
                 WordWrap = false
             };
 
-            _saveButton = new Button
+            _saveButton = new ThemedButton
             {
                 Text = LocalizationService.Get("Log.Save"),
-                AutoSize = true,
-                Margin = new Padding(6)
+                Size = new Size(110, 40),
+                Margin = new Padding(4, 2, 4, 2)
             };
             _saveButton.Click += SaveButton_Click;
 
-            _toolbar = new FlowLayoutPanel
+            _toolbar = new BufferedPanel
             {
-                Dock = DockStyle.Top,
-                Height = 42,
-                Padding = new Padding(4)
+                Anchor = AnchorStyles.Top | AnchorStyles.Right,
+                Size = new Size(256, 52),
+                Padding = Padding.Empty
             };
+            _saveButton.Bounds = new Rectangle(136, 4, 110, 40);
             _toolbar.Controls.Add(_saveButton);
+            var bottom = new ThemedButton { Text = LocalizationService.Get("Desktop.LogBottom"), Size = new Size(110, 40), Margin = new Padding(4, 2, 4, 2) };
+            bottom.Click += delegate { MoveToEnd(); };
+            bottom.Bounds = new Rectangle(16, 4, 110, 40);
+            _toolbar.Controls.Add(bottom);
 
-            Controls.Add(_logTextBox);
+            _heading = new UiLabel { Text = LocalizationService.Get("Log.Title"), Font = UiFonts.Pixels(24F, true), BackColor = Color.Transparent };
+            _description = new UiLabel { Text = LocalizationService.Get("Desktop.LogSubtitle"), BackColor = Color.Transparent };
+            _footer = new UiLabel { Text = LocalizationService.Get("Desktop.LogFooter"), BackColor = Color.Transparent };
+            _logSurface = new RoundedPanel { Radius = 10, Padding = new Padding(12), BackColor = Color.Transparent };
+            _logTextBox.BorderStyle = BorderStyle.None;
+            _logSurface.Controls.Add(_logTextBox);
+            ThemedScrollBar.Attach(_logTextBox);
+            Controls.AddRange(new Control[] { _logSurface, _heading, _description, _footer });
+            Resize += delegate { LayoutLog(); };
+            LayoutLog();
             Controls.Add(_toolbar);
+            _toolbar.BringToFront();
             ApplyCurrentTheme();
             Load += LogForm_Load;
             FormClosed += LogForm_FormClosed;
@@ -163,15 +187,32 @@ namespace DexManager.Forms
             _logTextBox.ScrollToCaret();
         }
 
+        protected override void OnPaintBackground(PaintEventArgs e) { DesktopSurface.Paint(e.Graphics, ClientRectangle); }
+        private void LayoutLog()
+        {
+            var s = Math.Max(1F, CurrentAutoScaleDimensions.Width / 96F);
+            _heading.Bounds = new Rectangle((int)(22*s), (int)(18*s), (int)(600*s), (int)(38*s));
+            _toolbar.Bounds = new Rectangle(ClientSize.Width - (int)(280*s), (int)(37*s), (int)(256*s), (int)(52*s));
+            _description.Bounds = new Rectangle((int)(22*s), (int)(57*s), Math.Max(100,_toolbar.Left-(int)(38*s)), (int)(24*s));
+            _description.TextAlign = ContentAlignment.BottomLeft;
+            _logSurface.Bounds = new Rectangle((int)(22*s), (int)(90*s), ClientSize.Width - (int)(44*s), ClientSize.Height - (int)(134*s));
+            _footer.Bounds = new Rectangle((int)(22*s), ClientSize.Height - (int)(34*s), ClientSize.Width - (int)(44*s), (int)(24*s));
+        }
         public void ApplyCurrentTheme()
         {
             var theme = ThemeColors.Current;
             BackColor = theme.WindowBackground;
-            _toolbar.BackColor = theme.WindowBackground;
+            _toolbar.BackColor = Color.Transparent;
+            _heading.ForeColor = theme.TextPrimary;
+            _description.ForeColor = theme.TextTertiary;
+            _footer.ForeColor = theme.TextTertiary;
+            _logSurface.FillColor = theme.CardBackground;
+            _logSurface.BorderColor = theme.CardBorder;
             _saveButton.BackColor = theme.CardSoft;
             _saveButton.ForeColor = theme.TextPrimary;
             _logTextBox.BackColor = theme.CardBackground;
             _logTextBox.ForeColor = theme.TextPrimary;
+            ThemedScrollBar.RefreshFor(_logTextBox);
             Invalidate(true);
         }
     }

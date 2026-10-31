@@ -1,4 +1,4 @@
-# DX Manager v2.0.1 - Third-Party Notices
+﻿# DX Manager v2.5.0 - Third-Party Notices
 
 DX Manager is an independently developed utility. The third-party binaries
 listed below are distributed without modification and remain under their
@@ -7,7 +7,7 @@ licenses.
 
 ## scrcpy
 
-DX Manager includes and uses scrcpy 4.1 to display and control Android
+DX Manager includes and uses scrcpy 5.0.1 to display and control Android
 devices.
 
 Copyright (C) 2018 Genymobile  
@@ -18,13 +18,13 @@ license text is provided in `scrcpy-LICENSE.txt` in this directory.
 
 Official project: https://github.com/Genymobile/scrcpy
 
-Bundled version: 4.1
+Bundled version: 5.0.1
 
 ## Android Debug Bridge (ADB)
 
 DX Manager includes Android Debug Bridge binaries from the Android Open
 Source Project. The scrcpy runtime contains platform-tools
-37.0.0-14910828, and the Windows 7/8.1 fallback contains platform-tools
+37.0.1-15733141, and the Windows 7/8.1 fallback contains platform-tools
 34.0.1-9979309.
 
 ADB source is distributed under the Apache License, Version 2.0. The complete
@@ -34,20 +34,20 @@ Official source: https://android.googlesource.com/platform/packages/modules/adb/
 
 ## SDL
 
-The Windows scrcpy client includes SDL 3.4.12, distributed under the zlib
+The Windows scrcpy client includes SDL 3.4.18, distributed under the zlib
 license.
 
 Copyright (C) 1997-2026 Sam Lantinga
 
 Official project and license:
-https://github.com/libsdl-org/SDL/blob/release-3.4.12/LICENSE.txt
+https://github.com/libsdl-org/SDL/blob/release-3.4.18/LICENSE.txt
 
 The complete notice is provided in `SDL3-LICENSE.txt` in this directory.
 
 ## FFmpeg libraries
 
 The Windows scrcpy client dynamically loads FFmpeg libraries including
-libavcodec 62.28.102, libavformat 62.12.102, libavutil 60.26.102, and
+libavcodec 63.1.102, libavformat 63.1.102, libavutil 61.1.102, and
 libswresample. The bundled build reports `LGPL version 2.1 or later` and does
 not report GPL components.
 
@@ -78,6 +78,12 @@ MinGW-w64 runtime. Its MIT/BSD-style notices are provided in
 
 Official project and source: https://www.mingw-w64.org/source/
 
+## DX Companion / Pretendard
+
+The bundled DX Companion includes the unmodified Pretendard typeface under the
+SIL Open Font License 1.1. Its complete copyright and license text is distributed
+as `tools\companion\Pretendard-LICENSE.txt`.
+
 ## Samsung DeX trademark notice
 
 DX Manager works with features provided by Samsung DeX on compatible
@@ -94,3 +100,13 @@ Corresponding source code and build information are available from the
 official project links above. Recipients may replace the dynamically loaded
 compatible libraries in the portable distribution, subject to the relevant
 license terms.
+
+## Embedded portable UI font
+
+The Windows UI embeds static weight-400/600 instances derived from the Store Pretendard Variable font. Glyph outlines and metrics are retained. The derivatives use DX Store UI family names because Pretendard is an OFL reserved font name. See Pretendard-LICENSE.txt. No system font installation is performed.
+
+## Fluent UI System Icons
+
+DX Manager embeds Regular icon alpha masks derived from Microsoft's Fluent UI System Icons, source commit a563cf9166f4f91aa617557ed272612b7f0a2f72. Copyright (c)2020 Microsoft Corporation; MIT License. The complete notice is included in Fluent-System-Icons-LICENSE.txt.
+https://github.com/microsoft/fluentui-system-icons
+The mouse asset is modified from Keyboard Mouse20Regular by retaining its mouse component only. Other assets retain the official geometry and are converted to transparent masks for theme coloring. Original SVGs/provenance are retained in the source repository.

@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Threading.Tasks;
@@ -36,9 +36,7 @@ namespace DexManager.Forms
                     "Main.StopDex");
                 _flexDisplayBox.Visible = false;
                 _flexDisplayBox.Enabled = false;
-                _stayAwakeBox.Top = 84;
                 LayoutStartAppControls(false);
-                SetAppProfileControlsVisible(false);
             }
             else
             {
@@ -55,11 +53,11 @@ namespace DexManager.Forms
                     "Main.StopSingle");
                 _flexDisplayBox.Visible = true;
                 _flexDisplayBox.Enabled = true;
-                _stayAwakeBox.Top = 119;
                 LayoutStartAppControls(true);
-                SetAppProfileControlsVisible(true);
             }
             LoadRunSettings();
+            SetAppProfileControlsVisible(slot > 0);
+            LayoutDesktopContent();
             UpdateRunningState();
         }
 
@@ -104,7 +102,7 @@ namespace DexManager.Forms
         private bool IsCustomResolutionSelected()
         {
             var preset = _resolutionBox.SelectedItem as ResolutionPreset;
-            return preset == null || preset.Width == 0;
+            return preset == null || !AppSettings.IsPresetResolution(preset.Width,preset.Height);
         }
 
         private int GetCurrentCustomWidth()
@@ -164,7 +162,7 @@ namespace DexManager.Forms
             _heightBox.ValueChanged += changed;
             _dpiBox.ValueChanged += changed;
             _bitRateBox.TextChanged += changed;
-            _maxFpsBox.SelectedIndexChanged += changed;
+            _maxFpsBox.SelectedIndexChanged += MaxFpsSelectionChanged;
             _turnScreenOffBox.CheckedChanged += changed;
             _stayAwakeBox.CheckedChanged += changed;
             _useHidKeyboardBox.CheckedChanged += changed;
@@ -244,7 +242,7 @@ namespace DexManager.Forms
             var settings = GetSingleWindowSettings(slot);
             SetConnectionIndicator(
                 _theme.Accent,
-                LocalizationService.Format("Main.SingleReady", slot),
+                LocalizationService.Format(IsSingleWindowAppMissing(slot)?"Main.SingleWaiting":"Main.SingleReady", slot),
                 string.IsNullOrWhiteSpace(settings.StartAppPackage)
                     ? LocalizationService.Get("Main.SelectApp")
                     : LocalizationService.Get("Main.PressStart"));
@@ -267,7 +265,7 @@ namespace DexManager.Forms
 
         private void AddTopMenu(string text, int x, Action action)
         {
-            var menu = new LinkLabel
+            var menu = new UiLinkLabel
             {
                 AutoSize = true,
                 LinkColor = Color.FromArgb(75, 85, 99),
@@ -281,7 +279,7 @@ namespace DexManager.Forms
 
         private Label AddSectionTitle(string text, int x, int y)
         {
-            var label = new Label
+            var label = new UiLabel
             {
                 AutoSize = true,
                 Font = UiFonts.Create(13F, FontStyle.Bold),
@@ -295,7 +293,7 @@ namespace DexManager.Forms
 
         private Label AddFieldLabel(string text, int x, int y)
         {
-            var label = new Label
+            var label = new UiLabel
             {
                 AutoSize = true,
                 ForeColor = _theme.TextTertiary,

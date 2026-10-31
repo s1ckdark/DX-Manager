@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:clipToPadding="false"
+    android:fillViewport="true">
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:paddingStart="20dp"
+        android:paddingTop="18dp"
+        android:paddingEnd="20dp"
+        android:paddingBottom="28dp">
+
+        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:gravity="center_vertical" android:orientation="horizontal">
+            <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:orientation="vertical">
+                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:fontFamily="@font/pretendard_variable" android:text="@string/app_name" android:textColor="@color/text_primary" android:textSize="27sp" android:textStyle="bold" />
+                <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="4dp" android:text="@string/home_header_subtitle" android:textColor="@color/text_secondary" android:textSize="14sp" />
+            </LinearLayout>
+            <TextView android:id="@+id/home_more_button" android:layout_width="40dp" android:layout_height="48dp" android:background="?android:attr/selectableItemBackgroundBorderless" android:clickable="true" android:contentDescription="@string/nav_settings" android:focusable="true" android:gravity="center" android:text="⋮" android:textColor="@color/text_secondary" android:textSize="28sp" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/home_connection_card"
+            android:layout_width="match_parent"
+            android:layout_height="@dimen/hero_card_height"
+            android:layout_marginTop="22dp"
+            android:background="@drawable/bg_connection_pending"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:padding="20dp">
+            <FrameLayout android:layout_width="88dp" android:layout_height="88dp" android:background="@drawable/bg_status_icon" android:padding="12dp">
+                <ImageView android:id="@+id/status_icon" android:layout_width="match_parent" android:layout_height="match_parent" android:contentDescription="@string/status_icon_description" android:src="@drawable/dx_manager_icon_mono" />
+            </FrameLayout>
+            <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_marginStart="18dp" android:layout_weight="1" android:orientation="vertical">
+                <TextView android:id="@+id/status_title" android:layout_width="match_parent" android:layout_height="wrap_content" android:textColor="@color/success" android:textSize="14sp" android:textStyle="bold" />
+                <TextView android:id="@+id/home_device_name" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="5dp" android:ellipsize="end" android:maxLines="1" android:textColor="@color/text_primary" android:textSize="23sp" android:textStyle="bold" />
+                <TextView android:id="@+id/home_transport" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="10dp" android:background="@drawable/bg_code" android:paddingStart="11dp" android:paddingTop="6dp" android:paddingEnd="11dp" android:paddingBottom="6dp" android:textColor="@color/text_primary" android:textSize="13sp" />
+                <TextView android:id="@+id/status_detail" android:layout_width="match_parent" android:layout_height="wrap_content" android:visibility="gone" />
+            </LinearLayout>
+        </LinearLayout>
+
+        <LinearLayout android:layout_width="match_parent" android:layout_height="112dp" android:layout_marginTop="14dp" android:background="@drawable/bg_action_card" android:gravity="center_vertical" android:orientation="horizontal" android:padding="16dp">
+            <FrameLayout android:layout_width="58dp" android:layout_height="58dp" android:background="@drawable/bg_icon_tile" android:padding="14dp"><ImageView android:layout_width="match_parent" android:layout_height="match_parent" android:contentDescription="@string/home_cleanup_title" android:src="@drawable/ic_broom" /></FrameLayout>
+            <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_marginStart="14dp" android:layout_weight="1" android:orientation="vertical">
+                <TextView android:id="@+id/home_cleanup_summary" android:layout_width="match_parent" android:layout_height="wrap_content" android:textColor="@color/text_primary" android:textSize="17sp" android:textStyle="bold" />
+                <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="5dp" android:maxLines="2" android:text="@string/home_cleanup_description_short" android:textColor="@color/text_secondary" android:textSize="13sp" />
+            </LinearLayout>
+            <Button android:id="@+id/home_cleanup_button" style="@style/Widget.DX.Button.Primary" android:layout_width="104dp" android:layout_height="50dp" android:layout_marginStart="10dp" android:text="@string/home_cleanup_now" />
+        </LinearLayout>
+
+        <LinearLayout android:layout_width="match_parent" android:layout_height="112dp" android:layout_marginTop="12dp" android:background="@drawable/bg_action_card" android:gravity="center_vertical" android:orientation="horizontal" android:padding="16dp">
+            <FrameLayout android:layout_width="58dp" android:layout_height="58dp" android:background="@drawable/bg_icon_tile" android:padding="14dp"><ImageView android:layout_width="match_parent" android:layout_height="match_parent" android:contentDescription="@string/home_transfer_title" android:src="@drawable/ic_upload" /></FrameLayout>
+            <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_marginStart="14dp" android:layout_weight="1" android:orientation="vertical">
+                <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:text="@string/home_send_to_pc_title" android:textColor="@color/text_primary" android:textSize="17sp" android:textStyle="bold" />
+                <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="5dp" android:maxLines="2" android:text="@string/home_send_to_pc_detail" android:textColor="@color/text_secondary" android:textSize="13sp" />
+            </LinearLayout>
+            <Button android:id="@+id/home_transfer_button" style="@style/Widget.DX.Button.Primary" android:layout_width="104dp" android:layout_height="50dp" android:layout_marginStart="10dp" android:text="@string/send_files_button" />
+        </LinearLayout>
+
+        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="25dp" android:text="@string/home_recent_activity" android:textColor="@color/text_primary" android:textSize="18sp" android:textStyle="bold" />
+        <LinearLayout android:layout_width="match_parent" android:layout_height="82dp" android:layout_marginTop="10dp" android:background="@drawable/bg_card" android:gravity="center_vertical" android:orientation="horizontal" android:padding="15dp">
+            <FrameLayout android:layout_width="38dp" android:layout_height="38dp" android:background="@drawable/bg_status_icon" android:padding="8dp"><ImageView android:layout_width="match_parent" android:layout_height="match_parent" android:contentDescription="@string/home_recent_activity" android:src="@drawable/ic_link" /></FrameLayout>
+            <TextView android:id="@+id/home_activity_title" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_marginStart="12dp" android:layout_weight="1" android:textColor="@color/text_primary" android:textSize="15sp" android:textStyle="bold" />
+            <TextView android:id="@+id/home_activity_elapsed" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginEnd="10dp" android:textColor="@color/text_secondary" android:textSize="12sp" />
+        </LinearLayout>
+    </LinearLayout>
+</ScrollView>

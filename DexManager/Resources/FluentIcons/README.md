@@ -1,0 +1,49 @@
+﻿# Fluent UI System Icons in portable DX Manager
+
+- Source: https://github.com/microsoft/fluentui-system-icons
+- Source commit: a563cf9166f4f91aa617557ed272612b7f0a2f72
+- License: MIT; full copyright/permission notice is shipped as licenses/Fluent-System-Icons-LICENSE.txt.
+- Regular icons are used. Original SVGs and source URLs are retained here.
+- Windows renderer uses embedded transparent 256px alpha masks tinted by the current theme through .NET Framework4.6.2 GDI+. There is no runtime network access, OS icon-font requirement, or additional runtime library.
+- The mouse is a derivative of the official Keyboard Mouse20Regular: its two existing mouse contours were retained and centered using viewBox12 0 8 12. The keyboard was removed. Mouse-keyboard-original.svg retains the unchanged source. No new mouse contour was drawn.
+- The original manual renderer remains in DesktopSurfaces.cs as a fallback; FluentIconRenderer.Enabled can be disabled internally for controlled comparison. There is no added user setting.
+- The original large gradient phone illustration and product logo remain intact.
+- sources.json records each symbol's official source. PNG hashes below identify the embedded preview resources.
+
+| Symbol | Official icon | PNG SHA256 |
+|---|---|---|
+| Display | Desktop | 7EA7C8596C9A4013ED58A96EA9704B44D67C2099180543C1811BC7F4DBBFBB40 |
+| Launch | Play | 7F9F07984931512DD8FB78EB62471A31F6DB5E8C0DBF7A25782EF17CE0C77041 |
+| Phone | Phone | 08C0E0EA8111CCAADA1B2D2C487CA6AADC66CDFBB3716BA40E42AEA5BC0EFA5A |
+| Keyboard | Keyboard | 8D2AA0CEECB01DF55BAAA902CAE869FC9FB7A690EFDE222638D8B4CBB564DCD4 |
+| Mouse | Keyboard Mouse | DB7CBA0C39DC9BA834945D1B983EFAA0EA95641E8AD1FB9227CA97B7C417EB8F |
+| Moon | Weather Moon | 3E39317168B8F27AEA3C7C0249CD7B895B33A2863C2C48953898F21F65A4EE78 |
+| Close | Dismiss Circle | 6C8042847DEF715F6AFAA46067AB2901A901735C68321F02721F2A34484BC88E |
+| Settings | Settings | 0AC535FDBE6F5347D01F141357F6727897A3756F78120B7FE7E0AE97A4F13B1A |
+| Help | Question Circle | 083CDC52B9806C90DFA151E30DE9BD7EDBBE9868555AFDB9E8A8888E7E41257B |
+| Refresh | Arrow Clockwise | 76C7C4D9A40DF08A7DE899A6BB3AEF2BA005181B2B96D471828E7EDFDAE6987F |
+| List | Document Bullet List | 4C7F9709E2573644DBE58FC68DEAB6C73AAD98847F0A3128D8393920C62676DB |
+| Link | Link | 059FE9DBDCBD2973BDC32EC93D6A81386E51AE206431AD31E83B103428AA5554 |
+| Folder | Folder Open | D2E0D9B66ADD9C78416B0F8156198079294DA5CFB4FE0D58D7330B9F77D9FF31 |
+| Information | Info | 7545B66B87B77412178E2C34C827EEEF9401F5351F28051A34E6248472E88640 |
+| Power | Power | C22AEC537700A10AEB2C800D9D06A9BD4F3FAC5E57BFAF5D73F952BAA3FAE4EA |
+| Language | Translate | A4CA7C52B1AF5CE62841BE7DF9E323F6785CED183E47008B7A1AA769A5486F72 |
+| Palette | Dark Theme | ACA5814D94F64A9422BF566BCE94E96FAF3AA06A12E65A30A0581DAE03E5D06D |
+| Usb | USB Plug | 7314274DA8CB6AE7E2D7F5012CF86B877670FA58B2D3B0906F5AB27D424B4A5C |
+| Wifi | WiFi 1 | 27BAF1FE33695FF1524D7F3922F3C42D87C4A225E06CDF2D228C09E1228E1E28 |
+| Menu | Navigation | D66BAB9C856097805869F055F6386DECCE49DA086149407CCBC44F6D9B7FC62E |
+| Chevron | Chevron Down | D1647A61FCA786A65612622CE3A0132CBC824861719E9608B28C3314DF4DAF6C |
+| Options | Play Settings | 467DDC9CB887792DBCB7EB037A02210FC2040E10DE0BD380BEC51ABF0A7A9953 |
+| Apps | Apps List | CCFA35039A537C95829AFC90152FBBE9353A967F27BDBF6DE2FC5D2BFEF22647 |
+| ScreenOff | Phone Dismiss | D750D5E10A82DB975E49133F16B22E246DC67F896CDE06985794C9D07CC37A7F |
+| ScreenOn | Phone | 08C0E0EA8111CCAADA1B2D2C487CA6AADC66CDFBB3716BA40E42AEA5BC0EFA5A |
+| Fullscreen | Arrow Expand | 96AD5F07F44088A108DCD2E8088EC50EAF2D8F992E5A058A21964150C21C83DD |
+| ResetSize | Arrow Autofit Content | 489556DFC68EED3868293E177943A25B207C962FB6E495D529AAC1F1E34C81CD |
+| Capture | Screenshot | 394F59082F1822B0E9380509B21CBDDC922D66B96AD317EC7FB14E3B365B9EE6 |
+| Manager | Phone Desktop | DB0219DDA7CC2CEEF0137CE32ECC21C5E195FEA4421F346F0B5F1EE2F218B6CC |
+| ChevronUp | Chevron Up | 74F3E30557997CE47E314CA1E7491142E470F85BA1C36637A9DAD3FE23234580 |
+| Save | Save | 49CBCB116CB1CA552896122F334257E92C2F3E3DD37B2F7F3F799DCD7A144082 |
+
+## Current use — Windows2.5.0
+
+The pinned SVG/mask/license provenance above remains unchanged. Portable command icons normally render at20px; reviewed mini-bar sizes remain specific to that UI. English Help caption fitting changes only its text font, not these assets.

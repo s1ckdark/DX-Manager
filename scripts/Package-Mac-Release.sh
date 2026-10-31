@@ -201,7 +201,7 @@ if [[ $skip_tests -eq 0 ]]; then
         --configuration Release --nologo
     dotnet test "$repository_root/DexManager.ViewModels.Tests/DexManager.ViewModels.Tests.csproj" \
         --configuration Release --nologo
-    dotnet run --project "$repository_root/DexManager.MultiDeviceTests/DexManager.MultiDeviceTests.csproj" \
+    dotnet run --project "$repository_root/DexManager.MultiDeviceTests.Mac/DexManager.MultiDeviceTests.csproj" \
         --configuration Release
 fi
 
@@ -225,7 +225,7 @@ dotnet publish "$repository_root/DexManager.Mac/DexManager.Mac.csproj" \
     -p:DebugSymbols=false \
     -p:DebugType=None
 
-dotnet publish "$repository_root/DexManager.AdbProxy/DexManager.AdbProxy.csproj" \
+dotnet publish "$repository_root/DexManager.AdbProxy.Mac/DexManager.AdbProxy.csproj" \
     --configuration Release \
     --framework net8.0 \
     --runtime "$rid" \

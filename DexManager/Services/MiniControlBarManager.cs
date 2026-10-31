@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Runtime.InteropServices;
@@ -24,6 +24,7 @@ namespace DexManager.Services
         private readonly Dictionary<string, MiniControlBarForm> _bars =
             new Dictionary<string, MiniControlBarForm>(
                 StringComparer.OrdinalIgnoreCase);
+        private bool _usbConnected, _wifiConnected;
         private bool _started;
         private bool _disposed;
 
@@ -59,6 +60,18 @@ namespace DexManager.Services
             _started = true;
             Synchronize();
             _timer.Start();
+        }
+
+        internal void UpdateConnection(PhysicalDeviceInfo device)
+        {
+            if (_disposed) return;
+            var usb = device != null && device.SelectAuthorizedTransport(DeviceTransportKind.Usb, null) != null;
+            var wifi = device != null && device.SelectAuthorizedTransport(DeviceTransportKind.Wireless, null) != null;
+            if (usb == _usbConnected && wifi == _wifiConnected) return;
+            _usbConnected = usb;
+            _wifiConnected = wifi;
+            foreach (var bar in _bars.Values)
+                if (!bar.IsDisposed) bar.SetConnectionState(usb, wifi);
         }
 
         internal void ApplySettings()
@@ -220,6 +233,7 @@ namespace DexManager.Services
                 target,
                 _settings.Theme,
                 _settings.KeyMappings.CaptureHotkey);
+            bar.SetConnectionState(_usbConnected, _wifiConnected);
             bar.CommandRequested += Bar_CommandRequested;
             _bars[key] = bar;
         }
@@ -369,7 +383,18 @@ namespace DexManager.Services
             Keys key,
             bool shift)
         {
-            if (!ScrcpyShortcutSender.Send(target, key, shift))
+            string serial;
+            int processId;
+            var targetFound = _scrcpyService.TryGetWindowTarget(
+                    target,
+                    out serial,
+                    out processId) ||
+                _singleWindowService.TryGetWindowTarget(
+                    target,
+                    out serial,
+                    out processId);
+            if (!targetFound ||
+                !ScrcpyShortcutSender.Send(target, processId, key, shift))
             {
                 _logService.Warning(LocalizationService.Get(
                     "Log.MiniBar.CommandFailed"));
@@ -411,16 +436,26 @@ namespace DexManager.Services
     {
         internal static bool Send(
             IntPtr target,
+            int expectedProcessId,
             Keys key,
             bool shift)
         {
-            if (target == IntPtr.Zero || !NativeMethods.IsWindow(target))
+            if (!WindowBelongsToProcess(target, expectedProcessId))
                 return false;
 
             if (NativeMethods.IsIconic(target))
                 NativeMethods.ShowWindow(target, NativeMethods.SwRestore);
-            NativeMethods.SetForegroundWindow(target);
+            if (NativeMethods.GetForegroundWindow() != target &&
+                !NativeMethods.SetForegroundWindow(target))
+            {
+                return false;
+            }
             Thread.Sleep(20);
+            if (NativeMethods.GetForegroundWindow() != target ||
+                !WindowBelongsToProcess(target, expectedProcessId))
+            {
+                return false;
+            }
 
             var inputs = new List<Input>();
             AddKey(inputs, NativeMethods.VkLMenu, false);
@@ -456,6 +491,24 @@ namespace DexManager.Services
                 NativeMethods.KeyeventfKeyup,
                 UIntPtr.Zero);
             return false;
+        }
+
+        private static bool WindowBelongsToProcess(
+            IntPtr target,
+            int expectedProcessId)
+        {
+            if (target == IntPtr.Zero ||
+                expectedProcessId <= 0 ||
+                !NativeMethods.IsWindow(target))
+            {
+                return false;
+            }
+
+            uint actualProcessId;
+            NativeMethods.GetWindowThreadProcessId(
+                target,
+                out actualProcessId);
+            return actualProcessId == (uint)expectedProcessId;
         }
 
         private static void AddKey(

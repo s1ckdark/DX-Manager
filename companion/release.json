@@ -1,0 +1,435 @@
+{
+  "VersionName": "2.1.6",
+  "VersionCode": 13,
+  "PackageName": "io.github.mazemei.dxdisplaycleanup",
+  "ApkRelativePath": "release/DX-Companion.apk",
+  "ApkSha256": "904491111341D46458BB9CE9B342D9210A20BB923BC0F605484D6AF7B90DFCC9",
+  "CertificateSha256": "AD615803C63760439750C36801E8152AB8664C60EE481EF1473F1DF5E80733BE",
+  "OriginalWorkroom": "Store",
+  "OriginalCommit": "867f384",
+  "MaintainedByWorkroom": "GitHub",
+  "ChangedAt": "2026-10-16T20:31:50+09:00",
+  "SourceFiles": [
+    {
+      "Path": ".gitignore",
+      "Sha256": "D64FA1923EDECBCFBE0125F8AFE808829BB083B6A5CB3CF6D4E4A240BCC76BC3"
+    },
+    {
+      "Path": "build.gradle",
+      "Sha256": "49073F614653654158D33BED5CAE1BEB89F9B480CCCB2FEE4B59EA9AC39EDE80"
+    },
+    {
+      "Path": "gradle.properties",
+      "Sha256": "0CC09EF92E85DAAC0271DD92C591577E920D99B7648042129E47D22279A81106"
+    },
+    {
+      "Path": "gradlew",
+      "Sha256": "D2F351CC4D1D088F1CA59C12DF28EC27DACC43A97607C056B0C0D549EDA44A13"
+    },
+    {
+      "Path": "gradlew.bat",
+      "Sha256": "57931B17DD228E5C24DAC90E815D0BF82477E831A4618DFAB4136F5446B42A9F"
+    },
+    {
+      "Path": "PACKAGE_README.md",
+      "Sha256": "6D0C9A3260954EF211DA5FB3B9FACB3892DA1123584E43A3A842E462AE0BBD2B"
+    },
+    {
+      "Path": "README.md",
+      "Sha256": "DF128D43C5846CB3605F300CD8CB05688B50164E57EA548752C441AA50D42796"
+    },
+    {
+      "Path": "settings.gradle",
+      "Sha256": "1643DD858F2F071212CEE478C639ED08F9A6381ADF71B00CFF81C1FC56C7520A"
+    },
+    {
+      "Path": "SIGNING.md",
+      "Sha256": "4969DD466395E8547FF5AF417F187377144D2C4BE9B8E5A794B9E9755579B9BC"
+    },
+    {
+      "Path": "app/build.gradle",
+      "Sha256": "1B7A530C99052F5B3230AF53BE85E9007291075FB820D54214CD1DFAA08807C2"
+    },
+    {
+      "Path": "app/src/main/AndroidManifest.xml",
+      "Sha256": "F4D1CBB2D982159E4B94C9ABE4D61AB4A07AB32DB7FB23CFCA89D7F25BEFFCBF"
+    },
+    {
+      "Path": "app/src/main/java/io/github/mazemei/dxdisplaycleanup/CleanupCoordinator.java",
+      "Sha256": "F8A45358DD5B1CA8D775C75307B9A0C46B4B1940C5AAC1A146ACA61209A2BC79"
+    },
+    {
+      "Path": "app/src/main/java/io/github/mazemei/dxdisplaycleanup/CleanupPreferences.java",
+      "Sha256": "5604F096F13C0A2251280D3E26E364320114ED482D034115CCEA0EE590DC1B52"
+    },
+    {
+      "Path": "app/src/main/java/io/github/mazemei/dxdisplaycleanup/CleanupTileService.java",
+      "Sha256": "778C4D68A51CD83B390DC060A6CE057247805DF042BF1A3EC348ADB8F3904CA1"
+    },
+    {
+      "Path": "app/src/main/java/io/github/mazemei/dxdisplaycleanup/CleanupWidgetProvider.java",
+      "Sha256": "654BDC89E45399C5F7630C2AC0057E04D6E2368B108C5E7AD05B70CE0DCA46CB"
+    },
+    {
+      "Path": "app/src/main/java/io/github/mazemei/dxdisplaycleanup/GuardianIdleStopPolicy.java",
+      "Sha256": "FE4AECB8FFF0118BE563BFF4206ED304FC4B0ABA511473A1A272F93A4BA82C36"
+    },
+    {
+      "Path": "app/src/main/java/io/github/mazemei/dxdisplaycleanup/GuardianPreferences.java",
+      "Sha256": "C299A82B52630EE9A9A7716181A2FF8E33BC40A7F09AD19090BF5FE395CC4FBF"
+    },
+    {
+      "Path": "app/src/main/java/io/github/mazemei/dxdisplaycleanup/GuardianSessionStore.java",
+      "Sha256": "15B2AC62D2E8CC5CC638022A027A5A78BD233AB58630564FBCB32EB793BD8A1C"
+    },
+    {
+      "Path": "app/src/main/java/io/github/mazemei/dxdisplaycleanup/MainActivity.java",
+      "Sha256": "E60C284FE9144E2ECD7310AA98EB20C07712F5BA3BF934462AFB4DB7D442120E"
+    },
+    {
+      "Path": "app/src/main/java/io/github/mazemei/dxdisplaycleanup/OverlayDisplayRepository.java",
+      "Sha256": "1E1F6489FDE035BDA3C39AC94AB77511C1B26AED0388FA474A7E18026F13489A"
+    },
+    {
+      "Path": "app/src/main/java/io/github/mazemei/dxdisplaycleanup/PhoneTransferEntry.java",
+      "Sha256": "E1E5816E7F41733793A676E92FBA65CD8C4F4A2D8F609AAFF5432D6BCD03844A"
+    },
+    {
+      "Path": "app/src/main/java/io/github/mazemei/dxdisplaycleanup/PhoneTransferPlanner.java",
+      "Sha256": "BFCB3095E010101BBD09BCFB0DA01D37B900527ADFCE8B96B02FFD88A538440C"
+    },
+    {
+      "Path": "app/src/main/java/io/github/mazemei/dxdisplaycleanup/PhoneTransferService.java",
+      "Sha256": "0A43A77486F413A985FF36A9DA06924756B3BE7013DF315565DCACF57205F2C3"
+    },
+    {
+      "Path": "app/src/main/java/io/github/mazemei/dxdisplaycleanup/SessionGuardianService.java",
+      "Sha256": "692D44C17848F79B4628B6A72E512BFAD42F13764D2B28D358FC99DE8EAC4D81"
+    },
+    {
+      "Path": "app/src/main/java/io/github/mazemei/dxdisplaycleanup/ShareToPcActivity.java",
+      "Sha256": "61068A045C140196FB9B89A960092A392DCA7E9CA9E37BDAC879BD83F28A6138"
+    },
+    {
+      "Path": "app/src/main/java/io/github/mazemei/dxdisplaycleanup/ShareTransferRequestState.java",
+      "Sha256": "AECD4A6461EE187D9E343C5964246922B775BD43CB6D89B3FF34BA515DC46117"
+    },
+    {
+      "Path": "app/src/main/java/io/github/mazemei/dxdisplaycleanup/StayAwakeRepository.java",
+      "Sha256": "6D3858ABE274134EF36DE16765B506468D5FC36DE5D51F0E53A23FFA40623D5B"
+    },
+    {
+      "Path": "app/src/main/java/io/github/mazemei/dxdisplaycleanup/TransferHistoryReceiver.java",
+      "Sha256": "FBB0CFAB99CC0CCA082E639F098E3354838B6C653B77EDC11A3BBA16D9389687"
+    },
+    {
+      "Path": "app/src/main/java/io/github/mazemei/dxdisplaycleanup/TransferHistoryStore.java",
+      "Sha256": "0BAE8FF24D6E7F7D918990F419B5FFAA9015EFE7C278E6A27E62BC4EBF6E1B3F"
+    },
+    {
+      "Path": "app/src/main/java/io/github/mazemei/dxdisplaycleanup/TransferRequestTracker.java",
+      "Sha256": "38AC22F2DE6673F068C895ED1092CAFE74EFF45EB39703B10B52A801D28EDBFA"
+    },
+    {
+      "Path": "app/src/main/java/io/github/mazemei/dxdisplaycleanup/TransferSessionProbe.java",
+      "Sha256": "E84485C67BA9306244EFA8C8AEB48A82CF6F5E5F0D433299627F43BC2466EA8F"
+    },
+    {
+      "Path": "app/src/main/java/io/github/mazemei/dxdisplaycleanup/TransferSessionReceiver.java",
+      "Sha256": "45CC699472C22A53F0005F3CAA866A6F3AEA98294AE92E805ECFF27DE974913F"
+    },
+    {
+      "Path": "app/src/main/java/io/github/mazemei/dxdisplaycleanup/TransferSessionStore.java",
+      "Sha256": "2125D285C7AD821CEAD7C84FB198CD29C5CBF75988666EC6ED3CC14DBC52A826"
+    },
+    {
+      "Path": "app/src/main/java/io/github/mazemei/dxdisplaycleanup/TransferSiblingNames.java",
+      "Sha256": "4F880E9F68B06844E8348348857ED6F2FA1358DA9021846826022F46B8D99FC3"
+    },
+    {
+      "Path": "app/src/main/java/io/github/mazemei/dxdisplaycleanup/TransferStartRegistry.java",
+      "Sha256": "2E0E49A2E5F9083C9D405452E97BAA4F1B45B6AB44412E4C52637D43B3FCB7A2"
+    },
+    {
+      "Path": "app/src/main/res/drawable/bg_action_card.xml",
+      "Sha256": "3CB8141A1BB974217BACB79B982A85B68F14592E3A90CE315512832FA38DE769"
+    },
+    {
+      "Path": "app/src/main/res/drawable/bg_app.xml",
+      "Sha256": "85B0C780BFB29AA9A8B3984DD93AA05851F283CA306A56D38061BBAFCCF16CE7"
+    },
+    {
+      "Path": "app/src/main/res/drawable/bg_bottom_navigation.xml",
+      "Sha256": "D9BB9E6A8DE1EDDB4318E1871E6C951B7AE0BF60567B40339A618E444B10462A"
+    },
+    {
+      "Path": "app/src/main/res/drawable/bg_card.xml",
+      "Sha256": "254602A96886701063E95274988D0CA2861A872F420325D59453499085106CA1"
+    },
+    {
+      "Path": "app/src/main/res/drawable/bg_code.xml",
+      "Sha256": "4D6433E639484248F232E57E4A73F084E0BEF52BFFF041511FA01ED7ADB1573E"
+    },
+    {
+      "Path": "app/src/main/res/drawable/bg_connection_pending.xml",
+      "Sha256": "FA1DC67A962E5D6DC8C53CBB8FCA6E3C7649EA99209DC8129A69DC9908910AE6"
+    },
+    {
+      "Path": "app/src/main/res/drawable/bg_connection_status.xml",
+      "Sha256": "2486CE3578FD56C7A56744B574246AB7EFF346ED56C2413D8DCB52ABEFDF9FB6"
+    },
+    {
+      "Path": "app/src/main/res/drawable/bg_icon_tile.xml",
+      "Sha256": "DD66C2C6DC7A638176B50659034956AC19DDF445292AFBFBBA39A78FEEFCB2F8"
+    },
+    {
+      "Path": "app/src/main/res/drawable/bg_info_card.xml",
+      "Sha256": "6F6B84906C5D99AA59CF9E30F3ADCABA7AF35F307073E8C7AD20A7FCC4843EAD"
+    },
+    {
+      "Path": "app/src/main/res/drawable/bg_nav_selected.xml",
+      "Sha256": "833D93CD9E7B8467CA723279C9ECD4D8E932780404A79CFBD8303BA4204FADD4"
+    },
+    {
+      "Path": "app/src/main/res/drawable/bg_option_row.xml",
+      "Sha256": "D8D5916C1D459865CCD64355EE39D1316D065480670D8809578529E899CF5C92"
+    },
+    {
+      "Path": "app/src/main/res/drawable/bg_primary_button.xml",
+      "Sha256": "1856BD7B5821E8EA49C7F95600BA0D4D63D163D28F7021206A37C8AC71C5DFBF"
+    },
+    {
+      "Path": "app/src/main/res/drawable/bg_secondary_button.xml",
+      "Sha256": "44312E1BCA61DD0212AE7E9014B2A89C631850492E66CBB58603704D4F2FC1D8"
+    },
+    {
+      "Path": "app/src/main/res/drawable/bg_status_card.xml",
+      "Sha256": "B2E91640DEB2D1248A5B16443984B72EC3AD32CCC05B3530D98F466A9044BFCE"
+    },
+    {
+      "Path": "app/src/main/res/drawable/bg_status_icon.xml",
+      "Sha256": "2ED29FC7ACAB52DCCA20C74FC3B1E9BE461C42ABB6466EBD87C1EDD50D8FA7B0"
+    },
+    {
+      "Path": "app/src/main/res/drawable/bg_widget_action.xml",
+      "Sha256": "020E0DC33BF89505568CF5CD4121E60118B20750A2A3A4A02D96AB9E1FC625DC"
+    },
+    {
+      "Path": "app/src/main/res/drawable/bg_widget_button.xml",
+      "Sha256": "BB844AAB255263B3C09ACCA2A5F1FE456D75124464982FA35328CF305415AD01"
+    },
+    {
+      "Path": "app/src/main/res/drawable/bg_widget_icon.xml",
+      "Sha256": "765E1591CD7234E2C3A7DAB0051CEA7CC27D24BE090C6D9D55889A871D1582C8"
+    },
+    {
+      "Path": "app/src/main/res/drawable/bg_widget.xml",
+      "Sha256": "582D20AFE052BB5F5E67A7EB3AD341F86DEF12ECDEA0F5401CB4092F9B36D0B3"
+    },
+    {
+      "Path": "app/src/main/res/drawable/checkbox_indicator.xml",
+      "Sha256": "00FD08F5A9743E5A85A128B957A700021DB21F092B8509B827E04370C04A2F84"
+    },
+    {
+      "Path": "app/src/main/res/drawable/ic_broom.xml",
+      "Sha256": "C4A507A686159C58AF54C4CB2E7C849B80B3D88E6D84F90F2BF140C3B7F68AD8"
+    },
+    {
+      "Path": "app/src/main/res/drawable/ic_checkbox_checked.xml",
+      "Sha256": "8B1CD64782DF91831BBCF9E0F40E1AEA9D20B94A900013FCD9F067F2A2822682"
+    },
+    {
+      "Path": "app/src/main/res/drawable/ic_checkbox_unchecked.xml",
+      "Sha256": "CDED60C754486768167770B61B54A4F5C54921DAB27357E1A7D62D68BB42884D"
+    },
+    {
+      "Path": "app/src/main/res/drawable/ic_cleanup.xml",
+      "Sha256": "0652338BF372B86F8EA802AC730955C37A5F8542C40DFDBF09491A04D6BB7E81"
+    },
+    {
+      "Path": "app/src/main/res/drawable/ic_download.xml",
+      "Sha256": "C44818B10592AA97885CBB7C67648CBA18054D027F561BE5E3E955FF189CD57F"
+    },
+    {
+      "Path": "app/src/main/res/drawable/ic_file.xml",
+      "Sha256": "A54CB456F7196DF398F6622943EDE736974BD169AA5DE86BD9E5554E8F60D50C"
+    },
+    {
+      "Path": "app/src/main/res/drawable/ic_folder.xml",
+      "Sha256": "DD164738BC63F1513F08724D647900B7B19FEECDB3B77D8C1200BDCEA8B3B27C"
+    },
+    {
+      "Path": "app/src/main/res/drawable/ic_home.xml",
+      "Sha256": "A3FAE5AC30FC1025B74EAC34198B6CB986E2DF34959D98884DD26A13C0C0E694"
+    },
+    {
+      "Path": "app/src/main/res/drawable/ic_link.xml",
+      "Sha256": "BE78619423FC9800E03754C1CEEFCCD5AB5CE5A6D4732BC22C00366A5EEF68A8"
+    },
+    {
+      "Path": "app/src/main/res/drawable/ic_monitor.xml",
+      "Sha256": "94F6CF900D627506284BC2BEF0941F9435E4E6E71A793C9453E5D79A58246819"
+    },
+    {
+      "Path": "app/src/main/res/drawable/ic_settings.xml",
+      "Sha256": "E3C30B7A01F7B51C060E5EE75F589FFB3DFF4419A9C93D335117DEA311BE4CE1"
+    },
+    {
+      "Path": "app/src/main/res/drawable/ic_sleep.xml",
+      "Sha256": "3D90B5BB39241169EB5D2FAB6C497696B1CB515A07B67E2CB22E38AC041132C3"
+    },
+    {
+      "Path": "app/src/main/res/drawable/ic_tile_cleanup.xml",
+      "Sha256": "8957B1842A57DC28672BA4F31B85FE3BE87515CB33967ABE0EE9CC26073B9D29"
+    },
+    {
+      "Path": "app/src/main/res/drawable/ic_transfer.xml",
+      "Sha256": "849FF535E37701EC98880BD698737E37E22708FE2908FD4BB148C9A058176A59"
+    },
+    {
+      "Path": "app/src/main/res/drawable/ic_upload.xml",
+      "Sha256": "9572940C072A1C84CC506941FF89063A8A1531CE2AE3A7EB1F94C16B88D8820E"
+    },
+    {
+      "Path": "app/src/main/res/drawable/ic_warning.xml",
+      "Sha256": "13F2595E8D355FD0EAD2CA026DA7AA22AB79955E784A222813507C8A42E28F9C"
+    },
+    {
+      "Path": "app/src/main/res/drawable-night/bg_widget_icon.xml",
+      "Sha256": "B72687D21F1ADE02409B5B09674318DED485292EE8D52541137142B2BBCB2804"
+    },
+    {
+      "Path": "app/src/main/res/drawable-night/bg_widget.xml",
+      "Sha256": "0B9BBCCB17CC736503FF67C19167B905B879AED7683DB6EC5A087B1A388F5E11"
+    },
+    {
+      "Path": "app/src/main/res/drawable-nodpi/dx_manager_icon_mono.png",
+      "Sha256": "86943C12F375825F88659082989C36E268792C16EAFBAC777333FCC783011C9F"
+    },
+    {
+      "Path": "app/src/main/res/drawable-nodpi/dx_manager_icon.png",
+      "Sha256": "124688BC427157C34C3845D9E9C32D185862EC3F0AF9F42E618410BF4A336F98"
+    },
+    {
+      "Path": "app/src/main/res/font/pretendard_variable.ttf",
+      "Sha256": "3090CCDE0442BB347AA7685D9BA8B17436A60682DF6E8F92A9A670DE14056E22"
+    },
+    {
+      "Path": "app/src/main/res/layout/activity_main.xml",
+      "Sha256": "8238851FB2C7E4CE614972154D48915B88E8A0B01E73B79FC026D3EF4AAD31BD"
+    },
+    {
+      "Path": "app/src/main/res/layout/dialog_about.xml",
+      "Sha256": "4D9692E49D45049DAAD60E6FC5F2747FD95FF13BECE1CD8C776F63BA2B1F8075"
+    },
+    {
+      "Path": "app/src/main/res/layout/item_transfer_history.xml",
+      "Sha256": "57955D7947B51B909D87955D0B2CAB8720238F758BF045F1677A00132B15D811"
+    },
+    {
+      "Path": "app/src/main/res/layout/page_cleanup.xml",
+      "Sha256": "7711067CF32B3F8A40C5C1371579790E01D610CBCFCA05E75F4432923110749F"
+    },
+    {
+      "Path": "app/src/main/res/layout/page_home.xml",
+      "Sha256": "CD6AF05022D6621650D2142A170616FA307AAEB331699A316FFA4E4B5A1F310A"
+    },
+    {
+      "Path": "app/src/main/res/layout/page_settings.xml",
+      "Sha256": "543A54344EC3E5405BB04A2BA4988CCD1540470330D33CA24AB4371E46DC1237"
+    },
+    {
+      "Path": "app/src/main/res/layout/page_transfer.xml",
+      "Sha256": "97173CD75410DCD856B4B7DBCC33EC9BF879475212572E5A70B958857F59B8B1"
+    },
+    {
+      "Path": "app/src/main/res/layout/widget_cleanup.xml",
+      "Sha256": "D0B185380313CBFD54362EE29C646E721FABAEA13AB6FC6B550BEF63461E7F4B"
+    },
+    {
+      "Path": "app/src/main/res/values/colors.xml",
+      "Sha256": "40F767F9C2F2BD4F1C3E9FFADAE85B3691FC794A622F4CDFA7D4415249441C15"
+    },
+    {
+      "Path": "app/src/main/res/values/dimens.xml",
+      "Sha256": "8AB26BAE37F2B61A988D648557EB94A839FFF2DA4F0623EEFFD35E0FB9C49B89"
+    },
+    {
+      "Path": "app/src/main/res/values/strings.xml",
+      "Sha256": "66746F322E66734F52F9FC471E95E34D255D0B1D96FE785C9F5FC240A8B25906"
+    },
+    {
+      "Path": "app/src/main/res/values/styles.xml",
+      "Sha256": "91B543E34B202E83F6255B1368589E9FE2489344C8BC158B1AADD4E5C6141EF6"
+    },
+    {
+      "Path": "app/src/main/res/values-ko/strings.xml",
+      "Sha256": "EF7487DC75E376ADF1D313AEC51432BC67556F5F804D07B9519D3FF99B4B4E05"
+    },
+    {
+      "Path": "app/src/main/res/values-night/colors.xml",
+      "Sha256": "65652B966255FEB11E7FB74FF873BB2D97C757324BEDCE87EDC40313C78D0955"
+    },
+    {
+      "Path": "app/src/main/res/values-night/styles.xml",
+      "Sha256": "D5688A32A37E6B22615AF0089B3447A6687BA25DD9CCFA18B89DDB1A4583CAF5"
+    },
+    {
+      "Path": "app/src/main/res/xml/cleanup_widget_info.xml",
+      "Sha256": "463DE650BAFBC216B1203FDCD504F0D1290266D256FAA489F4B651CEFD55D9FD"
+    },
+    {
+      "Path": "app/src/main/res/xml/data_extraction_rules.xml",
+      "Sha256": "5511FD8D67D5D7FCC1B0F61C76FBA0FAA9B2EB3D96DC64893D9011797956143F"
+    },
+    {
+      "Path": "app/src/main/res/xml-v31/cleanup_widget_info.xml",
+      "Sha256": "6C8090DD715A143C3593EFECBBDEB528CB1F6BC42FCBE015EEDBB05B062B23EA"
+    },
+    {
+      "Path": "app/src/test/java/io/github/mazemei/dxdisplaycleanup/CleanupCoordinatorTest.java",
+      "Sha256": "FAF3B55C4D7E4447F6BB2E618322B48D5D503FFBF48F7AFA01BF3B3CB77EA608"
+    },
+    {
+      "Path": "app/src/test/java/io/github/mazemei/dxdisplaycleanup/GuardianIdleStopPolicyTest.java",
+      "Sha256": "445FB733458F42528EAFA9BDB95237473612FE423076A2F72923C4FF1125E92E"
+    },
+    {
+      "Path": "app/src/test/java/io/github/mazemei/dxdisplaycleanup/GuardianPreferencesTest.java",
+      "Sha256": "F0650B2590F5A60AAE0A03F3D35E5C98112229B77E74BE207EE887FE9993AE23"
+    },
+    {
+      "Path": "app/src/test/java/io/github/mazemei/dxdisplaycleanup/OverlayDisplayRepositoryTest.java",
+      "Sha256": "A2F9DE6763A16E7C67AC31600900E99C5A55AF53CE48783DF809E78616E34974"
+    },
+    {
+      "Path": "app/src/test/java/io/github/mazemei/dxdisplaycleanup/ShareTransferRequestStateTest.java",
+      "Sha256": "A74EFB669715D3907DAAD9BD31A500A9659B8F9D2335E18EF977DABA3ADCD352"
+    },
+    {
+      "Path": "app/src/test/java/io/github/mazemei/dxdisplaycleanup/TransferRequestTrackerTest.java",
+      "Sha256": "B7A4DAC92B280899D40C569EEDDA5027DCB0D7B65256DCE89AAAD974F321EC33"
+    },
+    {
+      "Path": "app/src/test/java/io/github/mazemei/dxdisplaycleanup/TransferSessionProbeTest.java",
+      "Sha256": "6CF323DC1708C284753A7ED350B3FCE4A14C575EE8AA724C4A866FA6798BF4FE"
+    },
+    {
+      "Path": "app/src/test/java/io/github/mazemei/dxdisplaycleanup/TransferSiblingNamesTest.java",
+      "Sha256": "1958DD8EDA461539EE87E4C7BBD75AD17E714C8F1EBA45F6747B4B3A590D5C9F"
+    },
+    {
+      "Path": "app/src/test/java/io/github/mazemei/dxdisplaycleanup/TransferStartRegistryTest.java",
+      "Sha256": "10729F72154A0F1BBB7FDA3EF79D683B9F0C5C1560FC026851BA3BFE14B614D8"
+    },
+    {
+      "Path": "gradle/wrapper/gradle-wrapper.jar",
+      "Sha256": "81A82AAEA5ABCC8FF68B3DFCB58B3C3C429378EFD98E7433460610FECD7AE45F"
+    },
+    {
+      "Path": "gradle/wrapper/gradle-wrapper.properties",
+      "Sha256": "5F705ADAA45C1B4941763E0CB0FDE5F2435C7CCBE2FEAFBA9F3659A23A4F2CA5"
+    }
+  ],
+  "SourcePolicy": "Generated release snapshot. Maintain Android code in the canonical shared component and re-export."
+}

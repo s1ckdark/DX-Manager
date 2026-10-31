@@ -1,6 +1,9 @@
-/.gradle/
-/local.properties
-/signing.properties
-/**/build/
+# Historical Android outputs and trusted local signing inputs remain here after source migration.
+.gradle/
+app/build/
+build/
+bundled/*.apk
+signing.properties
+local.properties
 *.jks
 *.keystore

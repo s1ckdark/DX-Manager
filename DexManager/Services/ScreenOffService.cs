@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Diagnostics;
 using System.IO;
 using System.Text;
@@ -55,6 +55,8 @@ namespace DexManager.Services
                 throw new ArgumentNullException("logService");
         }
 
+        internal Func<bool> CanTurnPhoneScreenOff { get; set; }
+
         public bool Reapply(string serial, Func<bool> shouldRun)
         {
             if (string.IsNullOrWhiteSpace(serial))
@@ -75,7 +77,8 @@ namespace DexManager.Services
             {
                 return _launchCoordinator.RunExclusive(delegate
                 {
-                    if (_shutdownSignal.WaitOne(0) || !shouldRun())
+                    if (_shutdownSignal.WaitOne(0) || !shouldRun() ||
+                        (CanTurnPhoneScreenOff != null && !CanTurnPhoneScreenOff()))
                     {
                         _logService.Info(DeviceLogFormatter.ForSerial(
                             serial,

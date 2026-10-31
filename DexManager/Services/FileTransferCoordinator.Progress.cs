@@ -20,6 +20,11 @@ namespace DexManager.Services
 {
     public sealed partial class FileTransferCoordinator : IDisposable
     {
+        private const string CompanionHistoryComponent =
+            "io.github.mazemei.dxdisplaycleanup/.TransferHistoryReceiver";
+        private const string CompanionHistoryAction =
+            "io.github.mazemei.dxdisplaycleanup.RECORD_TRANSFER_HISTORY";
+
         private void CompleteSuccess(TransferWorkItem item)
         {
             MarkTerminalAndUnregister(item);
@@ -38,6 +43,7 @@ namespace DexManager.Services
                     "Log.FileTransfer.Completed",
                     item.FileName,
                     item.FinalFileName)));
+            NotifyCompanionHistory(item, "completed");
         }
 
         private void CompleteFailed(TransferWorkItem item, string message)
@@ -61,6 +67,7 @@ namespace DexManager.Services
                     "Log.FileTransfer.Failed",
                     item.FileName,
                     message)));
+            NotifyCompanionHistory(item, "failed");
         }
 
         private void CompleteCanceled(TransferWorkItem item)
@@ -85,6 +92,86 @@ namespace DexManager.Services
                 LocalizationService.Format(
                     "Log.FileTransfer.Canceled",
                     item.FileName)));
+            NotifyCompanionHistory(item, "canceled");
+        }
+
+        private void NotifyCompanionHistory(
+            TransferWorkItem item,
+            string status)
+        {
+            if (item == null || item.Session == null ||
+                string.IsNullOrWhiteSpace(item.Session.Serial))
+            {
+                return;
+            }
+            try
+            {
+                var id = string.IsNullOrWhiteSpace(item.Request.RequestId)
+                    ? Guid.NewGuid().ToString("N")
+                    : item.Request.RequestId;
+                var name = string.IsNullOrWhiteSpace(item.FinalFileName)
+                    ? item.FileName
+                    : item.FinalFileName;
+                var count = item.DirectoryTransfer
+                    ? Math.Max(1, item.Entries.Count(entry =>
+                        !entry.IsDirectory))
+                    : Math.Max(1, item.Entries.Count);
+                var timestamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+                var script = BuildCompanionHistoryCommand(
+                    id,
+                    name ?? string.Empty,
+                    status,
+                    count,
+                    item.DirectoryTransfer,
+                    timestamp);
+
+                // This helper uses the requested serial and the existing
+                // shutdown gate. History is optional and must not alter the
+                // transfer result.
+                RunCleanupScript(item.Session.Serial, script);
+            }
+            catch
+            {
+                // Transfer completion must not fail if Companion history is
+                // unavailable.
+            }
+        }
+
+        private static string BuildCompanionHistoryCommand(
+            string id,
+            string name,
+            string status,
+            int count,
+            bool folder,
+            long timestamp)
+        {
+            if (!string.Equals(status, "completed", StringComparison.Ordinal) &&
+                !string.Equals(status, "failed", StringComparison.Ordinal) &&
+                !string.Equals(status, "canceled", StringComparison.Ordinal))
+            {
+                throw new ArgumentOutOfRangeException("status");
+            }
+
+            return new StringBuilder()
+                    .Append("am broadcast -n ")
+                    .Append(CompanionHistoryComponent)
+                    .Append(" -a ")
+                    .Append(CompanionHistoryAction)
+                    .Append(" --es id64 '")
+                    .Append(ToBase64(id))
+                    .Append("' --es name64 '")
+                    .Append(ToBase64(name))
+                    .Append("' --es status '")
+                    .Append(status)
+                    .Append("' --ei count ")
+                    .Append(Math.Max(1, count).ToString(
+                        CultureInfo.InvariantCulture))
+                    .Append(" --ez folder ")
+                    .Append(folder ? "true" : "false")
+                    .Append(" --el time ")
+                    .Append(timestamp.ToString(
+                        CultureInfo.InvariantCulture))
+                    .ToString();
         }
 
         private void MarkTerminalAndUnregister(TransferWorkItem item)

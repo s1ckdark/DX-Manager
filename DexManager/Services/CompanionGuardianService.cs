@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.IO;
 using System.Net;
 using System.Net.Sockets;
@@ -96,7 +96,7 @@ namespace DexManager.Services
                 _logService.Info(DeviceLogFormatter.ForSerial(
                     serial,
                     "Companion shutdown protection is unavailable. " +
-                    "DX Companion 2.0.0 or later with cleanup permission is required."));
+                    "DX Companion " + DisplayCleanupPermissionService.BundledVersionName + " with cleanup permission is required."));
                 return;
             }
 
