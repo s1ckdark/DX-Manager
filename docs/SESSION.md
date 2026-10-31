@@ -41,6 +41,12 @@
 
 ## 2026-10-31 macOS GUI Connection 탭 (무선 ADB)
 
+- `scripts/Build-Mac-App.sh` 추가 — 개인용 `dist/DXManager.app`(osx-arm64, self-contained,
+  ad-hoc 서명)을 만든다. 번들 도구(scrcpy/adb/DXMAdbProxy)와 `PORTABLE_PACKAGE.txt` 표식,
+  icns, Info.plist를 포함하고 재빌드 시 `config/`·`logs/`·`screenshot/`을 보존한다. 실행·재빌드
+  보존·codesign 검증은 통과했고 GUI 실행은 하지 않았다(미확인). 자세한 사용법은
+  `docs/MACOS_GUIDE.md` 4.4.
+
 - 브랜치 `feature/gui-wireless-adb`(커밋 5ba4507, 0919aed, c10190d, e6057e1, cc287aa)가 설정
   창에 기기별 Connection 탭을 추가했다. `IWirelessConnectionGateway`가
   `ApplicationHost.WirelessAdb`의 `EnableFromUsbForDevice`·`ConnectForDevice`·

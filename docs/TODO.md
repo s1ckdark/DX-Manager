@@ -75,6 +75,11 @@
         만료될 수 있다. 선택 변경 시 스탬프를 지운다.
 - [ ] Connection 탭 포트 NumericUpDown 폭이 좁아 "5555" 마지막 자리가 잘려 보인다(실기 확인) —
       `MinWidth`를 늘린다.
+- [x] 로컬용 macOS .app 번들 스크립트
+  - [x] `scripts/Build-Mac-App.sh` → `dist/DXManager.app`(osx-arm64, ad-hoc 서명, 개인용)
+  - [x] 번들: Desktop 앱 + `tools/{adb-proxy,scrcpy,adb}` + `PORTABLE_PACKAGE.txt` + icns;
+        재빌드 시 `Contents/MacOS/{config,logs,screenshot}` 보존
+  - [ ] 번들 GUI 실제 실행(Finder/Dock) 확인은 사용자 몫
 - [ ] 설정 저장 잠금 통합 — `ApplicationHost.UpdateSettings`(`_settingsLock`, live 객체 변경 후 Save)와 `SettingsService.UpdateAndSave`(`_saveSync`, CloneCore→mutate→SaveCore→CopySettings)가 같은 `AppSettings`를 서로 다른 잠금으로 쓴다. `UpdateAndSave`의 CloneCore와 CopySettings 사이에 들어온 UI 저장은 메모리와 디스크에서 조용히 덮어써진다. 수 ms 창이라 드물지만, `UpdateSettings`가 `_saveSync` 아래에서 변경+저장을 한 번에 하도록 바꾸면 이 부류가 사라지고 Connection 탭의 `IsWirelessIdle` Save 게이트는 UX 용도만 남는다. Core 동시성 변경이라 별도 PR로 진행한다.
 - [ ] TUI [5]-[1]이 `EnableFromUsb(device.Identity, 5555)`로 identity를 호스트 자리에 넘긴다
       (`DexManager.Mac/Hosting/InteractiveHost.cs:537`) — 메서드는 호스트 IP를 기대한다.
