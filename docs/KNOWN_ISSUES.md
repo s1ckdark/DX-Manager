@@ -425,8 +425,17 @@ Core 155 — + 다중기기 39개)로만 뒷받침된다.
 
 설정 창 Connection 탭(기기별 USB→무선 전환·IP:포트 직접 연결·무선 해제)은 자동 테스트로만
 검증됐다(ViewModels.Tests 152, Desktop.Tests 26, Core Tests 281; 게이트웨이 테스트는
-`TempHostRoot`의 실제 `ApplicationHost`를 쓰지만 adb는 가짜다). 이 개발 환경은 Avalonia를
-띄우지 못하므로(RenderTimer -6661) 아래는 모두 **미확인**이다.
+`TempHostRoot`의 실제 `ApplicationHost`를 쓰지만 adb는 가짜다).
+
+2026-10-31 이 개발 환경에서 GUI 기동을 다시 시도한 결과, `DOTNET_ROOT=$HOME/.dotnet`을
+주고 `dotnet DXManager.Desktop.dll`로 실행하면 Avalonia 창이 정상적으로 뜬다(이전 기록의
+RenderTimer -6661은 재현되지 않았다). apphost `DXManager.Desktop`을 직접 실행하면
+`DXMAdbProxy`와 같은 이유로 "You must install .NET" 오류가 난다. 기기가 연결되지 않은
+상태에서 설정 창을 열어 Connection 탭이 다른 기기별 탭과 같은 자리에 나타나고 기기
+미선택 placeholder를 보이는 것, Cancel과 `Cmd+Q` 종료가 정상인 것까지 확인했다. 첫
+시도에서 Connection 탭을 클릭하자 설정 창이 사라진 일이 한 번 있었으나 다시 열어
+클릭했을 때는 재현되지 않았고 프로세스는 살아 있었으며 stderr에 아무것도 없었다.
+원인은 모른다. 실제 휴대폰이 연결된 상태의 동작은 아래와 같이 **미확인**이다.
 
 - USB 연결 상태에서 Prepare → 기기의 `Transports`에 Wireless 항목이 추가 표시되는가
 - 케이블 분리 후 기기 행이 유지되고 DeX를 시작할 수 있는가
