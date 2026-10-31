@@ -50,6 +50,34 @@ namespace DexManager.Services
         private const int DismissKeyguardLockProbeBudgetMs = 2000;
         private const int DismissKeyguardLockProbeIntervalMs = 150;
 
+        // 위 짧은 폴이 Locked로 끝난 뒤, 사용자가 폰에서 직접 잠금을
+        // 푸는 동안 더 기다리는 두 번째 단계의 예산과 재확인 간격.
+        // 실기 버그: PIN·지문·얼굴 인증이 필요한 폰은 dismiss가 인증
+        // 화면만 띄우고, 사용자가 그걸 2초 안에 끝내지 못한다. 그래서
+        // 시작 버튼을 한 번 누르면 잠금 화면만 뜨고 시작은 Locked로
+        // 실패해, 잠금을 푼 뒤 한 번 더 눌러야 연결됐다.
+        //
+        // 예산 15000ms: 사람이 PIN을 입력하거나 생체 인증을 마치기에
+        // 충분하면서, 폰을 그대로 두고 자리를 뜬 경우에도 시작이
+        // 끝없이 매달리지 않는 상한이다. 간격 500ms: 사람의 입력을
+        // 기다리는 단계라 150ms처럼 촘촘할 필요가 없다 - 해제 후 최대
+        // 0.5초 안에 진행되면 충분하고, adb 왕복 횟수를 줄인다.
+        //
+        // 대기는 Thread.Sleep이 아니라 _shutdownSignal로 한다 - 15초는
+        // 앱 종료가 기다리기에 너무 길다. 종료가 요청되면 남은 확인을
+        // 돌리지 않고 곧바로 시작을 포기한다. 단, 이미 나간 adb 확인
+        // 하나(IsDeviceLocked)는 종료 신호로 끊기지 않고 자체 타임아웃
+        // (AppSettings.ProcessTimeoutMs, 기본 15000ms)까지 기다릴 수
+        // 있다 - 확인이 정상 응답할 때의 전체 상한은 약 17초(2초 + 15초)다.
+        private const int UserUnlockWaitBudgetMs = 15000;
+        private const int UserUnlockWaitIntervalMs = 500;
+
+        // 테스트만 줄이는 이음매 - 15초 실시간 대기로 스위트를 느리게
+        // 만들지 않기 위해서다. 공개 표면이나 설정 항목으로 노출하지
+        // 않는다(InternalsVisibleTo로 테스트 어셈블리만 접근한다).
+        internal TimeSpan UserUnlockWaitBudget { get; set; } =
+            TimeSpan.FromMilliseconds(UserUnlockWaitBudgetMs);
+
         private readonly AdbService _adbService;
         private readonly VirtualDisplayService _virtualDisplayService;
         private readonly ScrcpyService _scrcpyService;
@@ -331,6 +359,36 @@ namespace DexManager.Services
             // RuntimeFactory.CreatedInstances를 각자의 identity로 순회하며
             // 종료) 반드시 회수되므로 불변식 자체는 유지된다 - 다만
             // 고아가 남아 있는 시간 창은 이 게이트만큼 넓어졌다.
+            if (lockState == LockState.Locked)
+            {
+                // 짧은 폴이 끝나도록 잠겨 있으면 dismiss가 인증 화면만
+                // 띄운 기기일 가능성이 크다 - 바로 실패시키지 않고 사용자가
+                // 폰에서 잠금을 푸는 동안 한 번 더 기다린다. 예산·간격·
+                // 종료 처리의 근거는 UserUnlockWaitBudgetMs 선언부 참고.
+                // 종료가 요청되면 probe가 adb를 부르지 않고 Unknown을
+                // 돌려 폴을 즉시 끝낸다 - 신호가 켜진 뒤에는 WaitOne이
+                // 바로 반환하므로, 그렇지 않으면 남은 예산 동안 확인만
+                // 연달아 돌게 된다. 그 Unknown은 아래 종료 검사가 받아
+                // 시작을 포기하므로 fail-open으로 통과되지 않는다.
+                _logService.Info(LocalizationService.Get(
+                    "Log.Dex.WaitingForUserUnlock"));
+                lockState = LockStatePoll.Until(
+                    delegate
+                    {
+                        return IsShutdownRequested
+                            ? LockState.Unknown
+                            : _adbService.IsDeviceLocked(serial);
+                    },
+                    UserUnlockWaitBudget,
+                    TimeSpan.FromMilliseconds(UserUnlockWaitIntervalMs),
+                    delegate(TimeSpan interval)
+                    {
+                        _shutdownSignal.WaitOne(interval);
+                    });
+                // 아직 세션 상태를 만들기 전이므로, 이 메서드 첫머리와
+                // 같은 방식으로 조용히 시작을 포기한다.
+                if (IsShutdownRequested) return false;
+            }
             if (lockState == LockState.Locked)
             {
                 throw new InvalidOperationException(

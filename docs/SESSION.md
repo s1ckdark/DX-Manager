@@ -2,6 +2,13 @@
 
 마지막 갱신: 2026-10-31
 
+## 2026-10-31 DeX 시작 잠금 해제 대기 (feature/mac-app-bundle, 미커밋)
+
+- PIN·생체 인증 폰에서 Start DX를 두 번 눌러야 연결되던 문제를 고쳤다. 짧은 잠금 폴(2초)이
+  `Locked`로 끝나면 사용자 잠금 해제를 최대 15초 더 기다리고(종료 요청 시 즉시 포기),
+  그래도 잠겨 있을 때만 `Error.Dex.DeviceLocked`를 낸다. 자세한 내용은 `KNOWN_ISSUES.md`
+  "macOS GUI Phase 3 알려진 한계" 1번. 단위 테스트는 통과했고 실기 확인은 미완료다.
+
 ## 2026-10-31 upstream v2.5.0 머지
 
 - upstream `maze-mei/DX-Manager` main(`f391baa`, 태그 `v2.5.0`)을 포크 main에 머지했다.
@@ -40,6 +47,12 @@
   점은 `TODO.md`에 항목으로 남겼다.
 
 ## 2026-10-31 macOS GUI Connection 탭 (무선 ADB)
+
+- `scripts/Build-Mac-App.sh` 추가 — 개인용 `dist/DXManager.app`(osx-arm64, self-contained,
+  ad-hoc 서명)을 만든다. 번들 도구(scrcpy/adb/DXMAdbProxy)와 `PORTABLE_PACKAGE.txt` 표식,
+  icns, Info.plist를 포함하고 재빌드 시 `config/`·`logs/`·`screenshot/`을 보존한다. 실행·재빌드
+  보존·codesign 검증은 통과했고 GUI 실행은 하지 않았다(미확인). 자세한 사용법은
+  `docs/MACOS_GUIDE.md` 4.4.
 
 - 브랜치 `feature/gui-wireless-adb`(커밋 5ba4507, 0919aed, c10190d, e6057e1, cc287aa)가 설정
   창에 기기별 Connection 탭을 추가했다. `IWirelessConnectionGateway`가

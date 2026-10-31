@@ -123,6 +123,26 @@ scrcpy 4.1 정적 빌드의 SHA-256을 확인한 뒤 번들합니다. 생성한 
 폴더에 다시 풀어 실행 권한, CPU 아키텍처, 외부 Homebrew 경로 의존성, 버전,
 라이선스와 사용자 데이터 제외 여부를 검사합니다.
 
+### 4.4 로컬 .app 번들 만들기
+
+Apple Silicon Mac에서 Avalonia GUI를 Finder/Dock에서 실행할 개인용 번들입니다.
+서명·공증과 Intel 빌드가 없으므로 배포용이 아닙니다.
+
+```bash
+scripts/Build-Mac-App.sh                 # dist/DXManager.app
+scripts/Build-Mac-App.sh --skip-tools    # scrcpy/adb 미포함
+scripts/Build-Mac-App.sh --no-sign       # ad-hoc 서명 생략
+```
+
+- 출력: `dist/DXManager.app` (`--output`으로 변경 가능, `dist/`는 Git 제외).
+- 번들 내용: self-contained `DXManager.Desktop`(osx-arm64), `tools/adb-proxy/DXMAdbProxy`,
+  `tools/scrcpy/*`(scrcpy 4.1), `tools/adb/adb`, `PORTABLE_PACKAGE.txt`(번들 도구 우선 사용
+  표식), `DXManager.icns`. `Contents/Info.plist`의 버전은 `DexManager.Desktop.csproj`의
+  `<Version>`을 따릅니다.
+- 설정·로그 위치: `DXManager.app/Contents/MacOS/config`(settings.json 등), `logs`, `screenshot`.
+- 다시 빌드해도 기존 번들의 `config/`, `logs/`, `screenshot/`을 보존해 새 번들에 복원합니다.
+- ad-hoc 서명만 하므로 처음 실행할 때 Gatekeeper가 막으면 앱을 우클릭 → 열기를 선택합니다.
+
 ---
 
 ## 5. 실행 및 CLI 명령어 (Usage & CLI Options)
