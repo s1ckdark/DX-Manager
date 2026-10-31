@@ -1,6 +1,5 @@
 using DexManager.Models;
 using DexManager.Services;
-using DexManager.ViewModels.Settings;
 using Xunit;
 
 namespace DexManager.ViewModels.Tests.Settings;

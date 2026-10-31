@@ -3,7 +3,7 @@ using CommunityToolkit.Mvvm.Input;
 using DexManager.Models;
 using DexManager.Services;
 
-namespace DexManager.ViewModels.Settings;
+namespace DexManager.ViewModels;
 
 /// <summary>
 /// 기기 하나의 무선 ADB 연결 페이지. 저장/취소 흐름이 없고 각 동작은
