@@ -25,6 +25,7 @@ public sealed partial class SettingsViewModel : ObservableObject, IDisposable
     private readonly IDeviceSelectionSource _deviceSelection;
     private readonly DeviceRuntimeSessionRegistry _sessions;
     private readonly IUiDispatcher _dispatcher;
+    private readonly IWirelessConnectionGateway _wireless;
     private bool _disposed;
 
     // 지금 화면에 올라와 있는 기기별 페이지 2개가 "어느 identity로"
@@ -41,16 +42,21 @@ public sealed partial class SettingsViewModel : ObservableObject, IDisposable
     /// 정직하게 알릴 수 있도록 <see cref="IsTargetDexRunning"/>을 채운다.</param>
     /// <param name="dispatcher">레지스트리의 <c>Changed</c>는 런타임 스레드에서
     /// 오므로, 관측 가능한 상태를 건드리기 전에 UI 스레드로 마샬링한다.</param>
+    /// <param name="wireless">Connection 페이지가 쓰는 무선 ADB 경계. 이
+    /// 인스턴스가 소유권을 넘겨받아 <see cref="Dispose"/>에서
+    /// (IDisposable이면) 함께 폐기한다.</param>
     public SettingsViewModel(
         ISettingsGateway gateway,
         IDeviceSelectionSource deviceSelection,
         DeviceRuntimeSessionRegistry sessions,
-        IUiDispatcher dispatcher)
+        IUiDispatcher dispatcher,
+        IWirelessConnectionGateway wireless)
     {
         _gateway = gateway ?? throw new ArgumentNullException(nameof(gateway));
         _deviceSelection = deviceSelection ?? throw new ArgumentNullException(nameof(deviceSelection));
         _sessions = sessions ?? throw new ArgumentNullException(nameof(sessions));
         _dispatcher = dispatcher ?? throw new ArgumentNullException(nameof(dispatcher));
+        _wireless = wireless ?? throw new ArgumentNullException(nameof(wireless));
 
         _paths = new PathsSettingsViewModel(_gateway);
         _appearance = new AppearanceSettingsViewModel(_gateway);
@@ -88,6 +94,17 @@ public sealed partial class SettingsViewModel : ObservableObject, IDisposable
     /// <summary>선택된 기기의 슬롯 설정 페이지. 선택된 기기가 없으면 null.</summary>
     [ObservableProperty]
     private SlotSettingsViewModel _slot;
+
+    /// <summary>선택된 기기의 무선 연결(Connection) 페이지. 선택된 기기가 없으면 null.
+    /// 저장 모델이 없는 즉시 실행형 페이지라 HasChanges/SaveAll/유효성 집계에는
+    /// 참여하지 않는다.</summary>
+    [ObservableProperty]
+    private ConnectionSettingsViewModel _connection;
+
+    /// <summary>Connection 페이지가 작업 중이 아닌지(페이지가 없어도 true).
+    /// 작업 중에는 Save 등 다른 동작을 막는 게이트로 쓴다.</summary>
+    [ObservableProperty]
+    private bool _isWirelessIdle = true;
 
     /// <summary>다섯 페이지 중 하나라도 저장되지 않은 편집이 있는지.</summary>
     [ObservableProperty]
@@ -210,11 +227,19 @@ public sealed partial class SettingsViewModel : ObservableObject, IDisposable
             ? null
             : new SlotSettingsViewModel(identity, _gateway);
 
+        // 이전 Connection 페이지는 구독(DevicesChanged)을 들고 있으므로 교체 전에
+        // 먼저 폐기해야 옛 기기 페이지가 계속 갱신되거나 새지 않는다.
+        Connection?.Dispose();
+        Connection = string.IsNullOrEmpty(identity)
+            ? null
+            : new ConnectionSettingsViewModel(identity, _wireless, _dispatcher);
+
         _devicePagesIdentity = identity;
         _devicePagesLoaded = true;
 
         AttachDevicePageHandlers();
         RecomputeHasChanges();
+        RecomputeWirelessIdle();
     }
 
     private void AttachGlobalPageHandlers()
@@ -235,12 +260,30 @@ public sealed partial class SettingsViewModel : ObservableObject, IDisposable
     {
         if (DisplayStream != null) DisplayStream.PropertyChanged += OnPagePropertyChanged;
         if (Slot != null) Slot.PropertyChanged += OnPagePropertyChanged;
+        if (Connection != null) Connection.PropertyChanged += OnConnectionPropertyChanged;
     }
 
     private void DetachDevicePageHandlers()
     {
         if (DisplayStream != null) DisplayStream.PropertyChanged -= OnPagePropertyChanged;
         if (Slot != null) Slot.PropertyChanged -= OnPagePropertyChanged;
+        if (Connection != null) Connection.PropertyChanged -= OnConnectionPropertyChanged;
+    }
+
+    // Connection은 HasChanges 집계에 넣지 않으므로 OnPagePropertyChanged와
+    // 분리한다 - 여기서는 작업 중 여부(IsBusy)만 따라간다.
+    private void OnConnectionPropertyChanged(object sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(ConnectionSettingsViewModel.IsBusy) ||
+            string.IsNullOrEmpty(e.PropertyName))
+        {
+            RecomputeWirelessIdle();
+        }
+    }
+
+    private void RecomputeWirelessIdle()
+    {
+        IsWirelessIdle = Connection == null || !Connection.IsBusy;
     }
 
     // 페이지가 올리는 모든 PropertyChanged에 반응해 집계를 다시 계산한다.
@@ -383,5 +426,10 @@ public sealed partial class SettingsViewModel : ObservableObject, IDisposable
         _sessions.Changed -= OnSessionsChanged;
         DetachGlobalPageHandlers();
         DetachDevicePageHandlers();
+
+        // 소유권을 넘겨받은 것들을 폐기한다: 페이지가 게이트웨이 이벤트를
+        // 구독 중이므로 페이지를 먼저, 그 다음 게이트웨이.
+        Connection?.Dispose();
+        (_wireless as IDisposable)?.Dispose();
     }
 }
