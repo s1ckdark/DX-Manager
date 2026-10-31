@@ -31,6 +31,13 @@
   Desktop.Tests 26, ViewModels.Tests 129, Tests 281로 모두 통과했고 다중 기기 회귀 테스트
   39개도 통과했다. `DexManager.AdbProxy.Mac` 산출물의 `--self-test`는 공유 마커를 출력한다.
   실제 Galaxy 기기 실기 검증은 이번 머지에서 수행하지 않았다.
+- 머지 후 리뷰에서 확인한 사항: 포크 main의 macOS 워크플로는 PR #9(2026-09-08) 이후 매번
+  실패하고 있었다. 원인은 `dotnet build --warnaserror`가 `ApplicationHostTests.cs`의
+  `xUnit1031` 경고를 오류로 바꾸기 때문이며, 이 PR의 첫 CI 실행도 같은 이유로 실패했다.
+  해당 테스트를 `async`/`await`로 바꾸는 별도 커밋을 같은 브랜치에 올렸다. 포크의
+  `DexManager.Desktop.Tests`(26개)는 CI와 패키징 스크립트가 실행하지 않는다는 점과,
+  `DisplayCleanupPermissionService`의 번들 Companion 상수가 2.0.0(versionCode 6) 기준이라는
+  점은 `TODO.md`에 항목으로 남겼다.
 
 ## macOS GUI Phase 0 완료
 
@@ -43,6 +50,7 @@
 - `InteractiveHost`는 `ApplicationHost`를 소비하며 TUI 전용 로직만 보유한다.
 - xUnit 101개(기존 95 + 신규 6), 다중기기 회귀 39개 통과. Release 빌드 경고 0.
 - 실제 Galaxy 기기의 DeX 실기 검증은 수행하지 않았다. 미확인 항목이다.
+
 ## macOS 포터블 배포 작업
 
 - 현재 통합 브랜치: `dev-mac-integrated` (upstream v2.0.1 merge commit 전)

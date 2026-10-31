@@ -11,7 +11,16 @@
         실험적 120 FPS(화면 켜짐 우선·복원 규칙), 하루 1회 업데이트 확인. Core는 upstream이
         건드리지 않았으므로 포팅은 별도 설계·승인 뒤 진행한다.
   - [ ] 번들 Companion을 upstream 정식 2.1.6(`companion/release/DX-Companion.apk`)으로 올릴지 판단 —
-        Mac 쪽 Companion 검증 상수(패키지·버전·해시)가 2.0.0 기준이면 함께 갱신해야 한다.
+        `DexManager.Core/Services/DisplayCleanupPermissionService.cs`의 번들 상수는 아직
+        2.0.0(versionCode 6, SHA-256 `7CD4…`) 기준이다. Mac 빌드·패키지는 APK를 번들하지 않아
+        지금은 "없음"으로 판정되지만, 번들을 시작하면 해시 불일치로 거부되므로 그때
+        `companion/integration/CompanionRelease.cs`를 연결하거나 상수를 갱신해야 한다.
+  - [ ] macOS 워크플로와 `Package-Mac-Release.sh`에 `DexManager.Desktop.Tests`(26개) 실행 단계와
+        `paths:` 필터 추가 — 현재는 sln 빌드로 컴파일만 되고 실행되지 않는다.
+  - [x] 포크 macOS CI 실패 원인 제거 — `ApplicationHostTests.Dispose_AfterShutdownAsync_DoesNotThrow`의
+        `GetAwaiter().GetResult()`가 `--warnaserror`에서 `xUnit1031` 오류가 되어 PR #9 이후 main의
+        모든 워크플로 실행이 실패했다. 테스트를 `async`/`await`로 바꿨다(아래 Phase 2 이연 항목의
+        "[Task 3] 빌드 경고 신규 발생"과 같은 건).
 
 - [x] macOS GUI Phase 0 — 플랫폼 분리와 ApplicationHost 추출
   - [x] `IPathProvider.IsPortablePackage` 승격
