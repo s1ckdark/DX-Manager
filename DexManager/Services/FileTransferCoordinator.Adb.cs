@@ -47,7 +47,9 @@ namespace DexManager.Services
             {
                 var output = new BoundedTextBuffer();
                 var error = new BoundedTextBuffer();
-                process.Start();
+                if (!TryStartAdbProcess(process))
+                    return new AdbExecutionResult(
+                        -1, string.Empty, string.Empty);
                 SetActiveProcess(item, process);
                 var stdoutThread = StartReaderThread(
                     process.StandardOutput,
@@ -138,6 +140,20 @@ namespace DexManager.Services
             return thread;
         }
 
+        private bool TryStartAdbProcess(Process process)
+        {
+            lock (_processStartSync)
+            {
+                if (Interlocked.CompareExchange(
+                        ref _shutdownRequested, 0, 0) != 0)
+                {
+                    return false;
+                }
+                process.Start();
+                return true;
+            }
+        }
+
         private AdbExecutionResult RunShellScript(
             TransferWorkItem item,
             string script,
@@ -173,7 +189,9 @@ namespace DexManager.Services
                 }
             })
             {
-                process.Start();
+                if (!TryStartAdbProcess(process))
+                    return new AdbExecutionResult(
+                        -1, string.Empty, string.Empty);
                 SetActiveProcess(item, process);
                 var output = process.StandardOutput.ReadToEndAsync();
                 var error = process.StandardError.ReadToEndAsync();
@@ -282,7 +300,9 @@ namespace DexManager.Services
                 }
             })
             {
-                process.Start();
+                if (!TryStartAdbProcess(process))
+                    return new AdbExecutionResult(
+                        -1, string.Empty, string.Empty);
                 var output = process.StandardOutput.ReadToEndAsync();
                 var error = process.StandardError.ReadToEndAsync();
                 var inputThread = StartStandardInputWriter(process, script);

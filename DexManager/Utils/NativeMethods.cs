@@ -119,6 +119,11 @@ namespace DexManager.Utils
         internal static extern bool IsWindow(IntPtr windowHandle);
 
         [DllImport("user32.dll")]
+        internal static extern uint GetWindowThreadProcessId(
+            IntPtr windowHandle,
+            out uint processId);
+
+        [DllImport("user32.dll")]
         [return: MarshalAs(UnmanagedType.Bool)]
         internal static extern bool IsWindowVisible(IntPtr windowHandle);
 

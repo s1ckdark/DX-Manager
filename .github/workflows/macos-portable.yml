@@ -5,11 +5,11 @@ on:
     paths:
       - ".github/workflows/macos-portable.yml"
       - "build/macos/**"
-      - "DexManager.AdbProxy/**"
+      - "DexManager.AdbProxy.Mac/**"
       - "DexManager.Core/**"
       - "DexManager.Desktop/**"
       - "DexManager.Mac/**"
-      - "DexManager.MultiDeviceTests/**"
+      - "DexManager.MultiDeviceTests.Mac/**"
       - "DexManager.Platform.Mac/**"
       - "DexManager.Tests/**"
       - "DexManager.ViewModels/**"
@@ -31,11 +31,11 @@ on:
     paths:
       - ".github/workflows/macos-portable.yml"
       - "build/macos/**"
-      - "DexManager.AdbProxy/**"
+      - "DexManager.AdbProxy.Mac/**"
       - "DexManager.Core/**"
       - "DexManager.Desktop/**"
       - "DexManager.Mac/**"
-      - "DexManager.MultiDeviceTests/**"
+      - "DexManager.MultiDeviceTests.Mac/**"
       - "DexManager.Platform.Mac/**"
       - "DexManager.Tests/**"
       - "DexManager.ViewModels/**"
@@ -110,7 +110,7 @@ jobs:
         run: dotnet test DexManager.ViewModels.Tests/DexManager.ViewModels.Tests.csproj --configuration Release --no-build --nologo
 
       - name: Run multi-device foundation tests
-        run: dotnet run --project DexManager.MultiDeviceTests/DexManager.MultiDeviceTests.csproj --configuration Release --no-build
+        run: dotnet run --project DexManager.MultiDeviceTests.Mac/DexManager.MultiDeviceTests.csproj --configuration Release --no-build
 
       - name: Build and verify portable ZIP
         run: >-
@@ -181,8 +181,8 @@ jobs:
           RELEASE_TAG: ${{ github.ref_name }}
         run: |
           if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
-            echo "A release already exists for $RELEASE_TAG; refusing to overwrite it." >&2
-            exit 1
+            echo "A release already exists for $RELEASE_TAG; keeping it unchanged."
+            exit 0
           fi
           mapfile -t assets < <(find release-assets -type f -print | sort)
           gh release create "$RELEASE_TAG" "${assets[@]}" \

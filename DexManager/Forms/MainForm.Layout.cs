@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Threading.Tasks;
@@ -21,102 +21,18 @@ namespace DexManager.Forms
 
         private void ApplyDesignLayout()
         {
-            foreach (Control control in Controls)
-            {
-                var divider = control as Panel;
-                if (divider != null && divider.Height == 1)
-                    divider.Visible = false;
-            }
-
-            _statusCard = CreateCard(new Point(220, 64), new Size(686, 84));
-            _displayCard = CreateCard(new Point(220, 164), new Size(686, 182));
-            _optionsCard = CreateCard(new Point(220, 362), new Size(686, 270));
-
-            _pageTitle.Location = new Point(220, 14);
-
-            MoveToCard(_indicatorDot, _statusCard, 18, 22);
-            MoveToCard(_indicatorStatus, _statusCard, 70, 16);
-            _indicatorStatus.Size = new Size(360, 28);
-            MoveToCard(_indicatorDetail, _statusCard, 70, 48);
-            _indicatorDetail.Size = new Size(580, 20);
-            _deviceInfoLabel.Visible = false;
-
-            MoveToCard(_displaySettingsTitle, _displayCard, 20, 13);
-            MoveToCard(_resolutionLabel, _displayCard, 20, 51);
-            MoveToCard(_resolutionBox, _displayCard, 20, 72);
-            _resolutionBox.Size = new Size(304, 32);
-            MoveToCard(_widthLabel, _displayCard, 158, 78);
-            MoveToCard(_widthBox, _displayCard, 196, 72);
-            _widthBox.Size = new Size(55, 32);
-            MoveToCard(_heightLabel, _displayCard, 257, 78);
-            MoveToCard(_heightBox, _displayCard, 305, 72);
-            _heightBox.Size = new Size(55, 32);
-            MoveToCard(_dpiLabel, _displayCard, 362, 51);
-            MoveToCard(_dpiBox, _displayCard, 362, 72);
-            _dpiBox.Size = new Size(304, 32);
-            MoveToCard(_bitRateLabel, _displayCard, 20, 113);
-            MoveToCard(_bitRateBox, _displayCard, 20, 134);
-            _bitRateBox.Size = new Size(304, 32);
-            MoveToCard(_maxFpsLabel, _displayCard, 362, 113);
-            MoveToCard(_maxFpsBox, _displayCard, 362, 134);
-            _maxFpsBox.Size = new Size(304, 32);
-
-            MoveToCard(_optionsTitle, _optionsCard, 20, 13);
-            MoveToCard(_turnScreenOffBox, _optionsCard, 20, 49);
-            MoveToCard(_useHidKeyboardBox, _optionsCard, 20, 84);
-            MoveToCard(_useHidMouseBox, _optionsCard, 20, 119);
-            MoveToCard(_forceStopAppBox, _optionsCard, 362, 49);
-            MoveToCard(_flexDisplayBox, _optionsCard, 362, 84);
-            MoveToCard(
-                _stayAwakeBox,
-                _optionsCard,
-                362,
-                _selectedMode == 0 ? 84 : 119);
-            foreach (var option in new[]
-            {
-                _turnScreenOffBox,
-                _useHidKeyboardBox,
-                _useHidMouseBox,
-                _forceStopAppBox,
-                _flexDisplayBox,
-                _stayAwakeBox
-            })
-            {
-                option.Size = new Size(284, 30);
-            }
-            MoveToCard(_startAppLabel, _optionsCard, 20, 168);
-            MoveToCard(_startAppBox, _optionsCard, 20, 189);
-            MoveToCard(_loadAppsButton, _optionsCard, 500, 189);
-            MoveToCard(_appProfileButton, _optionsCard, 490, 189);
-            LayoutStartAppControls(false);
-            MoveToCard(_advancedToggle, _optionsCard, 20, 238);
-            MoveToCard(_additionalArgumentsBox, _optionsCard, 190, 232);
-            _additionalArgumentsBox.Size = new Size(456, 32);
-
-            _startButton.Location = new Point(754, 646);
-            _stopButton.Location = _startButton.Location;
-            _applySettingsLink.Location = new Point(638, 655);
-            _modeHintLabel.Visible = false;
-
-            _sidebar.Location = new Point(14, 14);
-            _sidebar.Size = new Size(188, 618);
-            _sidebar.BringToFront();
+            InitializeDesktopLayout();
         }
-
         private void LayoutStartAppControls(bool showAppProfile)
         {
-            _startAppBox.Location = new Point(20, 189);
-            _startAppBox.Size = new Size(
-                showAppProfile ? 304 : 470,
-                32);
-            _loadAppsButton.Location = new Point(
-                showAppProfile ? 334 : 500,
-                189);
-            _loadAppsButton.Size = new Size(146, 32);
-            _appProfileButton.Location = new Point(490, 189);
-            _appProfileButton.Size = new Size(156, 32);
+            if (_appCard == null) return;
+            var width = (int)(_appCard.Width / DesktopScale);
+            var buttonWidth = 180;
+            var profileWidth = showAppProfile ? 144 : 0;
+            Place(_startAppBox, 24, 86, width - 58 - buttonWidth - profileWidth, 38);
+            Place(_loadAppsButton, width - 24 - buttonWidth - profileWidth, 86, buttonWidth, 40);
+            Place(_appProfileButton, width - 24 - 136, 86, 136, 40);
         }
-
         private RoundedPanel CreateCard(Point location, Size size)
         {
             var card = new RoundedPanel
@@ -154,8 +70,9 @@ namespace DexManager.Forms
             ApplyCardTheme(_statusCard);
             ApplyCardTheme(_displayCard);
             ApplyCardTheme(_optionsCard);
-            _displaySettingsTitle.ForeColor = _theme.TextSecondary;
-            _optionsTitle.ForeColor = _theme.TextSecondary;
+            ApplyCardTheme(_appCard);
+            _displaySettingsTitle.ForeColor = _theme.TextPrimary;
+            _optionsTitle.ForeColor = _theme.TextPrimary;
 
             foreach (var label in new[]
             {
@@ -168,7 +85,7 @@ namespace DexManager.Forms
                 _startAppLabel
             })
             {
-                label.ForeColor = _theme.TextTertiary;
+                label.ForeColor = _theme.TextSecondary;
                 label.BackColor = _theme.CardBackground;
             }
 
@@ -210,7 +127,7 @@ namespace DexManager.Forms
 
             _sidebar.BackColor = _theme.WindowBackground;
             _sidebar.FillColor = _theme.NavigationBackground;
-            _sidebar.BorderColor = _theme.CardBorder;
+            _sidebar.BorderColor = _theme.NavigationBackground;
             foreach (Control control in _sidebar.Controls)
             {
                 if (ReferenceEquals(control, _deviceSectionDivider))
@@ -221,13 +138,19 @@ namespace DexManager.Forms
                 control.BackColor = _theme.NavigationBackground;
                 var label = control as Label;
                 if (label != null)
-                    label.ForeColor = _theme.TextTertiary;
+                    label.ForeColor = _theme.TextSecondary;
                 var button = control as ThemedButton;
                 if (button != null)
-                    button.ForeColor = _theme.TextSecondary;
+                    button.ForeColor = _theme.TextPrimary;
                 control.Invalidate();
             }
 
+            if (_brandLabel != null) _brandLabel.ForeColor = _theme.TextPrimary;
+            if (_headerDevices != null) _headerDevices.BackColor = _theme.CardBackground;
+            _startAppLabel.ForeColor = _theme.TextPrimary;
+            foreach (var subtitle in new[] { _displaySubtitle, _optionsSubtitle, _appSubtitle }) if (subtitle != null) subtitle.ForeColor = _theme.TextTertiary;
+            if (_transportBadge != null) { _transportBadge.BackColor = Color.Transparent; _transportBadge.ForeColor = _theme.TextPrimary; _transportSurface.FillColor = _theme.CardSoft; _transportSurface.BorderColor = _theme.ControlBorder; }
+            if (_helpForm != null && !_helpForm.IsDisposed) _helpForm.ApplyCurrentTheme();
             _indicatorDot.Invalidate();
             _resolutionBox.Invalidate();
             _widthBox.Invalidate();
@@ -247,13 +170,19 @@ namespace DexManager.Forms
             _deleteAppProfileMenuItem.BackColor = _theme.CardSoft;
             _deleteAppProfileMenuItem.ForeColor = _theme.TextPrimary;
             RebuildDeviceTabs();
+            ApplyDesktopNoticeTheme();
             Invalidate(true);
         }
 
         private void ApplyThemeSelection(AppTheme theme)
         {
             _theme = ThemeColors.Use(theme);
+            ApplyUpdateTheme();
             ApplyTheme();
+            if (_fileTransferStatusForm != null && !_fileTransferStatusForm.IsDisposed)
+                _fileTransferStatusForm.ApplyCurrentTheme();
+            if (_phoneTransferStatusForm != null && !_phoneTransferStatusForm.IsDisposed)
+                _phoneTransferStatusForm.ApplyCurrentTheme();
             if (_settingsForm != null &&
                 !_settingsForm.IsDisposed)
             {
@@ -270,14 +199,15 @@ namespace DexManager.Forms
 
         private void ApplyCardTheme(RoundedPanel card)
         {
-            card.BackColor = _theme.WindowBackground;
+            if (card == null) return;
+            card.BackColor = Color.Transparent;
             card.FillColor = _theme.CardBackground;
             card.BorderColor = _theme.CardBorder;
             foreach (Control control in card.Controls)
             {
                 var label = control as Label;
                 if (label != null)
-                    label.BackColor = _theme.CardBackground;
+                    label.BackColor = Color.Transparent;
             }
         }
 
@@ -293,7 +223,7 @@ namespace DexManager.Forms
                 BorderColor = _theme.CardBorder
             };
 
-            _deviceSectionLabel = new Label
+            _deviceSectionLabel = new UiLabel
             {
                 AutoSize = true,
                 Font = UiFonts.Create(9.5F, FontStyle.Bold),
@@ -314,7 +244,7 @@ namespace DexManager.Forms
             };
             _sidebar.Controls.Add(_deviceSectionDivider);
 
-            _modeSectionLabel = new Label
+            _modeSectionLabel = new UiLabel
             {
                 AutoSize = true,
                 Font = UiFonts.Create(9.5F, FontStyle.Bold),
@@ -351,7 +281,7 @@ namespace DexManager.Forms
             _singleModeButton3.Click += delegate { SelectSingleWindowPreview(3); };
             _sidebar.Controls.Add(_singleModeButton3);
 
-            _sidebarHintLabel = new Label
+            _sidebarHintLabel = new UiLabel
             {
                 AutoEllipsis = true,
                 ForeColor = _theme.TextTertiary,
@@ -383,37 +313,25 @@ namespace DexManager.Forms
         private void LayoutSidebarNavigation()
         {
             if (_sidebar == null) return;
-
-            var showDevices = _deviceTabsVisibleForRun;
-            _deviceSectionLabel.Visible = showDevices;
-            _deviceTabsPanel.Visible = showDevices;
-            _deviceSectionDivider.Visible = showDevices;
-
-            var modeLabelY = 18;
-            if (showDevices)
+            _deviceSectionLabel.Visible = false;
+            _deviceTabsPanel.Visible = false;
+            _deviceSectionDivider.Visible = false;
+            _modeSectionLabel.Visible = false;
+            _sidebarHintLabel.Visible = false;
+            if (_brandLabel == null) return;
+            var height = (int)(_sidebar.Height / DesktopScale);
+            Place(_brandIcon, 16, 32, 34, 34);
+            Place(_brandLabel, 60, 29, 163, 40);
+            var buttons = new[] { _dexModeButton, _singleModeButton1, _singleModeButton2, _singleModeButton3 };
+            for (var i = 0; i < buttons.Length; i++)
             {
-                var rowCount = Math.Max(
-                    2,
-                    _deviceTabsPanel.Controls.Count);
-                _deviceTabsPanel.Location = new Point(10, 42);
-                _deviceTabsPanel.Size = new Size(
-                    168,
-                    Math.Min(rowCount * 58, 174));
-                _deviceSectionDivider.Location = new Point(
-                    20,
-                    _deviceTabsPanel.Bottom + 8);
-                modeLabelY = _deviceSectionDivider.Bottom + 13;
+                Place(buttons[i], 4, 92 + i * 42, 226, 36);
+                buttons[i].CornerRadius = 5;
             }
-
-            _modeSectionLabel.Location = new Point(20, modeLabelY);
-            var firstModeY = modeLabelY + 34;
-            _dexModeButton.Location = new Point(10, firstModeY);
-            _singleModeButton1.Location = new Point(10, firstModeY + 42);
-            _singleModeButton2.Location = new Point(10, firstModeY + 84);
-            _singleModeButton3.Location = new Point(10, firstModeY + 126);
-            _sidebarHintLabel.Location = new Point(20, firstModeY + 186);
+            Place(_helpSidebarButton, 4, height - 138, 226, 36);
+            Place(_settingsSidebarButton, 4, height - 92, 226, 36);
+            RefreshHeaderDevices();
         }
-
         private ThemedButton CreateSidebarButton(
             string text,
             int y,

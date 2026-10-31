@@ -1,39 +1,31 @@
-# DX Manager 아이콘 적용 가이드 (코덱스용)
+﻿# DX Manager icon resources
 
-## 포함된 파일
-- `DXManager.ico` — 멀티 레졸루션 아이콘 (16/20/24/32/48/256px 포함). **이 파일 하나만 있으면 충분합니다.**
-- `DXManager_256.png` / `_48.png` / `_32.png` / `_16.png` — 개별 PNG (필요 시 About 창, 트레이 등에 개별 사용)
-- `DXManager_source.svg` — 원본 벡터 소스 (추후 색상/디자인 수정 시 재사용)
+## English
 
-## 1. 프로젝트에 아이콘 추가
-1. `DXManager.ico`를 프로젝트 루트(예: `\Resources\` 폴더)에 복사
-2. 솔루션 탐색기 → 프로젝트 우클릭 → **속성(Properties)** → **Application** 탭
-3. **Icon and manifest** → **Icon** 항목에서 `DXManager.ico` 선택
-   - 이렇게 하면 `.exe` 파일 자체의 아이콘(탐색기, 바탕화면 바로가기)이 설정됩니다.
+The product logo is `DXManager.ico` with its source `DXManager_source.svg` and `DXManager_256.png`.
+The project sets its executable icon and embeds the logo. Forms and tray controls use `AppIconProvider`;
+new UI code must not depend on a loose icon file beside the EXE.
 
-## 2. 메인 폼(Form) 아이콘 설정
-Form 디자이너에서:
-- 폼 선택 → 속성 창(Properties) → **Icon** 속성에 `DXManager.ico` 지정
+Small command icons use the Microsoft Fluent UI System Icons assets under `FluentIcons`, with SVG
+sources and the generated runtime data used by `UiSymbol`/`SymbolView`. Keep the existing mapping,
+including Screenshot for capture and Wifi for wireless ADB. The custom phone illustration is retained.
+Use the current UI's20-pixel command-icon convention; mini bars have their own reviewed dimensions.
+The Fluent and Pretendard notices are under `../licenses` and remain in user distributions.
 
-또는 코드로 직접 지정할 경우:
-```csharp
-this.Icon = new Icon("Resources/DXManager.ico");
-```
-(또는 리소스로 임베드했다면 `Properties.Resources.DXManager`)
+This file documents existing resources. Updating GitHub screenshots does not require changing icons,
+generating replacement artwork or rebuilding a previously scanned EXE.
 
-## 3. 시스템 트레이 아이콘 (NotifyIcon)
-`NotifyIcon` 컴포넌트를 쓰고 있다면:
-```csharp
-notifyIcon1.Icon = new Icon("Resources/DXManager.ico");
-```
-`.ico` 안에 16px 버전이 포함되어 있어서 트레이에서도 자동으로 적절한 해상도가 선택됩니다.
+## 한국어
 
-## 4. 리소스로 임베드하고 싶다면
-1. `DXManager.ico`를 프로젝트에 추가 (우클릭 → 추가 → 기존 항목)
-2. 파일 속성에서 **빌드 작업(Build Action)** → `Embedded Resource` 또는 `Content`로 설정
-3. `Properties.Resources.resx`에 아이콘으로 추가하면 `Properties.Resources.DXManager`로 접근 가능
+프로그램 로고는 `DXManager.ico`, 원본 SVG와256 PNG로 관리합니다. 실행 파일·폼·트레이는 기존
+리소스 및 `AppIconProvider` 경로를 사용하며 외부 아이콘 파일을 새로 요구하지 않습니다.
+작은 기능 아이콘은 `FluentIcons`의 Microsoft Fluent 자산과 `UiSymbol`/`SymbolView` 매핑을 따릅니다.
+화면 캡처·무선 ADB 매핑과 사용자 확인을 마친 미니바 크기를 유지하세요.
+스크린샷 문서 작업 때문에 아이콘·글꼴·검사 완료 실행 파일을 바꾸지 않습니다.
 
-## 참고
-- 배경 그라데이션: 보라(#8b7bf0) → 스카이블루(#4fd1e8), 대각선 방향
-- 향후 이 아이콘의 색상 톤을 앱 내 강조색(버튼, 선택 상태 등)에도 맞추면 브랜드 일관성이 더 좋아집니다.
-- 디자인을 다시 조정하고 싶으면 `DXManager_source.svg`를 Claude에게 다시 전달해 반영 가능합니다.
+
+## Windows2.5.0 UI sizing — 2026-10-24
+
+Small command icons target20px; retain reviewed mini-bar dimensions and large custom phone artwork.
+English Help sidebar text alone uses13px to fit; Korean Help/other sidebar text remains14px.
+This is a text-layout exception. Preserve the renderer, global fonts, original SVG/license bytes and accepted mini-bar geometry.

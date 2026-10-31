@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Globalization;
@@ -17,16 +17,18 @@ namespace DexManager.Services
         private ScrcpyRuntimeInfo(
             int majorVersion,
             int minorVersion,
-            int sdlMajorVersion)
+            int sdlMajorVersion, string reportedVersion = null)
         {
             MajorVersion = majorVersion;
             MinorVersion = minorVersion;
             SdlMajorVersion = sdlMajorVersion;
+            ReportedVersion = reportedVersion;
         }
 
         public int MajorVersion { get; private set; }
         public int MinorVersion { get; private set; }
         public int SdlMajorVersion { get; private set; }
+        public string ReportedVersion { get; private set; }
 
         public bool SupportsKeepActiveLongOption
         {
@@ -68,9 +70,10 @@ namespace DexManager.Services
             int timeoutMs,
             ProcessRunner processRunner)
         {
-            var major = 4;
-            var minor = 1;
+            var major = 5;
+            var minor = 0;
             var sdlMajor = 3;
+            string reportedVersion = null;
 
             try
             {
@@ -84,10 +87,11 @@ namespace DexManager.Services
                     (result.StandardError ?? string.Empty);
                 var versionMatch = Regex.Match(
                     text,
-                    @"scrcpy\s+(\d+)\.(\d+)",
+                    @"scrcpy\s+(\d+)\.(\d+)(?:\.(\d+))?",
                     RegexOptions.IgnoreCase);
                 if (versionMatch.Success)
                 {
+                    reportedVersion = versionMatch.Value.Substring(7).Trim();
                     major = int.Parse(
                         versionMatch.Groups[1].Value,
                         CultureInfo.InvariantCulture);
@@ -113,10 +117,10 @@ namespace DexManager.Services
             }
             catch
             {
-                // Preserve the bundled scrcpy 4.1 behavior if probing fails.
+                // Preserve the pinned scrcpy 5.0.1 behavior if probing fails.
             }
 
-            return new ScrcpyRuntimeInfo(major, minor, sdlMajor);
+            return new ScrcpyRuntimeInfo(major, minor, sdlMajor, reportedVersion);
         }
     }
 
@@ -159,7 +163,7 @@ namespace DexManager.Services
                 "--no-window", "--no-video",
                 "--no-video-playback", "--no-playback",
                 "--no-cleanup", "--kill-adb-on-close", "--otg",
-                "-S", "--turn-screen-off", "--no-power-on",
+                "-S", "--turn-screen-off", "--no-power-on", "--max-fps",
                 "--power-off-on-close", "--screen-off-timeout",
                 "-w", "--stay-awake", "--keep-active",
                 "-x", "--flex-display"
@@ -170,6 +174,7 @@ namespace DexManager.Services
                 's', 'S', 'd', 'e', 'w', 'x'
             };
         private readonly object _syncRoot = new object();
+        private readonly object _processStartSync = new object();
         private readonly string _scrcpyPath;
         private readonly int _processTimeoutMs;
         private readonly ProcessRunner _processRunner;
@@ -181,6 +186,12 @@ namespace DexManager.Services
         private Process _process;
         private bool _stayAwakeRequested;
         private bool _turnScreenOffRequested;
+        private int _runningMaxFps;
+        internal Func<bool> CanTurnPhoneScreenOff { get; set; }
+        public bool RequiresPhoneScreenOn
+        {
+            get { lock (_syncRoot) return FrameRateRules.RequiresScreenOn(_runningMaxFps) && IsProcessRunning(_process); }
+        }
         private string _targetSerial;
         private int _displayId;
         private IntPtr _mainWindowHandle;
@@ -225,7 +236,8 @@ namespace DexManager.Services
 
         public void RequestShutdown()
         {
-            Interlocked.Exchange(ref _shutdownRequested, 1);
+            lock (_processStartSync)
+                Interlocked.Exchange(ref _shutdownRequested, 1);
         }
 
         public bool IsRunning
@@ -266,6 +278,38 @@ namespace DexManager.Services
                     {
                         return 0;
                     }
+                }
+            }
+        }
+
+        public bool TryGetWindowTarget(
+            IntPtr windowHandle,
+            out string serial,
+            out int processId)
+        {
+            serial = string.Empty;
+            processId = 0;
+            if (windowHandle == IntPtr.Zero) return false;
+            lock (_syncRoot)
+            {
+                if (_mainWindowHandle != windowHandle ||
+                    !IsProcessRunning(_process) ||
+                    string.IsNullOrWhiteSpace(_targetSerial))
+                {
+                    return false;
+                }
+
+                try
+                {
+                    processId = _process.Id;
+                    serial = _targetSerial;
+                    return processId > 0;
+                }
+                catch (InvalidOperationException)
+                {
+                    serial = string.Empty;
+                    processId = 0;
+                    return false;
                 }
             }
         }
@@ -385,11 +429,13 @@ namespace DexManager.Services
                 "DX Manager - DeX Station",
                 DeviceDisplayName)));
 
+            if (_runtimeInfo.MajorVersion >= 5) AddHardwareDecodingArgument(arguments, settings.AdditionalArguments);
             if (settings.UseHidKeyboard) arguments.Add("-K");
             if (settings.UseHidMouse) arguments.Add("-M");
             if (settings.StayAwake)
                 arguments.Add(_runtimeInfo.StayAwakeArgument);
-            if (settings.TurnScreenOff)
+            if (settings.TurnScreenOff && !FrameRateRules.RequiresScreenOn(settings.MaxFps) &&
+                (CanTurnPhoneScreenOff == null || CanTurnPhoneScreenOff()))
             {
                 arguments.Add("-S");
                 arguments.Add("--no-power-on");
@@ -413,6 +459,27 @@ namespace DexManager.Services
             return string.Join(" ", arguments);
         }
 
+        internal static void AddHardwareDecodingArgument(IList<string> arguments, string additional)
+        {
+            // Respect an explicit user override; never emit two decoder selections.
+            foreach (var token in TokenizeArguments(additional ?? string.Empty))
+                if (string.Equals(token, "--hwdec", StringComparison.Ordinal) ||
+                    token.StartsWith("--hwdec=", StringComparison.Ordinal)) return;
+            arguments.Add("--hwdec=auto");
+        }
+
+        public string ReadReportedVersion()
+        {
+            var result = _processRunner.Run(_scrcpyPath, "--version",
+                Path.GetDirectoryName(_scrcpyPath), Math.Min(_processTimeoutMs, 5000), false);
+            if (!result.IsSuccess) throw new InvalidOperationException(result.StandardError);
+            var match = Regex.Match((result.StandardOutput ?? "") + "\n" +
+                (result.StandardError ?? ""), @"scrcpy\s+(\d+\.\d+(?:\.\d+)?)",
+                RegexOptions.IgnoreCase);
+            if (!match.Success) throw new InvalidOperationException(
+                LocalizationService.Get("Update.VersionUnavailable"));
+            return match.Groups[1].Value;
+        }
         public static void ValidateAdditionalArguments(string arguments)
         {
             foreach (var token in TokenizeArguments(arguments))
@@ -545,8 +612,9 @@ namespace DexManager.Services
         public void Start(
             ScrcpySettings settings,
             int displayId,
-            string serial)
+            string serial, bool experimentalFpsConfirmed = false)
         {
+            FrameRateRules.RequireConsent(settings.MaxFps, experimentalFpsConfirmed);
             var started = false;
             _launchCoordinator.RunExclusive(delegate
             {
@@ -606,7 +674,7 @@ namespace DexManager.Services
                         _process = process;
                         _stopping = false;
                         _stayAwakeRequested = settings.StayAwake;
-                        _turnScreenOffRequested = settings.TurnScreenOff;
+                        _turnScreenOffRequested = settings.TurnScreenOff && !FrameRateRules.RequiresScreenOn(settings.MaxFps);
                         _targetSerial = serial;
                         _displayId = displayId;
                         _mainWindowHandle = IntPtr.Zero;
@@ -617,7 +685,20 @@ namespace DexManager.Services
                             arguments));
                     }
 
-                    process.Start();
+                    lock (_processStartSync)
+                    {
+                        if (Interlocked.CompareExchange(
+                                ref _shutdownRequested, 0, 0) != 0 ||
+                            Interlocked.CompareExchange(
+                                ref _disposed, 0, 0) != 0)
+                        {
+                            throw new InvalidOperationException(
+                                LocalizationService.Get(
+                                    "Error.Scrcpy.ShutdownRequested"));
+                        }
+                        lock (_syncRoot) _runningMaxFps = settings.MaxFps;
+                        process.Start();
+                    }
                     _fileTransferCoordinator.BindProcess(
                         transferSessionId,
                         process.Id);
@@ -718,7 +799,17 @@ namespace DexManager.Services
             {
                 try
                 {
-                    process.Start();
+                    lock (_processStartSync)
+                    {
+                        if (Interlocked.CompareExchange(
+                                ref _shutdownRequested, 0, 0) != 0 ||
+                            Interlocked.CompareExchange(
+                                ref _disposed, 0, 0) != 0)
+                        {
+                            return false;
+                        }
+                        process.Start();
+                    }
                     var waitMilliseconds = Math.Max(delayMs, 500);
                     var stopwatch = Stopwatch.StartNew();
                     while (stopwatch.ElapsedMilliseconds < waitMilliseconds)

@@ -1,4 +1,11 @@
-# DX Manager v1.3.0
+﻿# DX Manager v1.3.0
+
+> Historical release record. For current Windows instructions, see [2.5.0 changes](RELEASE_NOTES_v2.5.0.md) and the [documentation index](README.md).
+
+
+> Historical release record: versions, hashes and scan results below belong to v1.3.0.
+> For the prepared Windows 2.5.0, see [current notes](RELEASE_NOTES_v2.5.0.md).
+> 과거 v1.3.0 기록이며 아래의 버전·해시·검사 결과를 최신 빌드에 적용하지 않습니다.
 
 ## English
 

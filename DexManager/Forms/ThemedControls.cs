@@ -16,7 +16,7 @@ namespace DexManager.Forms
             UseVisualStyleBackColor = false;
             BackColor = ThemeColors.Current.CardBackground;
             ForeColor = ThemeColors.Current.TextSecondary;
-            Font = UiFonts.Create(9.5F);
+            Font = UiFonts.Pixels(14F);
             CornerRadius = 7;
             SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint |
                 ControlStyles.OptimizedDoubleBuffer, true);
@@ -32,7 +32,9 @@ namespace DexManager.Forms
             }
         }
 
-        public int CornerRadius { get; set; }
+        private int _cornerRadius;
+        public int CornerRadius { get { return _cornerRadius; } set { _cornerRadius=value; UiRendering.ClipRounded(this,value); } }
+        protected override void OnSizeChanged(System.EventArgs e) { base.OnSizeChanged(e); UiRendering.ClipRounded(this,CornerRadius); }
         public bool NavigationStyle { get; set; }
         public bool DeviceNavigationStyle { get; set; }
         public bool ShowNavigationDot { get; set; }
@@ -40,6 +42,11 @@ namespace DexManager.Forms
         public string TrailingText { get; set; }
         public string SecondaryText { get; set; }
         public Color StatusColor { get; set; }
+        public UiSymbol Symbol { get; set; }
+        public bool MenuCardStyle { get; set; }
+        public bool ChevronUp { get; set; }
+        public bool ExecutionBlocked { get; set; }
+        public bool CenterIconText { get; set; }
 
         protected override void OnMouseEnter(System.EventArgs e)
         {
@@ -81,30 +88,32 @@ namespace DexManager.Forms
                 : (roundedParent != null
                     ? roundedParent.FillColor
                     : (Parent == null ? BackColor : Parent.BackColor));
-            e.Graphics.Clear(background);
+            if (background.A < 255) background = ThemeColors.Current.WindowBackground;
+            DesktopSurface.PaintBehind(e.Graphics,this);
             e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
             var bounds = ClientRectangle;
+            bounds.Inflate(-1,-1);
             bounds.Width--;
             bounds.Height--;
             var colors = ThemeColors.Current;
-            var fill = DeviceNavigationStyle
+            var fill = MenuCardStyle ? (Primary || _hovered ? colors.AccentSoft : colors.CardSoft) : DeviceNavigationStyle
                 ? (_hovered
                     ? colors.AccentSoft
                     : (Primary ? colors.CardBackground : background))
                 : NavigationStyle
-                ? (Primary || _hovered ? colors.AccentSoft : background)
+                ? (Primary || _hovered ? (colors.IsDark ? Color.FromArgb(49, 53, 69) : Color.FromArgb(234, 237, 242)) : background)
                 : (Primary
                     ? (_hovered ? colors.AccentHover : colors.Accent)
                     : (_hovered ? colors.AccentSoft : colors.CardSoft));
-            var border = DeviceNavigationStyle
+            var border = MenuCardStyle ? (Primary ? colors.Accent : colors.ControlBorder) : DeviceNavigationStyle
                 ? (Primary ? colors.Accent : colors.CardBorder)
                 : NavigationStyle
                 ? fill
                 : (Primary ? fill : colors.ControlBorder);
             var text = NavigationStyle
-                ? (Primary ? colors.TextPrimary : colors.TextSecondary)
+                ? colors.TextPrimary
                 : (Primary ? Color.White : colors.TextPrimary);
-            if (!Enabled)
+            if (!Enabled || ExecutionBlocked)
             {
                 fill = colors.DisabledBackground;
                 border = colors.CardBorder;
@@ -112,7 +121,9 @@ namespace DexManager.Forms
             }
 
             using (var path = RoundedPath(bounds, CornerRadius))
-            using (var brush = new SolidBrush(fill))
+            using (Brush brush = Primary && !NavigationStyle && !MenuCardStyle && Enabled && !ExecutionBlocked
+                ? (Brush)new LinearGradientBrush(bounds, colors.AccentHover, colors.Accent, 0F)
+                : new SolidBrush(fill))
             using (var pen = new Pen(
                 border,
                 DeviceNavigationStyle && Primary ? 1.5F : 1F))
@@ -121,7 +132,7 @@ namespace DexManager.Forms
                 e.Graphics.DrawPath(pen, path);
             }
 
-            if (Focused && !NavigationStyle)
+            if (Focused && !NavigationStyle && !MenuCardStyle)
             {
                 var focusBounds = bounds;
                 focusBounds.Inflate(-2, -2);
@@ -142,7 +153,57 @@ namespace DexManager.Forms
                 return;
             }
 
-            if (NavigationStyle && ShowNavigationDot)
+            if (NavigationStyle && Primary && !DeviceNavigationStyle)
+            {
+                using (var brush = new SolidBrush(colors.Accent))
+                    e.Graphics.FillRectangle(brush, 2, 9, 3, Height - 18);
+            }
+
+            if (MenuCardStyle)
+            {
+                DesktopSurface.DrawIcon(e.Graphics, Symbol, new Rectangle(12, (Height - 20) / 2, 20, 20), colors.Accent);
+                using (var titleFont = UiFonts.Pixels(14F, true))
+                using (var summaryFont = UiFonts.Pixels(13F))
+                {
+                    var contentWidth = Width - 56;
+                    var summaryHeight = UiText.MeasureText(e.Graphics, SecondaryText ?? string.Empty,
+                        summaryFont, new Size(contentWidth, 0), TextFormatFlags.WordBreak | TextFormatFlags.NoPrefix).Height;
+                    summaryHeight = System.Math.Min(summaryHeight, Height - titleFont.Height - 10);
+                    var top = System.Math.Max(4, (Height-titleFont.Height-summaryHeight-4)/2);
+                    UiText.DrawText(e.Graphics, Text, titleFont, new Rectangle(44, top, contentWidth, titleFont.Height),
+                        colors.TextPrimary, TextFormatFlags.Left | TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis);
+                    UiText.DrawText(e.Graphics, SecondaryText ?? string.Empty, summaryFont,
+                        new Rectangle(44, top+titleFont.Height+4, contentWidth, summaryHeight), colors.TextSecondary,
+                        TextFormatFlags.Left | TextFormatFlags.WordBreak | TextFormatFlags.EndEllipsis);
+                }
+                return;
+            }
+            if (CenterIconText && Symbol != UiSymbol.None && !string.IsNullOrEmpty(Text))
+            {
+                // Store: 20px icon + 10px gap + 17px SemiBold text, centered as one group.
+                float scale = Font.SizeInPoints / 12.75F * e.Graphics.DpiX / 96F;
+                int iconSize = System.Math.Max(1, (int)System.Math.Round(20F * scale));
+                int gap = System.Math.Max(1, (int)System.Math.Round(10F * scale));
+                var measured = UiText.Measure(e.Graphics, Text, Font, Size.Empty, TextFormatFlags.NoPrefix);
+                int available = System.Math.Max(1, Width - (int)System.Math.Round(32F * scale) - iconSize - gap);
+                int textWidth = System.Math.Min(available, (int)System.Math.Ceiling(measured.Width));
+                int left = (Width - iconSize - gap - textWidth) / 2;
+                DesktopSurface.DrawIcon(e.Graphics, Symbol,
+                    new Rectangle(left, (Height - iconSize) / 2, iconSize, iconSize), text);
+                UiText.DrawText(e.Graphics, Text, Font,
+                    new Rectangle(left + iconSize + gap, 0, textWidth, Height), text,
+                    TextFormatFlags.Left | TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis | TextFormatFlags.NoPrefix);
+                return;
+            }
+            if (Symbol == UiSymbol.Chevron)
+            {
+                using (var pen = new Pen(colors.TextSecondary, 1.5F))
+                { var cy=Height/2; var cx=Width/2; e.Graphics.DrawLines(pen,ChevronUp?new[]{new Point(cx-5,cy+2),new Point(cx,cy-3),new Point(cx+5,cy+2)}:new[]{new Point(cx-5,cy-2),new Point(cx,cy+3),new Point(cx+5,cy-2)}); }
+            }
+            else if (Symbol != UiSymbol.None)
+                DesktopSurface.DrawIcon(e.Graphics, Symbol,
+                    new Rectangle(string.IsNullOrEmpty(Text) ? (Width - 20) / 2 : 18, (Height - 20) / 2, 20, 20), text);
+            else if (NavigationStyle && ShowNavigationDot)
             {
                 var dot = new Rectangle(14, (Height - 7) / 2, 7, 7);
                 using (var brush = new SolidBrush(
@@ -152,18 +213,19 @@ namespace DexManager.Forms
                 }
             }
 
-            if (NavigationStyle && ShowSettingsIcon)
+            if (Symbol == UiSymbol.None && NavigationStyle && ShowSettingsIcon)
                 DrawSettingsIcon(e.Graphics, text);
 
+            if (string.IsNullOrEmpty(Text)) return;
             var leadingOffset =
-                ShowNavigationDot || ShowSettingsIcon ? 30 : 14;
+                Symbol != UiSymbol.None ? 52 : ShowNavigationDot || ShowSettingsIcon ? 30 : 14;
             var trailingWidth = 0;
             if (NavigationStyle &&
                 !string.IsNullOrWhiteSpace(TrailingText))
             {
                 using (var trailingFont = UiFonts.Create(8.5F))
                 {
-                    trailingWidth = TextRenderer.MeasureText(
+                    trailingWidth = UiText.MeasureText(
                         TrailingText,
                         trailingFont).Width;
                     var trailingBounds = new Rectangle(
@@ -171,7 +233,7 @@ namespace DexManager.Forms
                         0,
                         trailingWidth,
                         Height);
-                    TextRenderer.DrawText(
+                    UiText.DrawText(
                         e.Graphics,
                         TrailingText,
                         trailingFont,
@@ -190,8 +252,8 @@ namespace DexManager.Forms
                     Width - leadingOffset - 14 -
                         (trailingWidth > 0 ? trailingWidth + 8 : 0),
                     Height)
-                : bounds;
-            TextRenderer.DrawText(
+                : Symbol == UiSymbol.None ? bounds : new Rectangle(44, 0, Width - 50, Height);
+            UiText.DrawText(
                 e.Graphics,
                 Text,
                 Font,
@@ -219,7 +281,7 @@ namespace DexManager.Forms
                 graphics.FillEllipse(brush, 13, Height - 20, 7, 7);
 
             var nameBounds = new Rectangle(13, 6, Width - 25, 23);
-            TextRenderer.DrawText(
+            UiText.DrawText(
                 graphics,
                 Text,
                 Font,
@@ -237,7 +299,7 @@ namespace DexManager.Forms
                     Height - 26,
                     Width - 38,
                     20);
-                TextRenderer.DrawText(
+                UiText.DrawText(
                     graphics,
                     SecondaryText ?? string.Empty,
                     statusFont,
@@ -287,26 +349,20 @@ namespace DexManager.Forms
 
         private static GraphicsPath RoundedPath(Rectangle rectangle, int radius)
         {
-            var diameter = radius * 2;
-            var path = new GraphicsPath();
-            path.AddArc(rectangle.Left, rectangle.Top, diameter, diameter, 180, 90);
-            path.AddArc(rectangle.Right - diameter, rectangle.Top, diameter, diameter, 270, 90);
-            path.AddArc(rectangle.Right - diameter, rectangle.Bottom - diameter, diameter, diameter, 0, 90);
-            path.AddArc(rectangle.Left, rectangle.Bottom - diameter, diameter, diameter, 90, 90);
-            path.CloseFigure();
-            return path;
+            return DesktopSurface.RoundedPath(rectangle, radius);
         }
     }
 
     internal sealed class ThemedCheckBox : CheckBox
     {
         private bool _hovered;
+        public UiSymbol Symbol { get; set; }
 
         public ThemedCheckBox()
         {
             AutoSize = false;
             BackColor = ThemeColors.Current.CardBackground;
-            Font = UiFonts.Create(9.5F);
+            Font = UiFonts.Pixels(14F);
             ForeColor = ThemeColors.Current.TextPrimary;
             SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint |
                 ControlStyles.OptimizedDoubleBuffer | ControlStyles.Opaque |
@@ -384,30 +440,27 @@ namespace DexManager.Forms
                 14,
                 14);
             using (var brush = new SolidBrush(
-                Enabled ? Color.White : colors.DisabledText))
+                Enabled ? (Checked ? (colors.IsDark ? Color.FromArgb(20,20,25) : Color.White) : (colors.IsDark ? colors.TextPrimary : colors.TextSecondary)) : colors.DisabledText))
             {
                 e.Graphics.FillEllipse(brush, knob);
             }
 
-            TextRenderer.DrawText(
+            if (Symbol != UiSymbol.None)
+                DesktopSurface.DrawIcon(e.Graphics, Symbol,
+                    new Rectangle(1, (Height - 20) / 2, 20, 20), colors.TextPrimary);
+            var offset = Symbol == UiSymbol.None ? 2 : 30;
+            UiText.DrawText(
                 e.Graphics,
                 Text,
                 Font,
-                new Rectangle(2, 0, Width - 52, Height),
+                new Rectangle(offset, 0, Width - offset - 46, Height),
                 Enabled ? ForeColor : colors.DisabledText,
-                TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis);
+                TextFormatFlags.VerticalCenter | TextFormatFlags.WordBreak);
         }
 
         private static GraphicsPath RoundedPath(Rectangle rectangle, int radius)
         {
-            var diameter = radius * 2;
-            var path = new GraphicsPath();
-            path.AddArc(rectangle.Left, rectangle.Top, diameter, diameter, 180, 90);
-            path.AddArc(rectangle.Right - diameter, rectangle.Top, diameter, diameter, 270, 90);
-            path.AddArc(rectangle.Right - diameter, rectangle.Bottom - diameter, diameter, diameter, 0, 90);
-            path.AddArc(rectangle.Left, rectangle.Bottom - diameter, diameter, diameter, 90, 90);
-            path.CloseFigure();
-            return path;
+            return DesktopSurface.RoundedPath(rectangle, radius);
         }
     }
 
@@ -420,40 +473,45 @@ namespace DexManager.Forms
             FillColor = ThemeColors.Current.CardBackground;
             BorderColor = ThemeColors.Current.CardBorder;
             SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint |
-                ControlStyles.OptimizedDoubleBuffer | ControlStyles.ResizeRedraw,
+                ControlStyles.OptimizedDoubleBuffer | ControlStyles.ResizeRedraw |
+                ControlStyles.SupportsTransparentBackColor,
                 true);
         }
 
-        public int Radius { get; set; }
+        private int _radius;
+        public int Radius { get { return _radius; } set { _radius=value; UiRendering.ClipRounded(this,value); } }
+        protected override void OnSizeChanged(System.EventArgs e) { base.OnSizeChanged(e); UiRendering.ClipRounded(this,Radius); }
         public Color FillColor { get; set; }
         public Color BorderColor { get; set; }
+        public int SurfaceOpacity { get; set; } = 255;
+        public Control BackdropSource { get; set; }
 
         protected override void OnPaintBackground(PaintEventArgs e)
         {
-            e.Graphics.Clear(Parent == null ? BackColor : Parent.BackColor);
-            e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
+            DesktopSurface.PaintBehind(e.Graphics,this);
+            PaintSurface(e.Graphics);
+        }
+        internal void PaintSurface(Graphics graphics)
+        {
+            graphics.SmoothingMode = SmoothingMode.AntiAlias;
             var bounds = ClientRectangle;
+            bounds.Inflate(-1,-1);
             bounds.Width--;
             bounds.Height--;
+            if(bounds.Width<=0 || bounds.Height<=0)return;
             using (var path = RoundedPath(bounds, Radius))
-            using (var brush = new SolidBrush(FillColor))
+            using (var brush = new SolidBrush(Color.FromArgb(
+                System.Math.Max(0, System.Math.Min(255, SurfaceOpacity)), FillColor)))
             using (var pen = new Pen(BorderColor))
             {
-                e.Graphics.FillPath(brush, path);
-                e.Graphics.DrawPath(pen, path);
+                graphics.FillPath(brush, path);
+                graphics.DrawPath(pen, path);
             }
         }
 
         private static GraphicsPath RoundedPath(Rectangle rectangle, int radius)
         {
-            var diameter = radius * 2;
-            var path = new GraphicsPath();
-            path.AddArc(rectangle.Left, rectangle.Top, diameter, diameter, 180, 90);
-            path.AddArc(rectangle.Right - diameter, rectangle.Top, diameter, diameter, 270, 90);
-            path.AddArc(rectangle.Right - diameter, rectangle.Bottom - diameter, diameter, diameter, 0, 90);
-            path.AddArc(rectangle.Left, rectangle.Bottom - diameter, diameter, diameter, 90, 90);
-            path.CloseFigure();
-            return path;
+            return DesktopSurface.RoundedPath(rectangle, radius);
         }
     }
 
@@ -494,9 +552,9 @@ namespace DexManager.Forms
         protected override void OnPaint(PaintEventArgs e)
         {
             e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
-            var bounds = new Rectangle(5, 5, Width - 11, Height - 11);
-            using (var track = new Pen(ThemeColors.Current.CardBorder, 6F))
-            using (var status = new Pen(StatusColor, 6F))
+            var bounds = new Rectangle(3, 3, Width - 7, Height - 7);
+            using (var track = new Pen(ThemeColors.Current.CardBorder, System.Math.Min(Width / 8F, 6F)))
+            using (var status = new Pen(StatusColor, System.Math.Min(Width / 8F, 6F)))
             {
                 track.StartCap = track.EndCap = LineCap.Round;
                 status.StartCap = status.EndCap = LineCap.Round;

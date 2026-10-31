@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="accent">#8778FF</color>
+    <color name="accent_pressed">#7161E4</color>
+    <color name="accent_cyan">#45D4E6</color>
+    <color name="accent_soft">#302A61</color>
+    <color name="window_background">#0D1120</color>
+    <color name="window_background_end">#12192A</color>
+    <color name="card_background">#D91A2034</color>
+    <color name="card_background_strong">#FF1B2135</color>
+    <color name="card_background_soft">#B8232A42</color>
+    <color name="card_border">#596B7397</color>
+    <color name="text_primary">#FFF5F6FB</color>
+    <color name="text_secondary">#FFB8BDCD</color>
+    <color name="text_tertiary">#FF8F96AA</color>
+    <color name="button_secondary">#E62A3148</color>
+    <color name="button_disabled">#FF555B70</color>
+    <color name="code_background">#E6232A3D</color>
+    <color name="divider">#52636B88</color>
+    <color name="nav_selected">#3D7768EF</color>
+    <color name="success">#FF49D697</color>
+    <color name="success_surface">#66234C43</color>
+    <color name="success_border">#8053BF91</color>
+    <color name="warning_surface">#664D432A</color>
+    <color name="warning_border">#807E7044</color>
+    <color name="info_surface">#66334669</color>
+    <color name="info_border">#806B79AA</color>
+</resources>

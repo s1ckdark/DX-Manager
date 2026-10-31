@@ -19,6 +19,7 @@ namespace DexManager.Forms
                 return;
             }
 
+            var generation = _storeTargetGeneration;
             SetCompanionBusy("Settings.DisplayCleanupChecking");
             try
             {
@@ -29,7 +30,7 @@ namespace DexManager.Forms
                     () => _displayCleanupPermissionService
                         .InspectBundledApk());
                 if (IsDisposed) return;
-                _displayCleanupStatus = status;
+                if (generation == _storeTargetGeneration) _displayCleanupStatus = status;
                 _bundledCompanionStatus = bundled;
             }
             catch (Exception ex)
@@ -46,7 +47,11 @@ namespace DexManager.Forms
                 _displayCleanupOperationRunning = false;
             }
             if (!IsDisposed)
+            {
+                if (generation != _storeTargetGeneration) { RefreshDisplayCleanupStatusAsync(); return; }
                 ApplyDisplayCleanupStatus(_displayCleanupStatus);
+                UpdateStoreCompanionLabels();
+            }
         }
 
         private async void CompanionInstallButton_Click(
@@ -64,10 +69,11 @@ namespace DexManager.Forms
             }
 
             var serial = _displayCleanupStatus.Serial;
+            var generation = _storeTargetGeneration;
             var confirmKey = _displayCleanupStatus.PackageInstalled
                 ? "Settings.CompanionUpdateConfirm"
                 : "Settings.CompanionInstallConfirm";
-            var answer = MessageBox.Show(
+            var answer = DesktopDialogs.Show(
                 this,
                 LocalizationService.Get(confirmKey),
                 LocalizationService.Get("Settings.GroupDisplayCleanup"),
@@ -86,7 +92,7 @@ namespace DexManager.Forms
                     () => _displayCleanupPermissionService
                         .InspectBundledApk());
                 if (IsDisposed) return;
-                _displayCleanupStatus = status;
+                if (generation == _storeTargetGeneration) _displayCleanupStatus = status;
                 _bundledCompanionStatus = bundled;
                 _displayCleanupOperationRunning = false;
                 ApplyDisplayCleanupStatus(status);
@@ -97,7 +103,7 @@ namespace DexManager.Forms
                 {
                     if (_companionInstalled != null)
                         _companionInstalled(serial);
-                    MessageBox.Show(
+                    DesktopDialogs.Show(
                         this,
                         LocalizationService.Get(
                             "Settings.CompanionInstallSucceeded"),
@@ -138,7 +144,8 @@ namespace DexManager.Forms
             }
 
             var serial = _displayCleanupStatus.Serial;
-            var answer = MessageBox.Show(
+            var generation = _storeTargetGeneration;
+            var answer = DesktopDialogs.Show(
                 this,
                 LocalizationService.Get(
                     "Settings.CompanionUninstallConfirm"),
@@ -157,13 +164,13 @@ namespace DexManager.Forms
                     () => _displayCleanupPermissionService
                         .Uninstall(serial));
                 if (IsDisposed) return;
-                _displayCleanupStatus = status;
+                if (generation == _storeTargetGeneration) _displayCleanupStatus = status;
                 _displayCleanupOperationRunning = false;
                 ApplyDisplayCleanupStatus(status);
                 if (status.State ==
                     DisplayCleanupPermissionState.NotInstalled)
                 {
-                    MessageBox.Show(
+                    DesktopDialogs.Show(
                         this,
                         LocalizationService.Get(
                             "Settings.CompanionUninstallSucceeded"),
@@ -208,7 +215,7 @@ namespace DexManager.Forms
                 return;
             }
 
-            var answer = MessageBox.Show(
+            var answer = DesktopDialogs.Show(
                 this,
                 LocalizationService.Get(
                     "Settings.DisplayCleanupGrantConfirm"),
@@ -219,6 +226,7 @@ namespace DexManager.Forms
                 MessageBoxDefaultButton.Button2);
             if (answer != DialogResult.Yes) return;
 
+            var generation = _storeTargetGeneration;
             SetCompanionBusy("Settings.DisplayCleanupGranting");
             try
             {
@@ -226,7 +234,7 @@ namespace DexManager.Forms
                 var status = await Task.Run(
                     () => _displayCleanupPermissionService.Grant(previous));
                 if (IsDisposed) return;
-                _displayCleanupStatus = status;
+                if (generation == _storeTargetGeneration) _displayCleanupStatus = status;
                 _displayCleanupOperationRunning = false;
                 ApplyDisplayCleanupStatus(status);
                 if (status.State ==
@@ -234,7 +242,7 @@ namespace DexManager.Forms
                 {
                     if (_companionInstalled != null)
                         _companionInstalled(status.Serial);
-                    MessageBox.Show(
+                    DesktopDialogs.Show(
                         this,
                         LocalizationService.Get(
                             "Settings.DisplayCleanupGrantSucceeded"),
@@ -264,6 +272,8 @@ namespace DexManager.Forms
         private void SetCompanionBusy(string statusKey)
         {
             _displayCleanupOperationRunning = true;
+            if (_companionDeviceSelector != null) _companionDeviceSelector.Enabled = false;
+            if (_wirelessDeviceBox != null) _wirelessDeviceBox.Enabled = false;
             _companionInstallButton.Enabled = false;
             _displayCleanupPermissionButton.Enabled = false;
             _companionUninstallButton.Enabled = false;
@@ -276,6 +286,9 @@ namespace DexManager.Forms
             DisplayCleanupPermissionStatus status)
         {
             if (status == null) return;
+            if (_companionDeviceSelector != null) _companionDeviceSelector.Enabled = true;
+            if (_wirelessDeviceBox != null) _wirelessDeviceBox.Enabled = true;
+            if (_storeUiReady && !string.IsNullOrWhiteSpace(status.Serial) && !string.Equals(status.Serial, ResolveStoreTargetSerial(), StringComparison.OrdinalIgnoreCase)) { RefreshDisplayCleanupStatusAsync(); return; }
             string key;
             switch (status.State)
             {

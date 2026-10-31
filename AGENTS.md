@@ -48,7 +48,7 @@
 - 정상 종료 시 관리 대상 기기의 overlay와 DX Manager가 변경한 화면 전원 및
   절전모드 해제 상태를 가능한 범위에서 복구한다. 연결이 끊겼으면 종료를
   막거나 반복 오류를 내지 말고 실패를 로그로 남긴다.
-- Scrcpy 4.x/SDL3 환경의 오른쪽 Shift를 왼쪽 Shift 입력으로 변환하는 보정은
+- Scrcpy SDL3 환경의 오른쪽 Shift를 왼쪽 Shift 입력으로 변환하는 보정은
   의도된 호환 동작이다. 실제 기기와 키보드에서 대체 동작을 검증하지 않은 채
   제거하지 않는다.
 - 키보드 후킹과 주입 입력은 사용자 입력을 구분하고, KeyUp 누락과 재진입으로
@@ -135,3 +135,38 @@
   `docs/TODO.md`, 세션 상태는 `docs/SESSION.md`, 큰 이정표는
   `docs/CHANGELOG.md`에 기록한다.
 - 공개 문서와 릴리스 설명의 언어 순서는 영어, 한국어 순으로 유지한다.
+
+## 고정 포터블 프리뷰 — 2026-10-08 사용자 지시
+
+- 포터블 프리뷰는 scripts/Build-PortablePreview.ps1을 사용해
+  E:\vs\dex system\dist\DX Manager Preview 한 폴더에 덮어쓴다.
+- 프리뷰마다 날짜/버전 폴더나 ZIP을 dist에 추가하지 않는다. ZIP은 사용자가
+  이동/배포용 압축을 요청할 때만 만든다. 정식 릴리스는 별도 승인 절차를 따른다.
+- 덮어쓸 때 config/settings.json, onboarding.json, 사용자 로그·캡처는 보존한다.
+  프리뷰 폴더 전체를 재귀 삭제하지 말고 관리 파일 목록으로 산출물만 갱신한다.
+- DX Companion, DX Manager Store와 업로드 대기 원본 DX Manager v2.5.0은
+  이번 정리에서 보존했다. Store 산출물을 임의로 덮어쓰거나 정리하지 않는다.
+- exe 실행 파일은 클릭 가능한 절대 경로 링크로 제공한다. ZIP은 Codex에서
+  미리보기를 지원하지 않으므로 ZIP 링크를 기본 실행 안내로 사용하지 않는다.
+
+
+## Shared Companion — user instruction 2026-10-12
+Official Android source/APK are now managed only in E:\vs\DX Companion Shared.
+Read its AGENTS.md/README.md/CHANGELOG.md/release.json before Android changes; record GitHub/Store workroom and thread.
+Use this repo Android wrappers; do not revive the old per-product source. Signing keys stay in trusted original paths.
+Both PC editions compile the same shared release constants and copy the verified official APK. Test APK stays separate.
+This migration does not authorize commit/push/upload or changing the other PC product UI.
+
+## Publication approval — user clarification 2026-10-16
+
+Antivirus results or confirmation that files are clean are not publication approval.
+Prepare requested documents locally; wait for the user's explicit instruction to publish before
+commit/push/tag/release creation or remote documentation changes. Preserve the scanned release bytes
+during a documentation-only task. Review remote-only macOS files before any future main integration.
+
+## Public source snapshots and platform builds — 2026-10-25
+
+companion/ is a generated, version-pinned public snapshot; do not maintain Android changes there independently.
+A public Windows checkout falls back to that snapshot when the canonical shared component is absent.
+Preserve its manifest-pinned source bytes and official APK; never add signing inputs.
+Mac .NET 8 proxy/foundation projects use separate .Mac directories; preserve the Windows .NET Framework projects.

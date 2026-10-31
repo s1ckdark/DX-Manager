@@ -1,4 +1,4 @@
-using System.ComponentModel;
+﻿using System.ComponentModel;
 using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.Serialization;
@@ -10,7 +10,8 @@ namespace DexManager.Models
     [DataContract]
     public sealed class AppSettings
     {
-        public const int CurrentSchemaVersion = 25;
+        public const int CurrentSchemaVersion = 28;
+        public const int MaximumRecentCustomResolutions = 5;
 
         [DataMember(Order = 1)] public int SchemaVersion { get; set; }
         [DataMember(Order = 2)] public PathSettings Paths { get; set; }
@@ -37,6 +38,12 @@ namespace DexManager.Models
         [DataMember(Order = 16)]
         public List<DeviceWirelessConnectionProfile>
             DeviceWirelessConnectionProfiles { get; set; }
+        [DataMember(Order = 17)]
+        public List<RecentCustomResolutionSettings> RecentCustomResolutions
+        {
+            get;
+            set;
+        }
 
         public static AppSettings CreateDefault()
         {
@@ -52,6 +59,8 @@ namespace DexManager.Models
                     new List<DeviceRunSettingsProfile>(),
                 DeviceWirelessConnectionProfiles =
                     new List<DeviceWirelessConnectionProfile>(),
+                RecentCustomResolutions =
+                    new List<RecentCustomResolutionSettings>(),
                 Paths = new PathSettings
                 {
                     AdbPath = string.Empty,
@@ -168,6 +177,9 @@ namespace DexManager.Models
             if (DeviceWirelessConnectionProfiles == null)
                 DeviceWirelessConnectionProfiles =
                     new List<DeviceWirelessConnectionProfile>();
+            if (RecentCustomResolutions == null)
+                RecentCustomResolutions =
+                    new List<RecentCustomResolutionSettings>();
             if (SingleWindowSlots == null)
                 SingleWindowSlots = new List<SingleWindowSlotSettings>();
             while (SingleWindowSlots.Count < 3)
@@ -376,6 +388,8 @@ namespace DexManager.Models
                     new List<DeviceWirelessConnectionProfile>();
                 SchemaVersion = defaults.SchemaVersion;
             }
+            if (oldSchemaVersion < CurrentSchemaVersion)
+                SchemaVersion = defaults.SchemaVersion;
             VirtualDisplay.Width = NormalizeRange(
                 VirtualDisplay.Width,
                 320,
@@ -441,8 +455,18 @@ namespace DexManager.Models
             NormalizeSingleWindowAppProfiles(
                 SingleWindowAppProfiles,
                 defaults.SingleWindowSlots[0]);
+            NormalizeRecentCustomResolutions();
             NormalizeDeviceRunSettingsProfiles(defaults);
             NormalizeDeviceWirelessConnectionProfiles(defaults);
+            FrameRateRules.Normalize(Scrcpy);
+            foreach (var slot in SingleWindowSlots) FrameRateRules.Normalize(slot);
+            foreach (var profile in SingleWindowAppProfiles) FrameRateRules.Normalize(profile);
+            foreach (var device in DeviceRunSettingsProfiles)
+            {
+                FrameRateRules.Normalize(device.Scrcpy);
+                foreach (var slot in device.SingleWindowSlots) FrameRateRules.Normalize(slot);
+                foreach (var profile in device.SingleWindowAppProfiles) FrameRateRules.Normalize(profile);
+            }
             if (string.IsNullOrWhiteSpace(Paths.Win7AdbPath))
                 Paths.Win7AdbPath = defaults.Paths.Win7AdbPath;
             if (string.IsNullOrWhiteSpace(Paths.ScrcpyPath))
@@ -559,6 +583,143 @@ namespace DexManager.Models
                 1000,
                 60000,
                 defaults.Timing.VirtualDisplayDetectionTimeoutMs);
+        }
+
+        internal bool RememberCustomResolution(int width, int height)
+        {
+            if (width < 320 || width > 4096 ||
+                height < 240 || height > 4096 ||
+                IsPresetResolution(width, height))
+            {
+                return false;
+            }
+            if (RecentCustomResolutions == null)
+                RecentCustomResolutions =
+                    new List<RecentCustomResolutionSettings>();
+
+            var existingIndex = RecentCustomResolutions.FindIndex(item =>
+                item != null && item.Width == width && item.Height == height);
+            if (existingIndex == 0) return false;
+            if (existingIndex > 0)
+                RecentCustomResolutions.RemoveAt(existingIndex);
+
+            RecentCustomResolutions.Insert(
+                0,
+                new RecentCustomResolutionSettings
+                {
+                    Width = width,
+                    Height = height
+                });
+            if (RecentCustomResolutions.Count > MaximumRecentCustomResolutions)
+            {
+                RecentCustomResolutions.RemoveRange(
+                    MaximumRecentCustomResolutions,
+                    RecentCustomResolutions.Count -
+                        MaximumRecentCustomResolutions);
+            }
+            return true;
+        }
+
+        internal static bool IsPresetResolution(int width, int height)
+        {
+            return (width == 1600 && height == 900) ||
+                (width == 1920 && height == 1080) ||
+                (width == 3840 && height == 2160);
+        }
+
+        internal static bool SingleWindowAppProfileMatchesSlot(
+            SingleWindowAppProfile profile,
+            SingleWindowSlotSettings slot,
+            string packageName,
+            string appName)
+        {
+            if (profile == null || slot == null) return false;
+            var resolvedAppName = string.IsNullOrWhiteSpace(appName)
+                ? profile.AppName ?? string.Empty
+                : appName;
+            return slot.Width == profile.Width &&
+                slot.Height == profile.Height &&
+                slot.CustomWidth == profile.CustomWidth &&
+                slot.CustomHeight == profile.CustomHeight &&
+                slot.Dpi == profile.Dpi &&
+                string.Equals(slot.BitRate, profile.BitRate,
+                    System.StringComparison.OrdinalIgnoreCase) &&
+                slot.MaxFps == profile.MaxFps &&
+                slot.TurnScreenOff == profile.TurnScreenOff &&
+                slot.TurnScreenOffBeforeHighFps == profile.TurnScreenOffBeforeHighFps &&
+                slot.StayAwake == profile.StayAwake &&
+                slot.UseHidKeyboard == profile.UseHidKeyboard &&
+                slot.UseHidMouse == profile.UseHidMouse &&
+                slot.ForceStopStartApp == profile.ForceStopStartApp &&
+                slot.FlexDisplay == profile.FlexDisplay &&
+                string.Equals(slot.AdditionalArguments,
+                    profile.AdditionalArguments,
+                    System.StringComparison.Ordinal) &&
+                string.Equals(slot.StartAppPackage, packageName,
+                    System.StringComparison.OrdinalIgnoreCase) &&
+                string.Equals(slot.StartAppName, resolvedAppName,
+                    System.StringComparison.Ordinal);
+        }
+
+        internal static void ApplySingleWindowAppProfile(
+            SingleWindowAppProfile profile,
+            SingleWindowSlotSettings slot,
+            string packageName,
+            string appName)
+        {
+            if (profile == null)
+                throw new System.ArgumentNullException("profile");
+            if (slot == null)
+                throw new System.ArgumentNullException("slot");
+
+            slot.Width = profile.Width;
+            slot.Height = profile.Height;
+            slot.CustomWidth = profile.CustomWidth;
+            slot.CustomHeight = profile.CustomHeight;
+            slot.Dpi = profile.Dpi;
+            slot.BitRate = profile.BitRate;
+            slot.MaxFps = profile.MaxFps;
+            slot.TurnScreenOff = profile.TurnScreenOff;
+            slot.TurnScreenOffBeforeHighFps = profile.TurnScreenOffBeforeHighFps;
+            slot.StayAwake = profile.StayAwake;
+            slot.UseHidKeyboard = profile.UseHidKeyboard;
+            slot.UseHidMouse = profile.UseHidMouse;
+            slot.ForceStopStartApp = profile.ForceStopStartApp;
+            slot.StartAppPackage = packageName;
+            slot.StartAppName = string.IsNullOrWhiteSpace(appName)
+                ? profile.AppName
+                : appName;
+            slot.AdditionalArguments = profile.AdditionalArguments;
+            slot.FlexDisplay = profile.FlexDisplay;
+        }
+
+        private void NormalizeRecentCustomResolutions()
+        {
+            var normalized = new List<RecentCustomResolutionSettings>(
+                MaximumRecentCustomResolutions);
+            var dimensions = new HashSet<long>();
+            foreach (var item in RecentCustomResolutions)
+            {
+                if (item == null ||
+                    item.Width < 320 || item.Width > 4096 ||
+                    item.Height < 240 || item.Height > 4096 ||
+                    IsPresetResolution(item.Width, item.Height))
+                {
+                    continue;
+                }
+
+                var key = ((long)item.Width << 32) | (uint)item.Height;
+                if (!dimensions.Add(key)) continue;
+                normalized.Add(new RecentCustomResolutionSettings
+                {
+                    Width = item.Width,
+                    Height = item.Height
+                });
+                if (normalized.Count == MaximumRecentCustomResolutions)
+                    break;
+            }
+
+            RecentCustomResolutions = normalized;
         }
 
         public DeviceRunSettingsProfile GetOrCreateDeviceRunSettings(
@@ -707,6 +868,8 @@ namespace DexManager.Models
                     profile.SingleWindowAppProfiles =
                         new List<SingleWindowAppProfile>();
                 }
+                if (profile.RememberedApps == null)
+                    profile.RememberedApps = new List<RememberedAppSettings>();
 
                 profile.VirtualDisplay.Width = NormalizeRange(
                     profile.VirtualDisplay.Width,
@@ -836,8 +999,16 @@ namespace DexManager.Models
             normalized = normalized.TrimEnd('/');
 
             var sharedStoragePath =
+                string.Equals(
+                    normalized,
+                    "/sdcard",
+                    System.StringComparison.Ordinal) ||
                 normalized.StartsWith(
                     "/sdcard/",
+                    System.StringComparison.Ordinal) ||
+                string.Equals(
+                    normalized,
+                    "/storage/emulated/0",
                     System.StringComparison.Ordinal) ||
                 normalized.StartsWith(
                     "/storage/emulated/0/",
@@ -987,7 +1158,7 @@ namespace DexManager.Models
                     System.Math.Min(640, profile.Dpi));
                 if (string.IsNullOrWhiteSpace(profile.BitRate))
                     profile.BitRate = defaults.BitRate;
-                if (profile.MaxFps != 30 && profile.MaxFps != 60)
+                if (!FrameRateRules.IsSupported(profile.MaxFps))
                     profile.MaxFps = defaults.MaxFps;
                 profile.AdditionalArguments =
                     (profile.AdditionalArguments ?? string.Empty).Trim();
@@ -1044,6 +1215,7 @@ namespace DexManager.Models
                 MaxFps = source.MaxFps,
                 WindowTitle = source.WindowTitle,
                 TurnScreenOff = source.TurnScreenOff,
+                TurnScreenOffBeforeHighFps = source.TurnScreenOffBeforeHighFps,
                 UseHidKeyboard = source.UseHidKeyboard,
                 UseHidMouse = source.UseHidMouse,
                 ForceStopStartApp = source.ForceStopStartApp,
@@ -1078,6 +1250,7 @@ namespace DexManager.Models
                 BitRate = source.BitRate,
                 MaxFps = source.MaxFps,
                 TurnScreenOff = source.TurnScreenOff,
+                TurnScreenOffBeforeHighFps = source.TurnScreenOffBeforeHighFps,
                 StayAwake = source.StayAwake,
                 UseHidKeyboard = source.UseHidKeyboard,
                 UseHidMouse = source.UseHidMouse,
@@ -1110,6 +1283,7 @@ namespace DexManager.Models
                     BitRate = profile.BitRate,
                     MaxFps = profile.MaxFps,
                     TurnScreenOff = profile.TurnScreenOff,
+                    TurnScreenOffBeforeHighFps = profile.TurnScreenOffBeforeHighFps,
                     StayAwake = profile.StayAwake,
                     UseHidKeyboard = profile.UseHidKeyboard,
                     UseHidMouse = profile.UseHidMouse,

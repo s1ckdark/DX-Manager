@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Drawing;
 using System.Threading.Tasks;
 using System.Windows.Forms;
@@ -49,6 +49,7 @@ namespace DexManager.Forms
                 context.Device = device.Clone();
                 RememberContextDisplayName(context, device);
                 ConfigureContextPresentation(context);
+                context.MiniBar.UpdateConnection(context.Device);
                 ConfigureContextConnection(context);
             }
 
@@ -60,6 +61,8 @@ namespace DexManager.Forms
 
             if (initialSelectionPending ||
                 _selectedDeviceContext == null ||
+                _selectedDeviceContext.Device == null ||
+                !_selectedDeviceContext.Device.IsConnected ||
                 string.IsNullOrWhiteSpace(_selectedDeviceContext.Identity))
             {
                 foreach (var identity in
@@ -199,6 +202,8 @@ namespace DexManager.Forms
                 return;
             }
 
+            RecordAvailableTransports(context);
+            StopSessionsOnMissingTransports(context);
             var selectedTransport = GetContextTransport(context);
             var serial = selectedTransport == null
                 ? string.Empty
@@ -213,6 +218,7 @@ namespace DexManager.Forms
                 serial,
                 context.Runtime.InstanceId);
             var newlyConnected = !context.WasConnected;
+            var autoStartResumed = RestoreAutoStartAfterReconnect(context, newlyConnected);
             var connectionChanged = newlyConnected ||
                 !string.Equals(
                     context.ActiveSerial,
@@ -227,7 +233,15 @@ namespace DexManager.Forms
                     previousSerial);
                 var detachTask = context.Runtime.PhoneTransfers.DetachAsync(
                     previousSerial);
-                ForgetDeviceConnectionTimestamp(previousSerial);
+                var previousTransport = context.Device.FindTransport(previousSerial);
+                if (previousTransport == null || !previousTransport.IsAuthorized)
+                {
+                    context.RequireManualStartAfterTransportLoss = true;
+                    context.AutoStartBlockedSerial = previousSerial;
+                    ForgetDeviceConnection(previousSerial);
+                    MarkSerialDisconnected(previousSerial);
+                }
+                else ForgetDeviceConnectionTimestamp(previousSerial);
             }
             context.WasConnected = true;
             context.ActiveSerial = serial;
@@ -241,7 +255,8 @@ namespace DexManager.Forms
                         context,
                         previousSerial,
                         serial,
-                        context.ConnectionGeneration);
+                        context.ConnectionGeneration,
+                        autoStartResumed);
                     return;
                 }
                 RecordDeviceConnected(serial);
@@ -255,19 +270,79 @@ namespace DexManager.Forms
                     serial,
                     newlyConnected);
             }
+            else if (autoStartResumed)
+            {
+                RetryContextCleanupAsync(context, serial, true);
+            }
+        }
+
+        // Only suppress fallback within the current connection episode.
+        // A restored original transport or a new physical connection can auto-start again.
+        private bool RestoreAutoStartAfterReconnect(DeviceUiContext context, bool newlyConnected)
+        {
+            if (!context.RequireManualStartAfterTransportLoss) return false;
+            var restored = context.Device.FindTransport(context.AutoStartBlockedSerial);
+            if (!newlyConnected && (restored == null || !restored.IsAuthorized)) return false;
+            context.RequireManualStartAfterTransportLoss = false;
+            context.AutoStartBlockedSerial = string.Empty;
+            return true;
+        }
+
+        private void RecordAvailableTransports(DeviceUiContext context)
+        {
+            if (context.Device.Transports == null) return;
+            foreach (var transport in context.Device.Transports)
+            {
+                if (transport == null || !transport.IsAuthorized ||
+                    string.IsNullOrWhiteSpace(transport.Serial)) continue;
+                lock (_deviceConnectionSync)
+                {
+                    if (!_deviceConnectedAtUtc.ContainsKey(transport.Serial))
+                        _deviceConnectedAtUtc[transport.Serial] = DateTime.UtcNow;
+                }
+                MarkSerialReconnected(transport.Serial);
+            }
+        }
+
+        private void StopSessionsOnMissingTransports(DeviceUiContext context)
+        {
+            var serials = new System.Collections.Generic.HashSet<string>(
+                context.Runtime.SingleWindows.GetRunningSerials(), StringComparer.OrdinalIgnoreCase);
+            var dexSerial = context.Runtime.Scrcpy.RunningSerial;
+            if (!string.IsNullOrWhiteSpace(dexSerial)) serials.Add(dexSerial);
+            foreach (var serial in serials)
+            {
+                var transport = context.Device.FindTransport(serial);
+                if (transport != null && transport.IsAuthorized) continue;
+                context.RequireManualStartAfterTransportLoss = true;
+                context.AutoStartBlockedSerial = serial;
+                ForgetDeviceConnection(serial);
+                MarkSerialDisconnected(serial);
+                StopDisconnectedSerialAsync(context, serial);
+            }
+        }
+
+        private async void StopDisconnectedSerialAsync(DeviceUiContext context, string serial)
+        {
+            try
+            {
+                await context.Runtime.Dex.StopForSerialAsync(serial);
+                await Task.Run(delegate { context.Runtime.SingleWindows.StopForSerial(serial); });
+            }
+            catch (Exception ex) { _logService.Error("Could not stop disconnected transport " + serial + ".", ex); }
         }
 
         private async void SwitchContextTransportAsync(
             DeviceUiContext context,
             string previousSerial,
             string serial,
-            int generation)
+            int generation,
+            bool allowAutoStart)
         {
             try
             {
-                if (context.Runtime.Dex.IsRunning)
-                    await context.Runtime.Dex.StopAsync();
-                await Task.Run((Action)context.Runtime.SingleWindows.StopAll);
+                await context.Runtime.Dex.StopForSerialAsync(previousSerial);
+                await Task.Run(delegate { context.Runtime.SingleWindows.StopForSerial(previousSerial); });
             }
             catch (Exception ex)
             {
@@ -301,7 +376,7 @@ namespace DexManager.Forms
                 transport == null
                     ? DeviceTransportKind.Unknown
                     : transport.Kind);
-            RetryContextCleanupAsync(context, serial, false);
+            RetryContextCleanupAsync(context, serial, allowAutoStart);
             RefreshSelectedDeviceState();
             RebuildDeviceTabs();
         }
@@ -316,19 +391,18 @@ namespace DexManager.Forms
                 : context.ConnectionGeneration;
             try
             {
+                var autoStartGeneration = _autoStartSettingsGeneration;
                 var cleanupReady = await context.Runtime.Dex
                     .RetryDeferredCleanupAsync(serial);
-                if (cleanupReady && allowAutoStart &&
-                    _settings.Features.AutoStartDexOnDeviceConnected &&
-                    await WaitForDeviceStartDelayAsync(
-                        serial,
-                        context,
-                        generation))
+                if (cleanupReady && allowAutoStart && !context.RequireManualStartAfterTransportLoss &&
+                    _settings.Features.AutoStartDexOnDeviceConnected)
                 {
-                    await StartDexForContextAsync(
-                        context,
-                        serial,
-                        generation);
+                    var launchTransport = context.Device == null ? null :
+                        context.Device.SelectLaunchTransport(context.ActiveSerial);
+                    if (launchTransport == null || !await WaitForDeviceStartDelayAsync(
+                        launchTransport.Serial, context, generation)) return;
+                    if (autoStartGeneration != _autoStartSettingsGeneration || !_settings.Features.AutoStartDexOnDeviceConnected) return;
+                    await StartDexForContextAsync(context, launchTransport.Serial, generation);
                 }
             }
             catch (Exception ex)
@@ -344,7 +418,7 @@ namespace DexManager.Forms
             string serial,
             int generation)
         {
-            if (!IsContextConnectionCurrent(context, serial, generation) ||
+            if (context.RequireManualStartAfterTransportLoss || !IsContextLaunchCurrent(context, serial, generation) ||
                 context.Runtime.Dex.IsShutdownRequested ||
                 context.Runtime.Dex.IsRunning)
             {
@@ -356,6 +430,14 @@ namespace DexManager.Forms
                 var runSettings = GetDeviceRunSettings(
                     _settings,
                     context.Identity);
+                runSettings = new DeviceRunSettingsProfile
+                {
+                    DeviceIdentity = context.Identity,
+                    VirtualDisplay = AppSettings.CloneVirtualDisplay(runSettings.VirtualDisplay),
+                    Scrcpy = AppSettings.CloneScrcpy(runSettings.Scrcpy)
+                };
+                if (!await ConfirmExperimentalFrameRateAsync(runSettings.Scrcpy.MaxFps) ||
+                    !IsContextLaunchCurrent(context, serial, generation) || context.Runtime.Dex.IsShutdownRequested) return;
                 if (runSettings.Scrcpy.TurnScreenOff)
                     RememberManagedSerial(serial);
 
@@ -374,10 +456,12 @@ namespace DexManager.Forms
                 _logService.Info(
                     "Starting DeX automatically for " +
                     GetContextDisplayName(context) + " (" + serial + ").");
-                await context.Runtime.Dex.StartAsync(serial);
+                context.PendingSessionStarts++;
+                try { await context.Runtime.Dex.StartAsync(serial, runSettings, true); }
+                finally { context.PendingSessionStarts--; }
 
                 if (_exitInProgress ||
-                    !IsContextConnectionCurrent(
+                    !IsContextLaunchCurrent(
                         context,
                         serial,
                         generation) ||
@@ -387,6 +471,7 @@ namespace DexManager.Forms
                 }
 
                 RememberStartedApp(
+                    context.Identity,
                     runSettings.Scrcpy.StartAppPackage,
                     runSettings.Scrcpy.StartAppName);
                 context.ModeSettingsDirty[0] = false;
@@ -418,6 +503,16 @@ namespace DexManager.Forms
             }
         }
 
+        private bool IsContextLaunchCurrent(DeviceUiContext context, string serial, int generation)
+        {
+            var transport = context == null || context.Device == null ? null :
+                context.Device.SelectLaunchTransport(context.ActiveSerial);
+            return context != null && !_exitInProgress && !IsDisposed &&
+                context.ConnectionGeneration == generation && context.WasConnected &&
+                transport != null && string.Equals(transport.Serial, serial, StringComparison.OrdinalIgnoreCase) &&
+                !IsSerialMarkedDisconnected(serial);
+        }
+
         private bool IsContextConnectionCurrent(
             DeviceUiContext context,
             string serial,
@@ -441,6 +536,13 @@ namespace DexManager.Forms
 
         private void HandleContextDisconnected(DeviceUiContext context)
         {
+            context.MiniBar.UpdateConnection(null);
+            if (context.PendingSessionStarts > 0 || context.Runtime.Dex.IsRunning ||
+                context.Runtime.SingleWindows.GetRunningSerials().Count > 0)
+            {
+                context.RequireManualStartAfterTransportLoss = true;
+                context.AutoStartBlockedSerial = context.ActiveSerial;
+            }
             context.WasConnected = false;
             context.ConnectionGeneration++;
             var serial = context.ActiveSerial;

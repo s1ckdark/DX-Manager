@@ -1,0 +1,129 @@
+{
+  "topics": [
+    {
+      "id": "getting-started",
+      "title": "Getting started",
+      "summary": "USB debugging and first connection",
+      "iconGlyph": "\uE8B7",
+      "blocks": [
+        {
+          "type": "paragraph",
+          "text": "DX Manager uses Android Developer options and ADB to run DeX and single windows for the connected phone. Enable Developer options and USB debugging on the phone first."
+        },
+        {
+          "type": "steps",
+          "heading": "First connection",
+          "items": [
+            "Connect the phone with USB and enable USB debugging.",
+            "Allow USB debugging in the approval prompt shown on the phone.",
+            "Choose the connected phone in the DX Manager device list."
+          ]
+        },
+        {
+          "type": "warning",
+          "heading": "If the phone has not been authorized",
+          "text": "Unlock the phone and check for the USB debugging approval prompt. DeX and file transfer cannot start until the approval is granted."
+        }
+      ]
+    },
+    {
+      "id": "modes",
+      "title": "DeX and single windows",
+      "summary": "Run modes and start apps",
+      "iconGlyph": "\uE7F4",
+      "blocks": [
+        {
+          "type": "paragraph",
+          "text": "DeX opens the phone's Samsung DeX virtual display in a Windows window. A single window runs one selected app on its own virtual display."
+        },
+        {
+          "type": "steps",
+          "heading": "How to start",
+          "items": [
+            "Choose the connected phone at the top of the main page.",
+            "Review the resolution, DPI, and run options.",
+            "DeX can start without a start app. A single window requires one selected start app."
+          ]
+        },
+        {
+          "type": "paragraph",
+          "text": "The last DeX and single-window 1–3 options and selected apps are saved separately for each phone."
+        }
+      ]
+    },
+    {
+      "id": "connection",
+      "title": "Connection problems",
+      "summary": "Device detection and launch issues",
+      "iconGlyph": "\uE8F1",
+      "blocks": [
+        {
+          "type": "steps",
+          "heading": "When the phone is not listed",
+          "items": [
+            "Check the USB cable and the phone's USB connection mode.",
+            "Unlock the phone and check for the USB debugging approval prompt.",
+            "Use Refresh on the main page, then choose the phone again."
+          ]
+        },
+        {
+          "type": "paragraph",
+          "text": "For Wi-Fi ADB, the phone and PC must be on the same network. The saved connection policy and the live connection can differ, so check status on the Connection page in Settings."
+        },
+        {
+          "type": "warning",
+          "heading": "When a session fails to launch",
+          "text": "Some apps restrict launching or mirroring while USB debugging is enabled, or because of DRM or security policies. Check the phone approval prompt and the session log first."
+        }
+      ]
+    },
+    {
+      "id": "transfer",
+      "title": "Files and DX Companion",
+      "summary": "Transfer files in both directions",
+      "iconGlyph": "\uE898",
+      "blocks": [
+        {
+          "type": "paragraph",
+          "text": "To send from the PC to the phone, drag files or folders onto a Scrcpy window. Set the destination folder on the Paths page in Settings."
+        },
+        {
+          "type": "paragraph",
+          "text": "The optional DX Companion supports phone-to-PC transfer and phone-side display cleanup. It is installed only when you explicitly request installation and permission from the Companion page in Settings."
+        },
+        {
+          "type": "warning",
+          "heading": "When a transfer does not start",
+          "text": "Check that the phone is authorized for ADB and is currently connected. Do not disconnect that phone while a transfer is active."
+        }
+      ]
+    },
+    {
+      "id": "recovery",
+      "title": "Exit and display recovery",
+      "summary": "Safe exit and phone cleanup",
+      "iconGlyph": "\uE7E8",
+      "blocks": [
+        {
+          "type": "paragraph",
+          "text": "Keep the phone connected, right-click the DX Manager icon in the system tray, and choose Exit. The main window's close button hides DX Manager in the tray; it does not exit the program."
+        },
+        {
+          "type": "steps",
+          "heading": "If a small virtual display remains on the phone",
+          "items": [
+            "Open Simulate secondary displays in Developer options on the phone.",
+            "Even if None is already selected, select any resolution once.",
+            "Open the menu again and select None.",
+            "If DX Companion is installed, you can also use Clean all on its Phone cleanup screen."
+          ]
+        },
+        {
+          "type": "warning",
+          "heading": "Important",
+          "text": "A virtual display or a stay-awake setting can remain after disconnection, a forced exit, or Windows shutdown. Use the steps above to clean up the phone."
+        }
+      ]
+    }
+  ]
+}

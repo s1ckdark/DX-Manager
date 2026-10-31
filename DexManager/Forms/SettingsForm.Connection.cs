@@ -105,18 +105,25 @@ namespace DexManager.Forms
             object sender,
             EventArgs e)
         {
+            SaveLoadedWirelessProfileToMemory();
+            var option = GetSelectedWirelessDeviceOption();
+            if (option == null) return;
             var host = _wirelessHostBox.Text;
             var port = (int)_pairingPortBox.Value;
             var pairingCode = _pairingCodeBox.Text.Trim();
+            var autoReconnect = _wirelessAutoReconnectBox.Checked;
             await RunWirelessOperationAsync(delegate
             {
                 return _wirelessAdbService.Pair(
+                    option.DeviceIdentity,
                     host,
                     port,
-                    pairingCode);
+                    pairingCode,
+                    autoReconnect);
             });
             if (IsDisposed) return;
             _pairingCodeBox.Clear();
+            LoadSelectedWirelessProfile(false);
         }
 
         private async Task RunWirelessOperationAsync(
@@ -228,7 +235,7 @@ namespace DexManager.Forms
                 {
                     foreach (var device in snapshot.Devices)
                     {
-                        if (device != null &&
+                        if (device != null && device.IsConnected &&
                             !string.IsNullOrWhiteSpace(device.Identity))
                         {
                             _wirelessDeviceBox.Items.Add(
@@ -266,6 +273,7 @@ namespace DexManager.Forms
                 _loadingWirelessDevice = false;
             }
             LoadSelectedWirelessProfile();
+            if (_storeUiReady && !_loadingStoreValues) RefreshDisplayCleanupStatusAsync();
         }
 
         public void RefreshSelectedDeviceContext()
@@ -279,7 +287,7 @@ namespace DexManager.Forms
 
             SaveLoadedWirelessProfileToMemory();
             PopulateWirelessDevices();
-            if (_activePageIndex == 4 &&
+            if ((_activePageIndex == 4 || _activePageIndex == 6) &&
                 !_displayCleanupOperationRunning)
             {
                 RefreshDeviceDiagnosticsAsync();
@@ -294,6 +302,7 @@ namespace DexManager.Forms
             if (_loadingWirelessDevice) return;
             SaveLoadedWirelessProfileToMemory();
             LoadSelectedWirelessProfile();
+            if (_storeUiReady && !_loadingStoreValues) RefreshDisplayCleanupStatusAsync();
         }
 
         private void LoadSelectedWirelessProfile()
@@ -340,6 +349,8 @@ namespace DexManager.Forms
             {
                 _loadingWirelessDevice = false;
             }
+            SynchronizeStoreSelectors();
+            if (_storeUiReady && !_loadingStoreValues) SaveStoreScope(s => {}, false);
             if (updateStatus) UpdateWirelessStatus();
             UpdateWirelessControls();
         }
@@ -352,16 +363,22 @@ namespace DexManager.Forms
             {
                 return;
             }
-            var profile = _settings.GetOrCreateDeviceWirelessConnection(
-                _loadedWirelessDeviceIdentity,
-                false);
-            profile.Mode = _wirelessConnectionBox.Checked
+            var identity = _loadedWirelessDeviceIdentity;
+            var mode = _wirelessConnectionBox.Checked
                 ? AdbConnectionMode.Wireless
                 : AdbConnectionMode.Usb;
-            profile.WirelessHost = (_wirelessHostBox.Text ?? string.Empty)
-                .Trim();
-            profile.WirelessPort = (int)_wirelessPortBox.Value;
-            profile.AutoReconnect = _wirelessAutoReconnectBox.Checked;
+            var host = (_wirelessHostBox.Text ?? string.Empty).Trim();
+            var port = (int)_wirelessPortBox.Value;
+            var autoReconnect = _wirelessAutoReconnectBox.Checked;
+            // Serialize the edited policy with discovery's settings snapshot/save.
+            _settingsService.UpdateInMemory(_settings, delegate(AppSettings settings)
+            {
+                var profile = settings.GetOrCreateDeviceWirelessConnection(identity, false);
+                profile.Mode = mode;
+                profile.WirelessHost = host;
+                profile.WirelessPort = port;
+                profile.AutoReconnect = autoReconnect;
+            });
         }
 
         private WirelessDeviceOption GetSelectedWirelessDeviceOption()
@@ -475,25 +492,7 @@ namespace DexManager.Forms
 
             public override string ToString()
             {
-                var hasUsb = HasAuthorizedUsb;
-                var hasWireless = !string.IsNullOrWhiteSpace(
-                    FindAuthorizedWirelessSerial(string.Empty));
-                var transport = hasUsb && hasWireless
-                    ? LocalizationService.Get(
-                        "Settings.DeviceTransportUsbWireless")
-                    : hasWireless
-                        ? LocalizationService.Get(
-                            "Settings.DeviceTransportWireless")
-                        : hasUsb
-                            ? LocalizationService.Get(
-                                "Settings.DeviceTransportUsb")
-                            : LocalizationService.Get(
-                                "Device.Disconnected");
-                var name = string.IsNullOrWhiteSpace(_device.DisplayName)
-                    ? DeviceIdentity
-                    : _device.DisplayName;
-                return name + " · " + transport + " · " +
-                    DeviceIdentity;
+                return string.IsNullOrWhiteSpace(_device.DisplayName) ? LocalizationService.Get("Common.Unknown") : _device.DisplayName;
             }
         }
 

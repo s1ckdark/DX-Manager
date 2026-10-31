@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Threading.Tasks;
@@ -18,21 +18,23 @@ namespace DexManager.Forms
             if (_resolutionSelectionInitialized && _resolutionWasCustom)
                 StoreCurrentCustomResolution();
 
+            if(IsResolutionEditorCommandSelected()){_resolutionBeforeDialogWidth=(int)_widthBox.Value;_resolutionBeforeDialogHeight=(int)_heightBox.Value;}
             ApplyResolutionSelection();
         }
 
         private void ApplyResolutionSelection()
         {
             var preset = _resolutionBox.SelectedItem as ResolutionPreset;
-            var custom = preset == null || preset.Width == 0;
+            var command = preset == null || preset.Width == 0;
+            var custom = command || !AppSettings.IsPresetResolution(preset.Width,preset.Height);
             LayoutResolutionControls(custom);
             _widthBox.Enabled = custom;
             _heightBox.Enabled = custom;
-            _widthBox.Visible = custom;
-            _heightBox.Visible = custom;
-            _widthLabel.Visible = custom;
-            _heightLabel.Visible = custom;
-            if (custom)
+            _widthBox.Visible = false;
+            _heightBox.Visible = false;
+            _widthLabel.Visible = false;
+            _heightLabel.Visible = false;
+            if (command)
             {
                 _widthBox.Value = Clamp(
                     GetCurrentCustomWidth(),
@@ -53,43 +55,28 @@ namespace DexManager.Forms
 
         private void LayoutResolutionControls(bool custom)
         {
-            if (!custom)
-            {
-                _resolutionBox.Width = 304;
-                return;
-            }
-
-            const int fieldTop = 72;
-            const int labelGap = 6;
-            const int numberWidth = 50;
-            const int widthGroupOffset = 50;
-            const int dpiGap = 22;
-
-            _resolutionBox.Width = 110;
-            _widthBox.Width = numberWidth;
-            _heightBox.Width = numberWidth;
-
-            // Keep the numeric fields on the same axes in every language.
-            // Only the translated labels move, right-aligned to their field.
-            _widthBox.Left = _resolutionBox.Right + widthGroupOffset;
-            _heightBox.Left = _dpiBox.Left - dpiGap - numberWidth;
-
-            var heightLabelWidth = MeasureInlineLabel(_heightLabel);
-            _heightLabel.Left =
-                _heightBox.Left - labelGap - heightLabelWidth;
-            var widthLabelWidth = MeasureInlineLabel(_widthLabel);
-            _widthLabel.Left =
-                _widthBox.Left - labelGap - widthLabelWidth;
-
-            _widthBox.Top = fieldTop;
-            _heightBox.Top = fieldTop;
-            _widthLabel.Top = GetInlineLabelTop(_widthLabel, fieldTop);
-            _heightLabel.Top = GetInlineLabelTop(_heightLabel, fieldTop);
+            if (_displayCard == null) return;
+            var width = (int)(_displayCard.Width / DesktopScale);
+            var fieldWidth = (width - 64) / 2;
+            var right = fieldWidth + 40;
+            Place(_resolutionLabel, 24, 89, fieldWidth, 20);
+            Place(_resolutionBox, 24, 115, fieldWidth, 40);
+            Place(_dpiLabel, right, 89, fieldWidth, 20);
+            Place(_dpiBox, right, 115, fieldWidth, 40);
+            Place(_widthLabel, 24, 155, 35, 24);
+            Place(_widthBox, 62, 151, Math.Max(54, fieldWidth - 38), 32);
+            Place(_heightLabel, right, 155, 35, 24);
+            Place(_heightBox, right + 38, 151, Math.Max(54, fieldWidth - 38), 32);
+            var labelTop = 170;
+            var fieldTop = 196;
+            Place(_bitRateLabel, 24, labelTop, fieldWidth, 21);
+            Place(_bitRateBox, 24, fieldTop, fieldWidth, 40);
+            Place(_maxFpsLabel, right, labelTop, fieldWidth, 21);
+            Place(_maxFpsBox, right, fieldTop, fieldWidth, 40);
         }
-
         private static int MeasureInlineLabel(Label label)
         {
-            return TextRenderer.MeasureText(
+            return UiText.MeasureText(
                 label.Text,
                 label.Font,
                 Size.Empty,
@@ -100,7 +87,7 @@ namespace DexManager.Forms
             Label label,
             int fieldTop)
         {
-            var labelHeight = TextRenderer.MeasureText(
+            var labelHeight = UiText.MeasureText(
                 label.Text,
                 label.Font,
                 Size.Empty,
@@ -116,6 +103,7 @@ namespace DexManager.Forms
             string bitRate;
             int maxFps;
             bool turnScreenOff;
+            bool? previousScreenOff;
             bool stayAwake;
             bool useHidKeyboard;
             bool useHidMouse;
@@ -136,6 +124,7 @@ namespace DexManager.Forms
                 bitRate = runSettings.Scrcpy.BitRate;
                 maxFps = runSettings.Scrcpy.MaxFps;
                 turnScreenOff = runSettings.Scrcpy.TurnScreenOff;
+                previousScreenOff = runSettings.Scrcpy.TurnScreenOffBeforeHighFps;
                 stayAwake = runSettings.Scrcpy.StayAwake;
                 useHidKeyboard = runSettings.Scrcpy.UseHidKeyboard;
                 useHidMouse = runSettings.Scrcpy.UseHidMouse;
@@ -155,6 +144,7 @@ namespace DexManager.Forms
                 bitRate = slot.BitRate;
                 maxFps = slot.MaxFps;
                 turnScreenOff = slot.TurnScreenOff;
+                previousScreenOff = slot.TurnScreenOffBeforeHighFps;
                 stayAwake = slot.StayAwake;
                 useHidKeyboard = slot.UseHidKeyboard;
                 useHidMouse = slot.UseHidMouse;
@@ -171,7 +161,10 @@ namespace DexManager.Forms
             _bitRateBox.Value = Clamp(
                 ParseBitRateNumber(bitRate),
                 _bitRateBox);
-            _maxFpsBox.SelectedItem = maxFps == 30 ? 30 : 60;
+            _maxFpsBox.SelectedItem = maxFps == 120 ? _maxFpsBox.Items[2] : (object)(maxFps == 30 ? 30 : 60);
+            _displayedMaxFps = maxFps;
+            _turnScreenOffBeforeHighFps = previousScreenOff;
+            _turnScreenOffBox.Enabled = !FrameRateRules.RequiresScreenOn(maxFps);
             _turnScreenOffBox.Checked = turnScreenOff;
             _stayAwakeBox.Checked = stayAwake;
             _useHidKeyboardBox.Checked = useHidKeyboard;
@@ -179,12 +172,15 @@ namespace DexManager.Forms
             _forceStopAppBox.Checked = forceStopStartApp;
             _flexDisplayBox.Checked = flexDisplay;
             _additionalArgumentsBox.Text = additionalArguments;
-            SetSelectedAppPackage(startAppPackage, startAppName);
+            RefreshAppItems(startAppPackage, startAppName);
+            RebuildResolutionOptions(width, height);
             _resolutionBox.SelectedIndex = FindResolutionPresetIndex(
                 width,
                 height);
             ApplyResolutionSelection();
             _loadingRunSettings = false;
+            if (!_appProfileApplying && _selectedMode > 0)
+                ApplySelectedAppProfileIfAvailable();
             UpdateApplySettingsLink();
             UpdateAppProfileControls();
         }
@@ -201,6 +197,58 @@ namespace DexManager.Forms
             return _resolutionBox.Items.Count - 1;
         }
 
+        private void RebuildResolutionOptions(
+            int activeWidth,
+            int activeHeight)
+        {
+            _resolutionBox.Items.Clear();
+            _resolutionBox.Items.Add(new ResolutionPreset(
+                "1600 x 900", 1600, 900));
+            _resolutionBox.Items.Add(new ResolutionPreset(
+                "1920 x 1080", 1920, 1080));
+            _resolutionBox.Items.Add(new ResolutionPreset(
+                "3840 x 2160 (4K)", 3840, 2160));
+
+            _resolutionBox.Items.Add(new ResolutionPreset(LocalizationService.IsKorean?"사용자 지정 해상도":"Custom resolutions",-1,-1));
+            var recent = _settings.RecentCustomResolutions ??
+                new List<RecentCustomResolutionSettings>();
+            var activeIsAvailable = AppSettings.IsPresetResolution(
+                activeWidth,
+                activeHeight);
+            foreach (var resolution in recent)
+            {
+                if (resolution == null) continue;
+                _resolutionBox.Items.Add(new ResolutionPreset(
+                    FormatResolution(resolution.Width, resolution.Height),
+                    resolution.Width,
+                    resolution.Height));
+                if (resolution.Width == activeWidth &&
+                    resolution.Height == activeHeight)
+                {
+                    activeIsAvailable = true;
+                }
+            }
+
+            if (!activeIsAvailable &&
+                activeWidth >= 320 && activeWidth <= 4096 &&
+                activeHeight >= 240 && activeHeight <= 4096)
+            {
+                // Keep an active app-profile resolution selectable even when
+                // it has aged out of the persisted five-entry recent list.
+                _resolutionBox.Items.Add(new ResolutionPreset(
+                    FormatResolution(activeWidth, activeHeight),
+                    activeWidth,
+                    activeHeight));
+            }
+
+            _resolutionBox.Items.Add(new ResolutionPreset(LocalizationService.Get("Main.Custom")+"...",0,0));
+        }
+
+        private static string FormatResolution(int width, int height)
+        {
+            return width.ToString() + " x " + height.ToString();
+        }
+
         private async void ApplyRunSettingsButton_Click(object sender, EventArgs e)
         {
             try
@@ -211,13 +259,16 @@ namespace DexManager.Forms
                     await ApplySingleWindowSettingsAsync(_selectedMode);
                     return;
                 }
-                var serial = GetSelectedDeviceSerial();
+                var launchOrchestrator = _orchestrator;
+                var launchSettings = CaptureSelectedRunSettings();
+                var serial = launchOrchestrator.CurrentSession == null ? GetSelectedDeviceSerial() : launchOrchestrator.CurrentSession.Serial;
+                if (launchOrchestrator.IsRunning && !await ConfirmExperimentalFrameRateAsync(launchSettings.Scrcpy.MaxFps)) return;
                 if (string.IsNullOrWhiteSpace(serial) ||
                     !_adbService.IsAuthorizedDeviceConnected(serial))
                 {
                     _logService.Info(LocalizationService.Get(
                         "Log.Main.SettingsDeferredNoDevice"));
-                    MessageBox.Show(
+                    DesktopDialogs.Show(
                         this,
                         LocalizationService.Get("Main.ApplyNoDevice"),
                         LocalizationService.Get("App.Name"),
@@ -240,7 +291,7 @@ namespace DexManager.Forms
                 BeginPhoneScreenWakeSuppression();
                 try
                 {
-                    applied = await _orchestrator.ApplyRuntimeSettingsAsync();
+                    applied = await launchOrchestrator.ApplyRuntimeSettingsAsync(launchSettings, true);
                 }
                 finally
                 {
@@ -248,7 +299,7 @@ namespace DexManager.Forms
                 }
                 if (!applied)
                 {
-                    MessageBox.Show(
+                    DesktopDialogs.Show(
                         this,
                         LocalizationService.Get("Main.ApplyDeferred"),
                         LocalizationService.Get("App.Name"),
@@ -259,7 +310,7 @@ namespace DexManager.Forms
 
                 UpdateRunningState();
                 _modeSettingsDirty[0] = false;
-                MessageBox.Show(
+                DesktopDialogs.Show(
                     this,
                     LocalizationService.Get("Main.ApplySucceeded"),
                     LocalizationService.Get("App.Name"),
@@ -279,7 +330,7 @@ namespace DexManager.Forms
                     Color.Firebrick,
                     LocalizationService.Get("Status.Error"),
                     _connectionError);
-                MessageBox.Show(
+                DesktopDialogs.Show(
                     this,
                     LocalizationService.Format(
                         "Main.ApplyFailed",
@@ -301,7 +352,7 @@ namespace DexManager.Forms
             if (string.IsNullOrWhiteSpace(serial) ||
                 !_adbService.IsAuthorizedDeviceConnected(serial))
             {
-                MessageBox.Show(
+                DesktopDialogs.Show(
                     this,
                     LocalizationService.Format(
                         "Main.SingleSavedNoDevice",
@@ -316,7 +367,7 @@ namespace DexManager.Forms
 
             if (!_singleWindowService.IsRunning(slot))
             {
-                MessageBox.Show(
+                DesktopDialogs.Show(
                     this,
                     LocalizationService.Format(
                         "Main.SingleSaved",
@@ -337,13 +388,15 @@ namespace DexManager.Forms
                     "Main.SingleApplying",
                     slot),
                 LocalizationService.Get("Main.SingleRestartDetail"));
-            var settings = GetSingleWindowSettings(slot);
+            var settings = AppSettings.CloneSingleWindowSlot(GetSingleWindowSettings(slot));
+            var launchService = _singleWindowService;
+            if (!await ConfirmExperimentalFrameRateAsync(settings.MaxFps)) return;
             BeginPhoneScreenWakeSuppression();
             try
             {
                 await Task.Run(delegate
                 {
-                    _singleWindowService.Restart(slot, settings);
+                    launchService.Restart(slot, settings, true);
                 });
             }
             finally
@@ -352,7 +405,7 @@ namespace DexManager.Forms
             }
             UpdateRunningState();
             _modeSettingsDirty[slot] = false;
-            MessageBox.Show(
+            DesktopDialogs.Show(
                 this,
                 LocalizationService.Format(
                     "Main.SingleApplied",
@@ -367,61 +420,54 @@ namespace DexManager.Forms
             if (_loadAppsButton.Enabled == false) return;
 
             _loadAppsButton.Enabled = false;
-                _loadAppsButton.Text = LocalizationService.Get("Main.Loading");
+            _loadAppsButton.Text = LocalizationService.Get("Main.Loading");
             try
             {
                 var serial = GetSelectedDeviceSerial();
+                var deviceIdentity = _selectedDeviceIdentity ?? string.Empty;
+                var sourceDevice = _selectedDeviceContext == null
+                    ? string.Empty : GetContextDisplayName(_selectedDeviceContext);
+                var scrcpyService = _scrcpyService;
                 if (string.IsNullOrWhiteSpace(serial))
                     throw new InvalidOperationException(
                         LocalizationService.Get(
                             "Error.Dex.NoAuthorizedDevice"));
                 var apps = await Task.Run(delegate
                 {
-                    return _scrcpyService.ListApps(serial);
+                    return scrcpyService.ListApps(serial);
                 });
+                if (_exitInProgress || IsDisposed || Disposing) return;
+                var count = _deviceAppCatalog.Replace(deviceIdentity, serial, apps);
+                if (!AppListResultMatchesSelection(
+                    deviceIdentity,
+                    serial,
+                    _selectedDeviceIdentity,
+                    GetSelectedDeviceSerial()))
+                {
+                    _logService.Info(LocalizationService.Get(
+                        "Log.Main.StaleAppListDiscarded"));
+                    ShowAppsLoadedNotice(count, sourceDevice);
+                    return;
+                }
+
                 var selectedPackage = GetSelectedAppPackage();
                 var selectedName = GetSelectedAppName(selectedPackage);
 
-                _startAppBox.SelectedIndex = -1;
-                _startAppBox.Items.Clear();
-                AddNoStartAppItem();
-                foreach (var app in apps) _startAppBox.Items.Add(app);
-                AddRememberedAppItems();
-
-                var selected = false;
-                if (string.IsNullOrWhiteSpace(selectedPackage))
-                {
-                    _startAppBox.SelectedIndex = 0;
-                    selected = true;
-                }
-                foreach (var app in apps)
-                {
-                    if (!string.Equals(
-                        app.PackageName,
-                        selectedPackage,
-                        StringComparison.OrdinalIgnoreCase))
-                    {
-                        continue;
-                    }
-
-                    _startAppBox.SelectedItem = app;
-                    selected = true;
-                    break;
-                }
-
-                if (!selected)
-                    SetSelectedAppPackage(selectedPackage, selectedName);
-                SaveSelectedAppIdentity();
+                RefreshAppItems(selectedPackage, selectedName);
+                if (!ApplySelectedAppProfileIfAvailable())
+                    SaveSelectedAppIdentity();
                 _logService.Info(LocalizationService.Get(
                     "Log.Main.AppListDisplayed"));
+                ShowAppsLoadedNotice(count, null);
             }
             catch (Exception ex)
             {
+                if (_exitInProgress || IsDisposed || Disposing) return;
                 _logService.Error(
                     LocalizationService.Get(
                         "Log.Main.AppListLoadFailed"),
                     ex);
-                MessageBox.Show(
+                DesktopDialogs.Show(
                     this,
                     LocalizationService.Format(
                         "Main.LoadAppsFailed",
@@ -433,19 +479,53 @@ namespace DexManager.Forms
             }
             finally
             {
-                _loadAppsButton.Text = LocalizationService.Get("Main.LoadApps");
-                _loadAppsButton.Enabled = true;
+                if (!_exitInProgress && !IsDisposed && !Disposing)
+                {
+                    _loadAppsButton.Text = LocalizationService.Get("Main.LoadApps");
+                    _loadAppsButton.Enabled = true;
+                }
             }
+        }
+
+        private static bool AppListResultMatchesSelection(
+            string requestedIdentity,
+            string requestedSerial,
+            string currentIdentity,
+            string currentSerial)
+        {
+            var requested = (requestedIdentity ?? string.Empty).Trim();
+            var current = (currentIdentity ?? string.Empty).Trim();
+            if (requested.Length > 0 && current.Length > 0)
+            {
+                return string.Equals(
+                    requested,
+                    current,
+                    StringComparison.OrdinalIgnoreCase);
+            }
+            return !string.IsNullOrWhiteSpace(requestedSerial) &&
+                string.Equals(
+                    requestedSerial.Trim(),
+                    (currentSerial ?? string.Empty).Trim(),
+                    StringComparison.OrdinalIgnoreCase);
         }
 
         private void ApplyRunSettings(bool showMessage)
         {
+            var rememberCustomResolution = IsCustomResolutionSelected();
+            var customWidth = (int)_widthBox.Value;
+            var customHeight = (int)_heightBox.Value;
             var bitRate = ((int)_bitRateBox.Value).ToString() + "M";
             ScrcpyService.ValidateAdditionalArguments(
                 _additionalArgumentsBox.Text);
             _settingsService.UpdateAndSave(_settings, delegate(
                 AppSettings candidate)
             {
+                if (rememberCustomResolution)
+                {
+                    candidate.RememberCustomResolution(
+                        customWidth,
+                        customHeight);
+                }
                 var runSettings = GetDeviceRunSettings(
                     candidate,
                     _selectedDeviceIdentity);
@@ -466,6 +546,7 @@ namespace DexManager.Forms
                     runSettings.Scrcpy.MaxFps = GetSelectedMaxFps();
                     runSettings.Scrcpy.TurnScreenOff =
                         _turnScreenOffBox.Checked;
+                    runSettings.Scrcpy.TurnScreenOffBeforeHighFps = _turnScreenOffBeforeHighFps;
                     runSettings.Scrcpy.StayAwake = _stayAwakeBox.Checked;
                     runSettings.Scrcpy.UseHidKeyboard =
                         _useHidKeyboardBox.Checked;
@@ -496,6 +577,7 @@ namespace DexManager.Forms
                     slot.BitRate = bitRate;
                     slot.MaxFps = GetSelectedMaxFps();
                     slot.TurnScreenOff = _turnScreenOffBox.Checked;
+                    slot.TurnScreenOffBeforeHighFps = _turnScreenOffBeforeHighFps;
                     slot.StayAwake = _stayAwakeBox.Checked;
                     slot.UseHidKeyboard = _useHidKeyboardBox.Checked;
                     slot.UseHidMouse = _useHidMouseBox.Checked;
@@ -509,6 +591,8 @@ namespace DexManager.Forms
                         _additionalArgumentsBox.Text.Trim();
                 }
             });
+            if (rememberCustomResolution)
+                RefreshRecentResolutionOptions();
             _logService.Info(
                 _selectedMode == 0
                     ? LocalizationService.Get(
@@ -518,12 +602,32 @@ namespace DexManager.Forms
                         _selectedMode));
             if (showMessage)
             {
-                MessageBox.Show(
+                DesktopDialogs.Show(
                     this,
                     LocalizationService.Get("Main.ApplyDeferred"),
                     LocalizationService.Get("App.Name"),
                     MessageBoxButtons.OK,
                     MessageBoxIcon.Information);
+            }
+        }
+
+        private void RefreshRecentResolutionOptions()
+        {
+            var wasLoading = _loadingRunSettings;
+            _loadingRunSettings = true;
+            try
+            {
+                RebuildResolutionOptions(
+                    (int)_widthBox.Value,
+                    (int)_heightBox.Value);
+                _resolutionBox.SelectedIndex = FindResolutionPresetIndex((int)_widthBox.Value,(int)_heightBox.Value);
+                _resolutionBox.Invalidate();
+                _resolutionWasCustom = IsCustomResolutionSelected();
+                _resolutionSelectionInitialized = true;
+            }
+            finally
+            {
+                _loadingRunSettings = wasLoading;
             }
         }
 
@@ -539,7 +643,7 @@ namespace DexManager.Forms
             EventArgs e)
         {
             if (_exitInProgress || IsDisposed || Disposing) return;
-            MessageBox.Show(
+            DesktopDialogs.Show(
                 this,
                 LocalizationService.Format(
                     "Main.DpiMinimum",
@@ -558,7 +662,7 @@ namespace DexManager.Forms
             var fieldName = ReferenceEquals(control, _heightBox)
                 ? LocalizationService.Get("Main.Height")
                 : LocalizationService.Get("Main.Width");
-            MessageBox.Show(
+            DesktopDialogs.Show(
                 this,
                 LocalizationService.Format(
                     "Main.ResolutionMaximum",
@@ -601,7 +705,7 @@ namespace DexManager.Forms
         {
             return _maxFpsBox.SelectedItem is int
                 ? (int)_maxFpsBox.SelectedItem
-                : 60;
+                : (_maxFpsBox.SelectedItem is ExperimentalFpsOption ? 120 : 60);
         }
 
         private static int ParseBitRateNumber(string value)
@@ -621,7 +725,7 @@ namespace DexManager.Forms
                 ? result
                 : 20;
         }
-        private sealed class ResolutionPreset
+        private sealed class ResolutionPreset : IDropDownGroupItem
         {
             public ResolutionPreset(string text, int width, int height)
             {
@@ -630,6 +734,8 @@ namespace DexManager.Forms
                 Height = height;
             }
 
+            public bool StartsGroup {get {return Width<0;}}
+            public bool IsSelectable {get {return Width>=0;}}
             public string Text { get; private set; }
             public int Width { get; private set; }
             public int Height { get; private set; }

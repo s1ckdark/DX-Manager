@@ -2,6 +2,17 @@
 
 ## 다음 작업
 
+- [x] upstream v2.5.0(maze-mei, 2026-10-25) 머지 — 포크 main에 Windows 2.5.0 소스·문서·`companion/`
+      스냅샷을 반영하고 Mac 프로젝트를 upstream의 `.Mac` 디렉터리 구조로 맞췄다.
+  - [x] `DexManager.AdbProxy.Mac/`에 PR #13의 `--self-test` 마커 변경 재적용
+  - [x] `DexManager.Mac.csproj`·`DexManager.Mac.sln`·macOS 워크플로·`Package-Mac-Release.sh`의
+        proxy/다중 기기 테스트 경로를 `.Mac`으로 전환
+  - [ ] upstream Windows 2.5.0 기능 중 Core/Mac 포팅 가치 검토 — scrcpy 5.0.1 `--hwdec=auto`,
+        실험적 120 FPS(화면 켜짐 우선·복원 규칙), 하루 1회 업데이트 확인. Core는 upstream이
+        건드리지 않았으므로 포팅은 별도 설계·승인 뒤 진행한다.
+  - [ ] 번들 Companion을 upstream 정식 2.1.6(`companion/release/DX-Companion.apk`)으로 올릴지 판단 —
+        Mac 쪽 Companion 검증 상수(패키지·버전·해시)가 2.0.0 기준이면 함께 갱신해야 한다.
+
 - [x] macOS GUI Phase 0 — 플랫폼 분리와 ApplicationHost 추출
   - [x] `IPathProvider.IsPortablePackage` 승격
   - [x] `DexManager.Platform.Mac` 라이브러리 분리
@@ -469,3 +480,41 @@
 22. HID 마우스 사용 중 포인터가 scrcpy 창에 잡히는 동작
 23. DX Companion 설치·서명 검증과 권한 버튼 비활성화
 24. DX Companion 휴대폰→PC 파일·폴더 전송 준비와 사용 방법
+
+## Upstream Windows 2.5.0 현황 (maze-mei, 머지 시점 기록)
+
+upstream `docs/TODO.md`의 2.5.0 릴리스 범위를 머지 시점 그대로 옮긴 기록이다. 이 포크의 작업 항목이 아니다.
+
+### English — 2026-10-25
+
+#### Release scope completed
+
+- [x] Accepted light/dark UI, tray lifecycle, wireless/TLS, transfer and scrcpy 5.0.1 changes.
+- [x] Experimental 120 FPS, every-start warning, prior screen-off restoration and same-phone screen priority.
+- [x] Daily background update checks, manual check UI and local per-version changes notes.
+- [x] Official Companion 2.1.6 with duplicate-share protection and verified-clean guardian stop behavior.
+- [x] English diagnostics/FAQ text and Help fit; environment-check header/button overlap fixed.
+- [x] 702 Windows checks; final EXE is identical to the tested preview.
+- [x] Clean 39-file ZIP with fixed external name and versioned inner folder.
+- [x] Maintainer-reported clean scan for the exact final EXE.
+- [x] README, EN/KO guides/35-question FAQs, release notes and 16 approved captures refreshed.
+- [x] Matching official Companion source/constants/APK included as a verified public snapshot.
+- [x] Public macOS implementation preserved in separate .NET 8 projects.
+- [x] Explicit maintainer authorization to commit and publish this release.
+
+#### Future work
+
+No new feature is required by this release request. Reported issues should be reviewed against [known limits](KNOWN_ISSUES.md).
+Future releases still need explicit publication approval. Do not add the private AI foreground-app/keymap experiment
+or change the Store product as part of routine portable maintenance.
+
+#### Verification boundaries
+
+Automated Windows checks are not universal Windows 7/GPU/DPI/phone/firmware or shutdown-packet guarantees.
+macOS build/runtime evidence is separate from Windows verification. See [verification](VERIFICATION_v2.5.0.md).
+
+### 한국어
+
+이번 요청 범위는 최종본·문서·공식 Companion 소스 연결·macOS 보존과 승인된 게시입니다.
+새 기능 추가나 Store 변경은 포함하지 않습니다. 실기 미확인 환경은 성공으로 확대하지 않으며
+다음 버전의 게시도 메이님의 별도 지시를 따릅니다.

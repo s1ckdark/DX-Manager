@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Globalization;
@@ -20,6 +20,7 @@ namespace DexManager.Services
             @"New display:.*\(id=(\d+)\)",
             RegexOptions.Compiled | RegexOptions.CultureInvariant);
         private readonly object _syncRoot = new object();
+        private readonly object _processStartSync = new object();
         private readonly string _scrcpyPath;
         private readonly int _processTimeoutMs;
         private readonly AdbService _adbService;
@@ -97,7 +98,8 @@ namespace DexManager.Services
 
         public void RequestShutdown()
         {
-            Interlocked.Exchange(ref _shutdownRequested, 1);
+            lock (_processStartSync)
+                Interlocked.Exchange(ref _shutdownRequested, 1);
         }
 
         public bool IsRunning(int slot)
@@ -143,6 +145,25 @@ namespace DexManager.Services
                         {
                             return true;
                         }
+                    }
+                    return false;
+                }
+            }
+        }
+
+        private readonly Dictionary<int, int> _runningMaxFps = new Dictionary<int, int>();
+        internal Func<bool> CanTurnPhoneScreenOff { get; set; }
+        public bool RequiresPhoneScreenOn
+        {
+            get
+            {
+                lock (_syncRoot)
+                {
+                    foreach (var entry in _processes)
+                    {
+                        int fps;
+                        if (_runningMaxFps.TryGetValue(entry.Key, out fps) &&
+                            FrameRateRules.RequiresScreenOn(fps) && IsProcessRunning(entry.Value)) return true;
                     }
                     return false;
                 }
@@ -331,11 +352,52 @@ namespace DexManager.Services
             return false;
         }
 
+        public bool TryGetWindowTarget(
+            IntPtr windowHandle,
+            out string serial,
+            out int processId)
+        {
+            serial = string.Empty;
+            processId = 0;
+            if (windowHandle == IntPtr.Zero) return false;
+            lock (_syncRoot)
+            {
+                foreach (var item in _processes)
+                {
+                    IntPtr handle;
+                    string targetSerial;
+                    if (!_windowHandles.TryGetValue(item.Key, out handle) ||
+                        handle != windowHandle ||
+                        !IsProcessRunning(item.Value) ||
+                        !_targetSerials.TryGetValue(item.Key, out targetSerial) ||
+                        string.IsNullOrWhiteSpace(targetSerial))
+                    {
+                        continue;
+                    }
+
+                    try
+                    {
+                        processId = item.Value.Id;
+                        serial = targetSerial;
+                        return processId > 0;
+                    }
+                    catch (InvalidOperationException)
+                    {
+                        serial = string.Empty;
+                        processId = 0;
+                        return false;
+                    }
+                }
+            }
+            return false;
+        }
+
         public void Start(
             int slot,
             SingleWindowSlotSettings settings,
-            string requestedSerial)
+            string requestedSerial, bool experimentalFpsConfirmed = false)
         {
+            FrameRateRules.RequireConsent(settings.MaxFps, experimentalFpsConfirmed);
             if (slot < 1 || slot > 3)
                 throw new ArgumentOutOfRangeException("slot");
             if (settings == null)
@@ -413,7 +475,7 @@ namespace DexManager.Services
                             Process_ErrorDataReceived;
                         _processes[slot] = process;
                         _stayAwakeRequests[slot] = settings.StayAwake;
-                        _screenOffRequests[slot] = settings.TurnScreenOff;
+                        _screenOffRequests[slot] = settings.TurnScreenOff && !FrameRateRules.RequiresScreenOn(settings.MaxFps);
                         _targetSerials[slot] = serial;
                         _displayIds.Remove(slot);
                         _windowHandles.Remove(slot);
@@ -426,7 +488,20 @@ namespace DexManager.Services
                             arguments));
                     }
 
-                    process.Start();
+                    lock (_processStartSync)
+                    {
+                        if (Interlocked.CompareExchange(
+                                ref _shutdownRequested, 0, 0) != 0 ||
+                            Interlocked.CompareExchange(
+                                ref _disposed, 0, 0) != 0)
+                        {
+                            throw new InvalidOperationException(
+                                LocalizationService.Get(
+                                    "Error.Scrcpy.ShutdownRequested"));
+                        }
+                        lock (_syncRoot) _runningMaxFps[slot] = settings.MaxFps;
+                        process.Start();
+                    }
                     _fileTransferCoordinator.BindProcess(
                         transferSessionId,
                         process.Id);
@@ -448,8 +523,9 @@ namespace DexManager.Services
             if (started) RaiseRunningChanged();
         }
 
-        public void Restart(int slot, SingleWindowSlotSettings settings)
+        public void Restart(int slot, SingleWindowSlotSettings settings, bool experimentalFpsConfirmed = false)
         {
+            FrameRateRules.RequireConsent(settings.MaxFps, experimentalFpsConfirmed);
             _launchCoordinator.RunExclusive(delegate
             {
                 string serial;
@@ -461,7 +537,7 @@ namespace DexManager.Services
                                 "Error.Dex.NoAuthorizedDevice"));
                 }
                 Stop(slot);
-                Start(slot, settings, serial);
+                Start(slot, settings, serial, experimentalFpsConfirmed);
             });
         }
 
@@ -473,6 +549,24 @@ namespace DexManager.Services
                 stopped = StopSlotCore(slot);
             });
 
+            if (stopped) RaiseRunningChanged();
+        }
+
+        public void StopForSerial(string serial)
+        {
+            if (string.IsNullOrWhiteSpace(serial)) return;
+            var stopped = false;
+            _launchCoordinator.RunExclusive(delegate
+            {
+                var slots = new List<int>();
+                lock (_syncRoot)
+                {
+                    foreach (var target in _targetSerials)
+                        if (string.Equals(target.Value, serial, StringComparison.OrdinalIgnoreCase))
+                            slots.Add(target.Key);
+                }
+                foreach (var slot in slots) stopped = StopSlotCore(slot) || stopped;
+            });
             if (stopped) RaiseRunningChanged();
         }
 
@@ -616,6 +710,7 @@ namespace DexManager.Services
                 arguments.Add(
                     settings.MaxFps.ToString(CultureInfo.InvariantCulture));
             }
+            if (_runtimeInfo.MajorVersion >= 5) ScrcpyService.AddHardwareDecodingArgument(arguments, settings.AdditionalArguments);
             if (settings.UseHidKeyboard) arguments.Add("-K");
             if (settings.UseHidMouse) arguments.Add("-M");
             if (settings.StayAwake)
@@ -633,7 +728,8 @@ namespace DexManager.Services
                         "Log.Scrcpy.FlexDisplayUnsupported"));
                 }
             }
-            if (settings.TurnScreenOff)
+            if (settings.TurnScreenOff && !FrameRateRules.RequiresScreenOn(settings.MaxFps) &&
+                (CanTurnPhoneScreenOff == null || CanTurnPhoneScreenOff()))
             {
                 arguments.Add("-S");
                 arguments.Add("--no-power-on");

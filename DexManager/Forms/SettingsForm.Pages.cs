@@ -17,93 +17,43 @@ namespace DexManager.Forms
         private Control BuildGeneralPage()
         {
             var page = CreatePage();
-            var appearance = CreateTable();
+            page.Controls.Add(new UiLabel { Text = LocalizationService.Get("Desktop.GeneralTitle"), AutoSize = true,
+                Font = UiFonts.Create(12F, FontStyle.Bold), ForeColor = _theme.TextPrimary, Margin = new Padding(0, 0, 0, 6) });
+            page.Controls.Add(new UiLabel { Text = LocalizationService.Get("Desktop.GeneralSubtitle"), AutoSize = true,
+                ForeColor = _theme.TextTertiary, Margin = new Padding(0, 0, 0, 14) });
+            CreateSettingRow(page, UiSymbol.Settings, LocalizationService.Get("Desktop.SingleInstance"),
+                LocalizationService.Get("Desktop.SingleInstanceHint"), null, LocalizationService.Get("Desktop.Always"));
+            CreateSettingRow(page, UiSymbol.Power, LocalizationService.Get("Desktop.CloseBehavior"),
+                LocalizationService.Get("Desktop.CloseBehaviorHint"), null, LocalizationService.Get("Desktop.HideToTray"));
             _languageBox = CreateSelect();
-            foreach (AppLanguage language in Enum.GetValues(typeof(AppLanguage)))
-                _languageBox.Items.Add(new LanguageOption(language));
-            AddRow(appearance, LocalizationService.Get("Settings.Language"), _languageBox);
-            AddRow(
-                appearance,
-                string.Empty,
-                CreateHint(LocalizationService.Get("Settings.LanguageRestart")));
+            foreach (AppLanguage language in Enum.GetValues(typeof(AppLanguage))) _languageBox.Items.Add(new LanguageOption(language));
+            CreateSettingRow(page, UiSymbol.Information, LocalizationService.Get("Settings.Language"),
+                LocalizationService.Get("Settings.LanguageRestart"), _languageBox);
             _themeBox = CreateSelect();
-            foreach (AppTheme theme in Enum.GetValues(typeof(AppTheme)))
-                _themeBox.Items.Add(new ThemeOption(theme));
-            AddRow(appearance, LocalizationService.Get("Settings.Theme"), _themeBox);
-            AddRow(
-                appearance,
-                string.Empty,
-                CreateHint(LocalizationService.Get("Settings.ThemeRestart")));
-            AddCard(page, LocalizationService.Get("Settings.GroupAppearance"), appearance);
-
-            var miniControlBar = CreateTable();
-            _miniControlBarBox = AddCheck(
-                miniControlBar,
-                LocalizationService.Get("Settings.MiniControlBar"));
+            foreach (AppTheme theme in Enum.GetValues(typeof(AppTheme))) _themeBox.Items.Add(new ThemeOption(theme));
+            CreateSettingRow(page, UiSymbol.Moon, LocalizationService.Get("Settings.Theme"),
+                LocalizationService.Get("Settings.ThemeRestart"), _themeBox);
+            _startWithWindowsBox = AddSettingToggle(page, "Settings.StartWithWindows", "Desktop.StartupHint", UiSymbol.Power);
+            _startMinimizedBox = AddSettingToggle(page, "Settings.StartMinimized", "Desktop.TrayHint", UiSymbol.Close);
+            _autoStartDexBox = AddSettingToggle(page, "Settings.AutoStartDex", null, UiSymbol.Display);
+            _miniControlBarBox = AddSettingToggle(page, "Settings.MiniControlBar", "Settings.MiniControlBarHint", UiSymbol.Mouse);
             _miniControlBarSideBox = CreateSelect();
-            foreach (MiniControlBarSide side in Enum.GetValues(
-                typeof(MiniControlBarSide)))
-            {
-                _miniControlBarSideBox.Items.Add(
-                    new MiniControlBarSideOption(side));
-            }
-            AddRow(
-                miniControlBar,
-                LocalizationService.Get("Settings.MiniControlBarSide"),
-                _miniControlBarSideBox);
-            AddRow(
-                miniControlBar,
-                string.Empty,
-                CreateHint(LocalizationService.Get(
-                    "Settings.MiniControlBarHint")));
-            _miniControlBarBox.CheckedChanged += delegate
-            {
-                _miniControlBarSideBox.Enabled =
-                    _miniControlBarBox.Checked;
-            };
-            AddCard(
-                page,
-                LocalizationService.Get("Settings.GroupMiniControlBar"),
-                miniControlBar);
-
+            foreach (MiniControlBarSide side in Enum.GetValues(typeof(MiniControlBarSide))) _miniControlBarSideBox.Items.Add(new MiniControlBarSideOption(side));
+            CreateSettingRow(page, UiSymbol.Mouse, LocalizationService.Get("Settings.MiniControlBarSide"), string.Empty, _miniControlBarSideBox);
+            _miniControlBarBox.CheckedChanged += delegate { _miniControlBarSideBox.Enabled = _miniControlBarBox.Checked; };
             var startup = CreateTable();
-            _startWithWindowsBox = AddCheck(startup, LocalizationService.Get("Settings.StartWithWindows"));
-            _startMinimizedBox = AddCheck(startup, LocalizationService.Get("Settings.StartMinimized"));
-            _autoStartDexBox = AddCheck(startup, LocalizationService.Get("Settings.AutoStartDex"));
-            _connectedStartDelayBox = AddNumber(
-                startup,
-                LocalizationService.Get("Settings.StartDelay"),
-                0,
-                60);
+            _connectedStartDelayBox = AddNumber(startup, LocalizationService.Get("Settings.StartDelay"), 0, 60);
             _autoHideBox = AddCheck(startup, LocalizationService.Get("Settings.AutoHide"));
-            _autoHideSecondsBox = AddNumber(
-                startup,
-                LocalizationService.Get("Settings.HideDelay"),
-                1,
-                3600);
-            _autoHideBox.CheckedChanged += delegate
-            {
-                _autoHideSecondsBox.Enabled = _autoHideBox.Checked;
-            };
-            _showConnectedDeviceInfoBox = AddCheck(
-                startup,
-                LocalizationService.Get("Settings.ShowConnectedDeviceInfo"));
+            _autoHideSecondsBox = AddNumber(startup, LocalizationService.Get("Settings.HideDelay"), 1, 3600);
+            _autoHideBox.CheckedChanged += delegate { _autoHideSecondsBox.Enabled = _autoHideBox.Checked; };
+            _showConnectedDeviceInfoBox = AddCheck(startup, LocalizationService.Get("Settings.ShowConnectedDeviceInfo"));
             AddCard(page, LocalizationService.Get("Settings.GroupStartup"), startup);
-
             var shutdown = CreateTable();
-            // Virtual display cleanup is now a fixed safety policy rather
-            // than a user option. Keep the hidden value for config backward
-            // compatibility while removing the misleading switch.
-            _resetDisplayOnStopBox = new ThemedCheckBox
-            {
-                Checked = true,
-                Visible = false
-            };
+            _resetDisplayOnStopBox = new ThemedCheckBox { Checked = true, Visible = false };
             _disableStayAwakeBox = AddCheck(shutdown, LocalizationService.Get("Settings.DisableStayAwake"));
             AddCard(page, LocalizationService.Get("Settings.GroupShutdown"), shutdown);
             return page;
         }
-
         private Control BuildPathPage()
         {
             var page = CreatePage();
@@ -245,7 +195,7 @@ namespace DexManager.Forms
             connectionButtons.Controls.Add(_wirelessDisconnectButton, 2, 0);
             AddRow(connection, LocalizationService.Get("Settings.WirelessActions"), connectionButtons);
 
-            _wirelessStatusLabel = new Label
+            _wirelessStatusLabel = new UiLabel
             {
                 AutoSize = true,
                 MaximumSize = new Size(410, 0),
@@ -259,7 +209,7 @@ namespace DexManager.Forms
             AddRow(
                 pairing,
                 "Android 11+",
-                new Label
+                new UiLabel
                 {
                     AutoSize = true,
                     MaximumSize = new Size(410, 0),
@@ -333,7 +283,7 @@ namespace DexManager.Forms
                 FlowDirection = FlowDirection.TopDown,
                 WrapContents = false
             };
-            panel.Controls.Add(new Label
+            panel.Controls.Add(new UiLabel
             {
                 AutoSize = true,
                 MaximumSize = new Size(700, 0),
@@ -365,7 +315,7 @@ namespace DexManager.Forms
             panel.Controls.Add(logButton);
             panel.Controls.Add(environmentButton);
             panel.Controls.Add(_diagnosticReportButton);
-            panel.Controls.Add(new Label
+            panel.Controls.Add(new UiLabel
             {
                 AutoSize = true,
                 MaximumSize = new Size(610, 0),
@@ -389,7 +339,7 @@ namespace DexManager.Forms
                 page.PerformLayout();
             };
             panel.Controls.Add(_advancedOptionsButton);
-            panel.Controls.Add(new Label
+            panel.Controls.Add(new UiLabel
             {
                 AutoSize = true,
                 MaximumSize = new Size(610, 0),
@@ -408,7 +358,7 @@ namespace DexManager.Forms
 
             AddCard(
                 page,
-                LocalizationService.Get("Settings.SelectedDeviceDiagnostics"),
+                LocalizationService.Get("Settings.ConnectedDeviceDiagnostics"),
                 BuildSelectedDeviceDiagnosticsPanel());
 
             var displayCleanup = new FlowLayoutPanel
@@ -418,7 +368,7 @@ namespace DexManager.Forms
                 FlowDirection = FlowDirection.TopDown,
                 WrapContents = false
             };
-            displayCleanup.Controls.Add(new Label
+            displayCleanup.Controls.Add(new UiLabel
             {
                 AutoSize = true,
                 MaximumSize = new Size(610, 0),
@@ -462,7 +412,7 @@ namespace DexManager.Forms
             companionButtons.Controls.Add(_displayCleanupPermissionButton);
             companionButtons.Controls.Add(_companionUninstallButton);
             displayCleanup.Controls.Add(companionButtons);
-            _displayCleanupStatusLabel = new Label
+            _displayCleanupStatusLabel = new UiLabel
             {
                 AutoSize = true,
                 MaximumSize = new Size(610, 0),
@@ -473,7 +423,7 @@ namespace DexManager.Forms
                     "Settings.DisplayCleanupChecking")
             };
             displayCleanup.Controls.Add(_displayCleanupStatusLabel);
-            AddCard(
+            _companionCard = AddCard(
                 page,
                 LocalizationService.Get(
                     "Settings.GroupDisplayCleanup"),

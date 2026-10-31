@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Net;
 using System.Text;
 using System.Text.RegularExpressions;
 using DexManager.Models;
@@ -12,6 +13,15 @@ namespace DexManager.Services
     {
         private static readonly Regex IpAddress = new Regex(
             @"(?<!\d)(?:\d{1,3}\.){3}\d{1,3}(?::\d+)?",
+            RegexOptions.Compiled);
+        private static readonly Regex Ipv6Endpoint = new Regex(
+            @"(?i)(?<![a-z0-9_])(?:\[[0-9a-f:.]+(?:%[a-z0-9_.-]+)?\](?::\d+)?|[0-9a-f]*:[0-9a-f:.]*(?:%[a-z0-9_.-]+)?)(?![a-z0-9_])",
+            RegexOptions.Compiled);
+        private static readonly Regex MdnsHostname = new Regex(
+            @"(?i)(?<![a-z0-9-])(?:[a-z0-9][a-z0-9-]*\.)+(?:local|lan|home|internal)(?::\d+)?",
+            RegexOptions.Compiled);
+        private static readonly Regex MdnsSerialAlias = new Regex(
+            @"(?i)\badb-[^\s,;]+?\._adb-tls-(?:connect|pairing)\._tcp\.?",
             RegexOptions.Compiled);
         private static readonly Regex TokenValue = new Regex(
             @"(?i)(token|auth(?:entication)?)[=: ]+[^\s,;]+",
@@ -33,8 +43,15 @@ namespace DexManager.Services
             DeviceRuntimeRegistrySnapshot runtimes,
             DeviceVersionDiagnostic diagnostic,
             DisplayCleanupPermissionStatus companion,
-            IEnumerable<string> sessionEntries)
+            IEnumerable<string> sessionEntries,
+            IEnumerable<DeviceVersionDiagnostic> connectedDiagnostics)
         {
+            var selectedSerial = diagnostic == null
+                ? string.Empty
+                : diagnostic.Serial;
+            var sensitiveSerials = CollectSensitiveSerials(
+                devices,
+                selectedSerial);
             var builder = new StringBuilder();
             builder.AppendLine("DX Manager diagnostic report");
             builder.AppendLine("Generated: " +
@@ -50,7 +67,7 @@ namespace DexManager.Services
             builder.AppendLine();
 
             builder.AppendLine("[Selected device]");
-            AppendDevice(builder, diagnostic);
+            AppendDevice(builder, diagnostic, sensitiveSerials);
             builder.AppendLine("Identity: " + MaskIdentity(selectedIdentity));
             builder.AppendLine("Companion: " + CompanionText(companion));
 
@@ -88,13 +105,30 @@ namespace DexManager.Services
             }
             builder.AppendLine();
 
+            builder.AppendLine("[Connected device versions]");
+            var versions = (connectedDiagnostics ??
+                Enumerable.Empty<DeviceVersionDiagnostic>())
+                .Where(item => item != null)
+                .ToArray();
+            if (versions.Length == 0)
+            {
+                builder.AppendLine("None inspected.");
+            }
+            else
+            {
+                foreach (var connectedDiagnostic in versions)
+                {
+                    builder.AppendLine("Device identity: " +
+                        MaskIdentity(connectedDiagnostic.DeviceIdentity));
+                    AppendDevice(
+                        builder,
+                        connectedDiagnostic,
+                        sensitiveSerials);
+                }
+            }
+            builder.AppendLine();
+
             builder.AppendLine("[Recent warnings and errors]");
-            var selectedSerial = diagnostic == null
-                ? string.Empty
-                : diagnostic.Serial;
-            var sensitiveSerials = CollectSensitiveSerials(
-                devices,
-                selectedSerial);
             var relevant = (sessionEntries ?? Enumerable.Empty<string>())
                 .Where(IsWarningOrError)
                 .TakeLastCompatible(40)
@@ -113,7 +147,8 @@ namespace DexManager.Services
 
         private static void AppendDevice(
             StringBuilder builder,
-            DeviceVersionDiagnostic diagnostic)
+            DeviceVersionDiagnostic diagnostic,
+            IEnumerable<string> sensitiveSerials)
         {
             if (diagnostic == null)
             {
@@ -137,7 +172,9 @@ namespace DexManager.Services
             if (!diagnostic.QuerySucceeded)
             {
                 builder.AppendLine("Version query error: " +
-                    OneLine(diagnostic.ErrorDetail));
+                    SanitizeLogLine(
+                        OneLine(diagnostic.ErrorDetail),
+                        sensitiveSerials));
             }
         }
 
@@ -229,7 +266,20 @@ namespace DexManager.Services
             {
                 result = result.Replace(userProfile, "<user-profile>");
             }
+            result = Ipv6Endpoint.Replace(result, delegate(Match match)
+            {
+                var address = match.Value;
+                if (address.StartsWith("[", StringComparison.Ordinal))
+                    address = address.Substring(1, address.IndexOf(']') - 1);
+                var scope = address.IndexOf('%');
+                if (scope >= 0) address = address.Substring(0, scope);
+                IPAddress parsed;
+                return address.Count(c => c == ':') >= 2 &&
+                    IPAddress.TryParse(address, out parsed) ? "<ip>" : match.Value;
+            });
             result = IpAddress.Replace(result, "<ip>");
+            result = MdnsHostname.Replace(result, "<hostname>");
+            result = MdnsSerialAlias.Replace(result, "<mdns-endpoint>");
             result = TokenValue.Replace(result, "$1=<redacted>");
             result = QuotedPath.Replace(result, "\"<path>\"");
             result = AbsoluteWindowsPath.Replace(result, "<path>");
@@ -271,7 +321,16 @@ namespace DexManager.Services
             {
                 foreach (var device in devices.Devices)
                 {
-                    if (device == null || device.Transports == null) continue;
+                    if (device == null) continue;
+                    if (!string.IsNullOrWhiteSpace(device.DisplayName)) values.Add(device.DisplayName);
+                    if (!string.IsNullOrWhiteSpace(device.Identity))
+                    {
+                        values.Add(device.Identity);
+                        var separator = device.Identity.IndexOf(':');
+                        if (separator >= 0 && separator < device.Identity.Length - 1)
+                            values.Add(device.Identity.Substring(separator + 1));
+                    }
+                    if (device.Transports == null) continue;
                     foreach (var transport in device.Transports)
                     {
                         if (transport != null &&

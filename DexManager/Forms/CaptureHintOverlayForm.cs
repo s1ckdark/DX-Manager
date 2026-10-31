@@ -23,7 +23,7 @@ namespace DexManager.Forms
             AutoSize = true;
             AutoSizeMode = AutoSizeMode.GrowAndShrink;
 
-            _messageLabel = new Label
+            _messageLabel = new UiLabel
             {
                 AutoSize = true,
                 ForeColor = Color.White,

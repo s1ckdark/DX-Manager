@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.IO;
 using System.Threading;
 using System.Windows.Forms;
@@ -19,13 +19,13 @@ namespace DexManager
         {
             NativeMethods.SuppressNativeCrashDialogs();
 
-            bool createdNew;
-            _singleInstanceMutex = new Mutex(
-                true,
-                SingleInstanceName,
-                out createdNew);
-            if (!createdNew)
+            _singleInstanceMutex = new Mutex(false, SingleInstanceName);
+            var acquired = false;
+            try { acquired = _singleInstanceMutex.WaitOne(0, false); }
+            catch (AbandonedMutexException) { acquired = true; }
+            if (!acquired)
             {
+                if (!IsAutoRun(args)) SingleInstanceActivationService.SignalPrimary(SingleInstanceName);
                 _singleInstanceMutex.Dispose();
                 return;
             }
@@ -36,6 +36,19 @@ namespace DexManager
             var logService = new LogService();
             ProcessRunner processRunner = null;
             MainForm mainForm = null;
+            var activation = new SingleInstanceActivationService(SingleInstanceName);
+            var activationPending = 0;
+            activation.ActivationRequested += delegate
+            {
+                Interlocked.Exchange(ref activationPending, 1);
+                var target = mainForm;
+                if (target != null && target.IsHandleCreated)
+                {
+                    Interlocked.Exchange(ref activationPending, 0);
+                    target.RequestWindowActivation();
+                }
+            };
+            activation.StartListening();
             var bundledProcessCleanup =
                 new BundledProcessCleanupService(logService);
 
@@ -201,6 +214,17 @@ namespace DexManager
                     pathService,
                     captureService,
                     IsAutoRun(args));
+                mainForm.Shown += delegate
+                {
+                    if (Interlocked.Exchange(ref activationPending, 0) != 0)
+                        mainForm.RequestWindowActivation();
+                };
+                mainForm.InitializeUpdateChecks(new UpdateCheckService(
+                    Application.ProductVersion, new GitHubReleaseSource(),
+                    new FileUpdateCheckStateStore(
+                        Path.Combine(settingsService.BaseDirectory, "config", "update-check.json"),
+                        delegate(string message) { logService.Warning(message); }),
+                    null, delegate(string message) { logService.Info(message); }));
                 Application.Run(mainForm);
             }
             catch (Exception ex)
@@ -223,6 +247,7 @@ namespace DexManager
             }
             finally
             {
+                activation.Dispose();
                 // Explicit app exit performs the final package-owned process
                 // sweep. During Windows shutdown, do not race the OS by
                 // terminating ADB/scrcpy processes from this finally block.

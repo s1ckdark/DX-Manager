@@ -1,5 +1,21 @@
 # DX Manager for macOS 사용 및 개발 가이드
 
+## Release status — reviewed 2026-10-24
+
+This is the separate macOS .NET8 implementation from public main, not the Windows2.5.0 WinForms package.
+The published releases checked on this date contain Windows ZIP assets; no published Mac ZIP is currently available.
+The portable-ZIP instructions below describe the Mac packaging workflow and apply when its artifacts are published.
+Its documented scrcpy4.1 bundle and earlier test counts are Mac-specific and were not revalidated by the Windows702-check run.
+Do not apply the Windows120 FPS/update/UI changes to macOS without checking its own implementation.
+The current Mac source/workflow, including the Avalonia desktop GUI, lives in this fork
+([s1ckdark/DX-Manager](https://github.com/s1ckdark/DX-Manager)); upstream public main keeps the TUI/CLI base only.
+
+이 문서는 별도 macOS 구현 안내입니다. 현재 확인한 공개 릴리스에는 Mac ZIP이 없으며,
+아래 사전 빌드 ZIP 안내는 해당 결과물이 공개될 때 적용됩니다. Windows2.5.0의 기능·검증 결과를
+macOS에 적용하지 않습니다. Mac의 기존 내용·실행 환경은 원래 안내로 보존합니다.
+
+
+
 <p align="center">
   <b>Samsung DeX & 다중 가상 디스플레이 매니저 for macOS (.NET 8 Native Edition)</b>
 </p>
@@ -17,7 +33,7 @@
 ## 2. 시스템 요구사항 (Requirements)
 
 - **운영체제**: macOS 14 Sonoma 이상
-- **아키텍처**: 
+- **아키텍처**:
   - Apple Silicon (Apple M series) - Native ARM64
   - Intel Mac (x86_64)
 - **포터블 ZIP 사용자**: Homebrew, .NET, scrcpy와 ADB를 별도로 설치하지
@@ -89,7 +105,7 @@ DX Manager for macOS는 xUnit 기반 단위/통합 테스트와 다중 기기 �
 dotnet test DexManager.Mac.sln -c Release
 
 # 39개 다중 기기 세션 격리 회귀 테스트 실행
-dotnet run --project DexManager.MultiDeviceTests -c Release
+dotnet run --project DexManager.MultiDeviceTests.Mac -c Release
 ```
 
 ### 4.3 아키텍처별 포터블 ZIP 생성
@@ -227,7 +243,7 @@ macOS 환경에서 Scrcpy 조작 시 기본 Modifier 키는 **`Option (⌥)`** �
 ## 8. 문제 해결 (Troubleshooting)
 
 ### Q1. DeX 종료 후 스마트폰 화면 구석에 작은 보조 화면이 남아있습니다.
-> **원인**: 케이블을 강제로 뽑거나 비정상 종료 시 Android OS가 오버레이 설정을 유지할 수 있습니다.  
+> **원인**: 케이블을 강제로 뽑거나 비정상 종료 시 Android OS가 오버레이 설정을 유지할 수 있습니다.
 > **해결 방법**:
 > 1. 대화형 콘솔에서 `[2] Stop DeX Mode`를 다시 실행합니다.
 > 2. 또는 터미널에서 수동으로 ADB 명령을 전송합니다:

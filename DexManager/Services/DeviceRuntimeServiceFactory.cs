@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using DexManager.Models;
 using DexManager.Utils;
@@ -91,6 +91,10 @@ namespace DexManager.Services
                 _launchCoordinator,
                 scrcpy.RuntimeInfo,
                 _logService);
+            Func<bool> canTurnScreenOff = () => !scrcpy.RequiresPhoneScreenOn && !singleWindows.RequiresPhoneScreenOn;
+            scrcpy.CanTurnPhoneScreenOff = canTurnScreenOff;
+            singleWindows.CanTurnPhoneScreenOff = canTurnScreenOff;
+            screenOff.CanTurnPhoneScreenOff = canTurnScreenOff;
             var virtualDisplay = new VirtualDisplayService(
                 _adbService,
                 _logService);

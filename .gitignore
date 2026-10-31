@@ -24,13 +24,25 @@ packages/
 
 # Generated release packages
 dist/
+
+# Private Android signing inputs
+**/signing.properties
+*.jks
+*.keystore
+**/local.properties
+
 # macOS system files
+
 .DS_Store
+
 **/.DS_Store
 
 # User local settings
+
 **/config/settings.json
+
 **/config/settings.json.*
+
 **/*.dSYM/
 
 # Agent tooling operational state

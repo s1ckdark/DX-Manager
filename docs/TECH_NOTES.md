@@ -1,4 +1,147 @@
-# Technical Notes
+# Technical notes
+
+## Current Windows architecture — 2026-10-25
+
+Baseline: code checkpoint `ccc10a9`, Windows2.5.0, .NET Framework4.6.2 x64, scrcpy5.0.1 and official Companion2.1.6/code13.
+These notes describe the portable product; Store WinUI and the public macOS .NET8 implementation are separate.
+The included companion/ release snapshot supplies public builds; canonical Android development remains shared.
+
+### Physical devices and transports
+
+`PhysicalDeviceRegistry` merges transports using stable physical identity rather than a friendly name.
+`DeviceRuntimeSessionRegistry` and `DeviceRuntimeServiceFactory` bind one runtime service set to each phone.
+Device commands capture an explicit serial; no global mutable target chooses commands for a live session.
+New launches prefer authorized USB, then that phone's authorized wireless transport. Running windows retain their captured serial.
+USB loss does not silently migrate those windows. A later manual start or a real reconnect follows the saved policy.
+
+`MainForm.Devices` projects the device selector and device-owned run settings/app lists.
+App profiles are keyed by Android package and stored per phone. DeX start app is optional; each single-window slot requires one.
+A missing-app notice is scoped to its phone/slot.
+
+### Launch, FPS and screen power
+
+`DexOrchestrator` owns DeX overlay leases; `SingleWindowService` owns three separate scrcpy-created displays.
+Overlay reuse requires matching width, height and DPI. Discover display IDs from observed state rather than guessing.
+`ScrcpyLaunchCoordinator` serializes starts; the final shutdown check and `Process.Start` remain in the short process-start lock,
+with window discovery/waits outside that lock.
+
+`FrameRateRules` allows30/60/120, default60. Nullable `TurnScreenOffBeforeHighFps` preserves the prior true/false value
+through root/default, per-phone DeX, slots, app profiles, normalization, clone and UI projection.
+At120 screen-off is false/disabled. At30/60 restore the prior value and clear the backup.
+Older experimental120 data without a backup uses the documented true fallback.
+
+All actual120 UI starts/restarts use the common confirmation gate; service entry points also fail closed without confirmation.
+Capture the runtime, serial and cloned settings before confirmation/delays. Default action is Cancel; no device launch I/O follows cancellation.
+Builders omit `-S`/`--turn-screen-off`/`--no-power-on` at120 and reserve advanced `--max-fps` overrides.
+Actual live-process FPS, not edited settings, determines a phone's screen-on requirement.
+Any live120 DeX/app slot suppresses other starts/delayed screen-off on that phone; the last120 exit lets ordinary requests resume.
+Other phones are independent. Manual power/shortcuts remain outside this automatic preference policy.
+
+The official5.0.1 runtime receives `--hwdec=auto` unless an explicit hardware-decoder option is already supplied.
+Use the selected scrcpy version/log output for diagnostics; a lower CPU reading is not decoder proof.
+
+### Transfers, input and lifecycle
+
+- `FileTransferCoordinator` and `DXMAdbProxy` intercept only managed scrcpy target-folder pushes.
+  Device management/wake-up commands still use the explicit ADB service path.
+- `PhoneTransferReceiver` uses authenticated per-phone local reverse sessions. Both directions preserve Unicode,
+  structure and empty folders, reserve collision-safe sibling names and keep partial/committing states separate.
+- The official Companion retains duplicate-share protection; don't combine a test share target with the official receiver.
+- Keyboard/capture/mini-bar actions use the focused or explicitly owned session. Keep injected input separated from physical input.
+  SDL3 right Shift→left Shift correction and optional manual Scroll Lock Enter conversion remain; no app tracker is present.
+- Re-running the EXE signals the existing instance. Main-to-tray closes attached Settings/Help/dialogs while sessions continue.
+  Idle auto-hide also minimizes scrcpy. Preserve user settings/history when overwriting the fixed preview.
+
+### Online updates, local notes and consent
+
+`GitHubReleaseSource` reads a numeric stable release tag and validated HTTPS release URL.
+`UpdateCheckService` persists the local-day attempt before background networking, uses a five-second deadline,
+single-flight control and no automatic offline loop. Manual checks stay explicit.
+Automatic availability uses the lower-right banner or tray notification when hidden/minimized; current/offline automatic results are silent.
+The GitHub button opens the release page without dismissing the banner.
+
+`PortableUpdateNoticeService` uses independent `config/update-notice.json`, atomic writes and a monotonic version checkpoint.
+Read previous safety acceptance before showing a new safety notice. Fresh config establishes a changes baseline;
+existing accepted config can show an unseen version once. Show it before device startup/automatic120 consent.
+Informational-note failures do not block startup; mandatory120 confirmation failure does.
+First-run safety acknowledgement is independent of ordinary settings reset and absent from clean packages.
+
+### Companion recovery and shutdown
+
+Official Android source/APK are maintained in one shared component. The PC validates package/version/certificate/hash and grants protected
+cleanup permission only to the trusted app on the selected phone. File-transfer connection and recovery permission are separate states.
+
+Companion2.1.6 serializes connection/terminal callbacks with session-generation checks. Once the authenticated PC link is lost
+and overlay/Stay awake are verified inactive, protection stops promptly, even with raw Wi-Fi still on.
+Active/unverified recovery retains the existing transport/delay policy. Initial tunnel setup has a grace period.
+Normal exit performs device cleanup; Windows shutdown blocks new ADB helpers and uses the established Companion channel best-effort.
+Real shutdown delivery and every firmware are not guaranteed by headless tests.
+
+### Packaging and verification
+
+`Package-Release.ps1` copies an explicit runtime/license list. `Build-FinalRelease.ps1` backs up the old final and creates
+`DX-Manager-win-x64.zip` containing `DX Manager v2.5.0/`. The39-file deliverable contains no personal config/history,
+logs, captures, developer docs, screenshot assets, symbols, signing material or test programs.
+The two scrcpy PNGs are required vendor runtime resources.
+
+The prepared EXE is identical to the702-check English UI preview. Check exact hashes in [verification](VERIFICATION_v2.5.0.md).
+Documentation-only work preserves the final ZIP/EXE/APK. Web guides can be expanded independently of the embedded document snapshot.
+Changes to embedded resources require an explicit product rebuild and renewed artifact verification.
+
+## 한국어
+
+휴대폰별 런타임·명시적 serial·새 실행 USB 우선·실행 중 연결 고정,120 실행 동의와 원래 화면 끄기 값 복원,
+동일 폰 화면 켜짐 우선, Unicode 전송·포커스 입력·트레이·정리 규칙을 유지합니다.
+온라인 확인·로컬 변경사항·안전 동의는 별도 상태입니다. 현재 검증 수와 배포 파일의 해시는 위 기록을 따르며,
+아래 과거 설계 기록을 현행2.5.0 동작으로 해석하지 않습니다.
+
+<details>
+<summary>Earlier implementation/preparation records (historical)</summary>
+
+These dated records describe earlier states. Use the current sections above for2.5.0.
+
+
+## 2026-10-24 English fallback coverage
+
+DiagnosticsEnvironmentText.Text and DiagnosticsReportStatusText.Text lacked StoreStrings entries, exposing Korean fallbacks. Add matched EN/KO entries and English-safe fallbacks while retaining Korean wording. The955-call-site audit also found missing USB/Wi-Fi entries and Log.Wireless.DeviceMismatch; these are filled. Concatenated resource prefixes were checked against actual members.
+
+InitializeDesktopLayout sets13px only for English Help after the common14px assignment and before RememberDesktopFonts. Existing font fitting preserves that choice; no renderer/global font change. LocalizationUiIntegrationTests checks full text fit at three window sizes and Korean Help parity. The English FAQ uses an English cross-language link label; language selection intentionally keeps the native 한국어 name.
+
+The fixture selects English before creating forms on a Korean UI culture. User/device/app/file names, vendor output, native OS dialog language and third-party license content are not rewritten as application translations.
+
+
+## 2026-10-24 diagnostics header layout
+
+RefreshStoreEnvironment reparents RefreshDiagnosticsButton from EditorHost to HeaderSurface, then enables WideContent. Reflow previously expanded TitleLabel and DescriptionLabel across that button's rectangle, so the labels painted over most of it. Reserve178px of header text space for the wide DiagnosticsEnvironmentCard, matching its160px action plus margin. Keep EditorHost full-width for wrapped paths. Tests reproduce the old overlap and check expanded header/button bounds at520/716/900px and actual repeat clicks in light/dark themes.
+
+
+## 2026-10-19 portable 120 FPS preparation
+
+The maintainer authorized implementing the Store handoff in the portable product
+and rebuilding the fixed preview/final ZIP locally. Store is read-only; reference
+commit11050e7822c43ec409d7d943ece5d9884d997b99 is not merged.
+Added default60/experimental120, one fail-closed warning before every120 start,
+exact screen-off preference restoration, per-phone mixed-session screen policy
+and local version-scoped change notes. scrcpy5.0.1 and signed Companion2.1.6 are
+unchanged. No AI app detection, Android changes, commit/push/tag or publication.
+See PORTABLE_120FPS_2026-10-19.md for implementation and fresh verification.
+October16 scan evidence remains historical; the new EXE needs a fresh user scan.
+
+
+## Current state — 2026-10-16
+
+- Latest public Windows release:2.0.1. Prepared local Windows build:2.5.0; not published.
+- Active portable branch: feature/portable-backport-v2.0.1-20260928, local HEAD8b19906 plus accepted uncommitted work.
+- scrcpy 5.0.1; official shared Companion 2.1.6/code13/protocol1; Android 13 minimum.
+- New launches USB-first; live serials stay captured. Companion management has its own Settings page.
+- First-run consent is saved once; updates check daily in the background with offline failure recorded.
+- The exact release ZIP/EXE/APK have been built and the maintainer reports clean antivirus results.
+- Current work is local GitHub-documentation/screenshot preparation; no release approval has been given.
+- Standalone public-source shared-component closure, remote macOS preservation and new portable captures
+  are tracked in DOCUMENTATION_AUDIT_2026-10-16.md and SCREENSHOT_PLAN_v2.5.0.md.
+
+See PROJECT_BRIEF.md, BUILDING.md and VERIFICATION_v2.5.0.md for the current contracts and boundaries.
+Older dated implementation notes below describe earlier stages; their old version pins are historical.
 
 ## 주요 구조
 
@@ -404,3 +547,5 @@ Scrcpy 주 창과 단일창 서비스에는 프로세스 종료, 출력 drain, �
 규칙이 다르고 과거 종료 경합 회귀가 있었으므로 단순 공통 helper 추출은 하지 않는다.
 공통화는 비정상 분리·사용자 창 닫기·동시 종료를 검증하는 전용 테스트를 먼저 만든
 뒤 진행한다.
+
+</details>

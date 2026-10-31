@@ -17,7 +17,7 @@ namespace DexManager.Forms
             Items = new List<object>();
             TabStop = true;
             Cursor = Cursors.Hand;
-            Font = UiFonts.Create(9.5F);
+            Font = UiFonts.Pixels(14F);
             Size = new Size(200, 32);
             SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint |
                 ControlStyles.OptimizedDoubleBuffer | ControlStyles.ResizeRedraw |
@@ -25,6 +25,8 @@ namespace DexManager.Forms
         }
 
         public IList<object> Items { get; private set; }
+        public bool CenterSelectedText { get; set; }
+        public bool CenterInWholeField { get; set; }
 
         public int SelectedIndex
         {
@@ -91,12 +93,12 @@ namespace DexManager.Forms
             }
             else if (e.KeyCode == Keys.Down && Items.Count > 0)
             {
-                CommitSelection(Math.Min(Items.Count - 1, SelectedIndex + 1));
+                MoveSelection(1);
                 e.Handled = true;
             }
             else if (e.KeyCode == Keys.Up && Items.Count > 0)
             {
-                CommitSelection(Math.Max(0, SelectedIndex - 1));
+                MoveSelection(-1);
                 e.Handled = true;
             }
             base.OnKeyDown(e);
@@ -135,6 +137,7 @@ namespace DexManager.Forms
 
         protected override void OnPaint(PaintEventArgs e)
         {
+            UiText.Configure(e.Graphics);
             var colors = ThemeColors.Current;
             e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
             DrawFieldBackground(e.Graphics, ClientRectangle, Focused, Enabled);
@@ -142,13 +145,13 @@ namespace DexManager.Forms
             var text = SelectedItem == null
                 ? string.Empty
                 : SelectedItem.ToString();
-            TextRenderer.DrawText(
+            UiText.DrawText(
                 e.Graphics,
                 text,
                 Font,
-                new Rectangle(10, 0, Math.Max(Width - 42, 0), Height),
+                new Rectangle(CenterInWholeField ? 12 : 10, 0, Math.Max(Width - (CenterInWholeField ? 24 : 42), 0), Height),
                 Enabled ? colors.TextPrimary : colors.DisabledText,
-                TextFormatFlags.Left | TextFormatFlags.VerticalCenter |
+                (CenterSelectedText ? TextFormatFlags.HorizontalCenter : TextFormatFlags.Left) | TextFormatFlags.VerticalCenter |
                 TextFormatFlags.EndEllipsis | TextFormatFlags.NoPadding);
 
             using (var pen = new Pen(
@@ -191,7 +194,7 @@ namespace DexManager.Forms
             {
                 _dropDown = null;
                 if (!IsDisposed && IsHandleCreated)
-                    BeginInvoke((Action)delegate { Focus(); });
+                    BeginInvoke((Action)delegate {var owner=FindForm();if(!IsDisposed && owner!=null && owner.Enabled)Focus();});
             };
             var screenPoint = PointToScreen(new Point(0, Height + 3));
             var workingArea = Screen.FromControl(this).WorkingArea;
@@ -202,8 +205,19 @@ namespace DexManager.Forms
             _dropDown.Show(FindForm());
         }
 
+        private void MoveSelection(int direction)
+        {
+            int next=SelectedIndex<0?0:SelectedIndex+direction;
+            while(next>=0 && next<Items.Count) {
+                var group=Items[next] as IDropDownGroupItem;
+                if(group==null || group.IsSelectable){CommitSelection(next);return;}
+                next+=direction;
+            }
+        }
         private void CommitSelection(int index)
         {
+            if(index<0 || index>=Items.Count)return;
+            var group=Items[index] as IDropDownGroupItem;if(group!=null && !group.IsSelectable)return;
             SelectedIndex = index;
             var handler = SelectionChangeCommitted;
             if (handler != null) handler(this, EventArgs.Empty);
@@ -251,6 +265,8 @@ namespace DexManager.Forms
 
     internal sealed class ThemedTextControl : UserControl
     {
+        [System.Runtime.InteropServices.DllImport("user32.dll", CharSet=System.Runtime.InteropServices.CharSet.Unicode, EntryPoint="SendMessageW")]
+        private static extern IntPtr SetCueBanner(IntPtr window, int message, IntPtr value, string text);
         private readonly TextBox _editor;
         private readonly ThemedTextDisplay _display;
         private bool _syncingText;
@@ -258,12 +274,18 @@ namespace DexManager.Forms
         private int _maxLength = 256;
         private bool _usePasswordMask;
         private bool _useMiddleEllipsis;
+        private string _placeholderText;
+        public string PlaceholderText
+        {
+            get { return _placeholderText; }
+            set { _placeholderText = value; if (_display != null) { _display.PlaceholderText = value; _display.Invalidate(); } if(_editor!=null && _editor.IsHandleCreated)SetCueBanner(_editor.Handle,0x1501,new IntPtr(1),value??string.Empty); }
+        }
 
         public ThemedTextControl()
         {
             TabStop = false;
             Cursor = Cursors.IBeam;
-            Font = UiFonts.Create(9.5F);
+            Font = UiFonts.Pixels(14F);
             Size = new Size(200, 32);
             SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint |
                 ControlStyles.OptimizedDoubleBuffer | ControlStyles.ResizeRedraw |
@@ -280,6 +302,7 @@ namespace DexManager.Forms
                 Font = Font
             };
             _editor.TextChanged += Editor_TextChanged;
+            _editor.HandleCreated += delegate {SetCueBanner(_editor.Handle,0x1501,new IntPtr(1),_placeholderText??string.Empty);};
             _editor.Enter += Editor_Enter;
             _editor.Leave += Editor_Leave;
 
@@ -293,10 +316,12 @@ namespace DexManager.Forms
 
             Controls.Add(_editor);
             Controls.Add(_display);
+            _display.BringToFront();
             LayoutChildren();
             ApplyTheme();
         }
 
+        public bool ReadOnly { get { return _editor.ReadOnly; } set { _editor.ReadOnly = value; } }
         public int MaxLength
         {
             get { return _maxLength; }
@@ -392,6 +417,7 @@ namespace DexManager.Forms
 
         protected override void OnPaint(PaintEventArgs e)
         {
+            UiText.Configure(e.Graphics);
             ApplyTheme();
             e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
             ThemedSelectControl.DrawFieldBackground(
@@ -476,7 +502,9 @@ namespace DexManager.Forms
         private sealed class ThemedTextDisplay : Control
         {
             public string DisplayText { get; set; }
+            public string PlaceholderText { get; set; }
             public bool UsePasswordMask { get; set; }
+        public bool CenterText { get; set; }
             public bool UseMiddleEllipsis { get; set; }
 
             public ThemedTextDisplay()
@@ -490,8 +518,11 @@ namespace DexManager.Forms
 
             protected override void OnPaint(PaintEventArgs e)
             {
+                UiText.Configure(e.Graphics);
                 base.OnPaint(e);
                 var value = DisplayText ?? string.Empty;
+                var placeholder = value.Length == 0 && !string.IsNullOrEmpty(PlaceholderText);
+                if (placeholder) value = PlaceholderText;
                 if (UsePasswordMask)
                     value = new string('\u2022', value.Length);
 
@@ -502,12 +533,12 @@ namespace DexManager.Forms
                     (UseMiddleEllipsis
                         ? TextFormatFlags.PathEllipsis
                         : TextFormatFlags.EndEllipsis);
-                TextRenderer.DrawText(
+                UiText.DrawText(
                     e.Graphics,
                     value,
                     Font,
                     ClientRectangle,
-                    ForeColor,
+                    placeholder ? ThemeColors.Current.TextTertiary : ForeColor,
                     BackColor,
                     flags);
             }
@@ -523,7 +554,7 @@ namespace DexManager.Forms
         {
             TabStop = true;
             Cursor = Cursors.IBeam;
-            Font = UiFonts.Create(9.5F);
+            Font = UiFonts.Pixels(14F);
             Size = new Size(200, 32);
             MaxLength = 256;
             SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint |
@@ -533,6 +564,7 @@ namespace DexManager.Forms
 
         public int MaxLength { get; set; }
         public bool UsePasswordMask { get; set; }
+        public bool CenterText { get; set; }
         public bool UseMiddleEllipsis { get; set; }
 
         public void SelectAll()
@@ -587,7 +619,9 @@ namespace DexManager.Forms
                 SelectAll();
                 return;
             }
-            _selectionStart = FindCharacterIndex(e.X - 10);
+            using (var graphics = CreateGraphics())
+            using (var format = CreateTextFormat())
+                _selectionStart = FindCharacterIndex(e.X - (int)TextLeft(graphics, Text, format));
             _selectionLength = 0;
             Invalidate();
         }
@@ -688,6 +722,7 @@ namespace DexManager.Forms
 
         protected override void OnPaint(PaintEventArgs e)
         {
+            UiText.Configure(e.Graphics);
             var colors = ThemeColors.Current;
             e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
             ThemedSelectControl.DrawFieldBackground(
@@ -718,10 +753,11 @@ namespace DexManager.Forms
                         Math.Max(Width - 20, 0),
                         format);
                 }
+                var textLeft = TextLeft(e.Graphics, displayValue, format);
                 DrawText(
                     e.Graphics,
                     displayValue,
-                    10,
+                    textLeft,
                     textY,
                     textColor,
                     format);
@@ -732,7 +768,7 @@ namespace DexManager.Forms
                     var selected = displayValue.Substring(
                         selectionStart,
                         selectionLength);
-                    var selectionX = 10F + MeasureText(
+                    var selectionX = textLeft + MeasureText(
                         e.Graphics,
                         prefix,
                         format);
@@ -756,7 +792,7 @@ namespace DexManager.Forms
                 }
                 else if (Focused)
                 {
-                    var caretX = 10F + MeasureText(
+                    var caretX = textLeft + MeasureText(
                         e.Graphics,
                         displayValue.Substring(0, selectionStart),
                         format);
@@ -948,6 +984,7 @@ namespace DexManager.Forms
             StringFormat format)
         {
             if (string.IsNullOrEmpty(value)) return 0F;
+            UiText.Configure(graphics);
             return graphics.MeasureString(
                 value,
                 Font,
@@ -963,6 +1000,7 @@ namespace DexManager.Forms
             Color color,
             StringFormat format)
         {
+            UiText.Configure(graphics);
             using (var brush = new SolidBrush(color))
                 graphics.DrawString(
                     value ?? string.Empty,
@@ -972,6 +1010,10 @@ namespace DexManager.Forms
                     format);
         }
 
+        private float TextLeft(Graphics graphics, string value, StringFormat format)
+        {
+            return CenterText ? System.Math.Max(10F, (Width - MeasureText(graphics, value ?? string.Empty, format)) / 2F) : 10F;
+        }
         private static StringFormat CreateTextFormat()
         {
             var format = (StringFormat)StringFormat.GenericTypographic.Clone();

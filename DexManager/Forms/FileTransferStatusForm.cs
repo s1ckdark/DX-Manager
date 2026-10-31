@@ -14,13 +14,16 @@ namespace DexManager.Forms
         private const int AnimationIntervalMs = 350;
         private const int AutoHideMilliseconds = 4000;
         private const int VisibleQueueRows = 5;
-        private const int ExpandedHeight = 286;
-        private const int CompactHeight = 184;
+        private const int ExpandedHeight = 368;
+        private const int CompactHeight = 244;
         private readonly FileTransferCoordinator _coordinator;
         private readonly Label _statusLabel;
         private readonly Label[] _queueLabels;
         private readonly Label _detailLabel;
         private readonly Label _countLabel;
+        private readonly Label _deviceLabel;
+        private readonly Label _targetLabel;
+        private readonly RoundedPanel _contentCard;
         private readonly ThemedButton _cancelButton;
         private readonly Timer _animationTimer;
         private readonly ToolTip _toolTip;
@@ -28,10 +31,21 @@ namespace DexManager.Forms
         private DateTime _hideAtUtc;
         private bool _cancelRequested;
         private int _animationFrame;
+        public event EventHandler PositionUpdateRequested;
+
+        public string SessionId
+        {
+            get { return _progress == null ? string.Empty : _progress.SessionId; }
+        }
+
+        public int TargetProcessId { get; private set; }
+        public IntPtr TargetWindowHandle { get; private set; }
+        public bool HasResolvedTargetWindow { get; private set; }
 
         public FileTransferStatusForm(
             FileTransferCoordinator coordinator,
-            AppTheme theme)
+            AppTheme theme,
+            string deviceName = null)
         {
             _coordinator = coordinator ??
                 throw new ArgumentNullException("coordinator");
@@ -48,18 +62,39 @@ namespace DexManager.Forms
             ShowInTaskbar = false;
             TopMost = false;
             StartPosition = FormStartPosition.Manual;
-            ClientSize = new Size(430, ExpandedHeight);
+            ClientSize = new Size(620, ExpandedHeight);
+            DoubleBuffered = true;
 
-            _statusLabel = new Label
+            _contentCard = new RoundedPanel
+            {
+                Radius = 12, Location = new Point(20, 86), Size = new Size(580, 220),
+                BackColor = Color.Transparent, FillColor = palette.CardBackground,
+                BorderColor = palette.CardBorder
+            };
+            Controls.Add(_contentCard);
+
+            _statusLabel = new UiLabel
             {
                 AutoSize = false,
-                Font = UiFonts.Create(12F, FontStyle.Bold),
+                BackColor = Color.Transparent,
+                Font = UiFonts.Pixels(20, true),
                 ForeColor = palette.TextPrimary,
-                Location = new Point(18, 14),
-                Size = new Size(394, 28),
+                Location = new Point(20, 16),
+                Size = new Size(580, 30),
                 Text = LocalizationService.Get("FileTransfer.Preparing")
             };
             Controls.Add(_statusLabel);
+            _deviceLabel = new UiLabel { Location = new Point(20, 52), Size = new Size(580, 22),
+                BackColor = Color.Transparent,
+                Font = UiFonts.Pixels(14), ForeColor = palette.TextSecondary, AutoEllipsis = true,
+                Text = string.IsNullOrWhiteSpace(deviceName)
+                    ? StoreUiText.Get("CommonConnectedPhone", "Connected phone") : deviceName };
+            _targetLabel = new UiLabel { Location = new Point(20, 326), Size = new Size(450, 24),
+                BackColor = Color.Transparent,
+                Font = UiFonts.Pixels(14), ForeColor = palette.TextSecondary, AutoEllipsis = true,
+                Text = StoreUiText.Get("FileTransferSendingToPhone", "Sending to phone") };
+            Controls.Add(_deviceLabel);
+            Controls.Add(_targetLabel);
 
             _toolTip = new ToolTip
             {
@@ -67,53 +102,57 @@ namespace DexManager.Forms
                 InitialDelay = 400,
                 ReshowDelay = 100
             };
-            _queueLabels = new Label[VisibleQueueRows];
+            _queueLabels = new UiLabel[VisibleQueueRows];
             for (var index = 0; index < _queueLabels.Length; index++)
             {
-                var label = new Label
+                var label = new UiLabel
                 {
                     AutoEllipsis = true,
+                    BackColor = Color.Transparent,
                     ForeColor = index == 0
                         ? palette.TextPrimary
                         : palette.TextSecondary,
                     Font = index == 0
-                        ? UiFonts.Create(9.5F, FontStyle.Bold)
-                        : UiFonts.Create(9.5F),
-                    Location = new Point(18, 50 + index * 25),
-                    Size = new Size(394, 23),
+                        ? UiFonts.Pixels(15, true)
+                        : UiFonts.Pixels(14),
+                    Location = new Point(16, 16 + index * 27),
+                    Size = new Size(548, 25),
                     Visible = false
                 };
                 _queueLabels[index] = label;
-                Controls.Add(label);
+                _contentCard.Controls.Add(label);
             }
 
-            _detailLabel = new Label
+            _detailLabel = new UiLabel
             {
+                BackColor = Color.Transparent,
                 AutoEllipsis = true,
-                ForeColor = palette.TextTertiary,
-                Location = new Point(18, 180),
-                Size = new Size(394, 21)
+                ForeColor = palette.TextSecondary, Font = UiFonts.Pixels(14),
+                Location = new Point(16, 162),
+                Size = new Size(548, 23)
             };
-            _countLabel = new Label
+            _countLabel = new UiLabel
             {
+                BackColor = Color.Transparent,
                 AutoEllipsis = true,
-                ForeColor = palette.TextTertiary,
-                Location = new Point(18, 208),
-                Size = new Size(286, 32),
+                ForeColor = palette.TextSecondary, Font = UiFonts.Pixels(14),
+                Location = new Point(16, 188),
+                Size = new Size(548, 28),
                 TextAlign = ContentAlignment.MiddleLeft
             };
             _cancelButton = new ThemedButton
             {
                 Text = LocalizationService.Get("Common.Cancel"),
                 Primary = false,
-                Location = new Point(328, 238),
-                Size = new Size(84, 32),
+                Location = new Point(490, 320),
+                Size = new Size(110, 36),
+                Font = UiFonts.Pixels(14),
                 TabStop = false
             };
             _cancelButton.Click += CancelButton_Click;
 
-            Controls.Add(_detailLabel);
-            Controls.Add(_countLabel);
+            _contentCard.Controls.Add(_detailLabel);
+            _contentCard.Controls.Add(_countLabel);
             Controls.Add(_cancelButton);
 
             _animationTimer = new Timer
@@ -122,6 +161,24 @@ namespace DexManager.Forms
             };
             _animationTimer.Tick += AnimationTimer_Tick;
             _animationTimer.Start();
+        }
+
+        protected override void OnPaintBackground(PaintEventArgs e)
+        {
+            DesktopSurface.Paint(e.Graphics, ClientRectangle);
+        }
+
+        public void ApplyCurrentTheme()
+        {
+            var palette = ThemeColors.Current;
+            BackColor = palette.WindowBackground; ForeColor = palette.TextPrimary;
+            _statusLabel.ForeColor = palette.TextPrimary;
+            _deviceLabel.ForeColor = _targetLabel.ForeColor = _detailLabel.ForeColor =
+                _countLabel.ForeColor = palette.TextSecondary;
+            _contentCard.FillColor = palette.CardBackground; _contentCard.BorderColor = palette.CardBorder;
+            for (var i = 0; i < _queueLabels.Length; i++)
+                _queueLabels[i].ForeColor = i == 0 ? palette.TextPrimary : palette.TextSecondary;
+            Invalidate(true);
         }
 
         protected override bool ShowWithoutActivation
@@ -171,25 +228,44 @@ namespace DexManager.Forms
                 progress.Stage == FileTransferStage.Canceled);
         }
 
+        public void SetScrcpyTarget(int processId, IntPtr windowHandle)
+        {
+            if (processId != TargetProcessId)
+            {
+                TargetProcessId = processId;
+                TargetWindowHandle = IntPtr.Zero;
+                HasResolvedTargetWindow = false;
+            }
+            if (windowHandle != IntPtr.Zero)
+            {
+                TargetWindowHandle = windowHandle;
+                HasResolvedTargetWindow = true;
+            }
+        }
+
         private void ApplyCompactLayout(bool compact)
         {
             if (compact)
             {
                 foreach (var label in _queueLabels)
                     label.Visible = false;
-                _detailLabel.Location = new Point(18, 50);
-                _countLabel.Location = new Point(18, 78);
-                _countLabel.Size = new Size(286, 42);
-                _cancelButton.Location = new Point(328, 136);
-                ClientSize = new Size(430, CompactHeight);
+                _detailLabel.Location = new Point(16, 16);
+                _countLabel.Location = new Point(16, 44);
+                _countLabel.Size = new Size(548, 28);
+                _contentCard.Size = new Size(580, 84);
+                _cancelButton.Location = new Point(490, 196);
+                _targetLabel.Location = new Point(20, 202);
+                ClientSize = new Size(620, CompactHeight);
                 return;
             }
 
-            _detailLabel.Location = new Point(18, 180);
-            _countLabel.Location = new Point(18, 208);
-            _countLabel.Size = new Size(286, 32);
-            _cancelButton.Location = new Point(328, 238);
-            ClientSize = new Size(430, ExpandedHeight);
+            _detailLabel.Location = new Point(16, 162);
+            _countLabel.Location = new Point(16, 188);
+            _countLabel.Size = new Size(548, 28);
+            _contentCard.Size = new Size(580, 220);
+            _cancelButton.Location = new Point(490, 320);
+            _targetLabel.Location = new Point(20, 326);
+            ClientSize = new Size(620, ExpandedHeight);
         }
 
         private void UpdateQueueRows(FileTransferProgress progress)
@@ -218,6 +294,7 @@ namespace DexManager.Forms
                     marker = "!  ";
                 }
                 label.Text = marker + entry.DisplayName;
+                label.Font = UiFonts.Pixels(entry.Active ? 15 : 14, entry.Active);
                 label.Visible = true;
                 _toolTip.SetToolTip(label, entry.DisplayName);
             }
@@ -344,6 +421,9 @@ namespace DexManager.Forms
 
         private void AnimationTimer_Tick(object sender, EventArgs e)
         {
+            var positionHandler = PositionUpdateRequested;
+            if (Visible && positionHandler != null)
+                positionHandler(this, EventArgs.Empty);
             if (_hideAtUtc != DateTime.MinValue &&
                 DateTime.UtcNow >= _hideAtUtc)
             {

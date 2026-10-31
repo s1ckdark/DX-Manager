@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
@@ -75,11 +75,11 @@ namespace DexManager.Services
             }
         }
 
-        public Task StartAsync(string serial)
+        public Task StartAsync(string serial, DeviceRunSettingsProfile launchSettings = null, bool experimentalFpsConfirmed = false)
         {
             return Task.Run(delegate
             {
-                lock (_operationGate) StartCore(serial);
+                lock (_operationGate) StartCore(serial, launchSettings, experimentalFpsConfirmed);
             });
         }
 
@@ -88,6 +88,19 @@ namespace DexManager.Services
             return Task.Run(delegate
             {
                 lock (_operationGate) StopCore();
+            });
+        }
+
+        public Task StopForSerialAsync(string serial)
+        {
+            return Task.Run(delegate
+            {
+                lock (_operationGate)
+                {
+                    var captured = _currentSession == null ? _scrcpyService.RunningSerial : _currentSession.Serial;
+                    if (!string.IsNullOrWhiteSpace(serial) && string.Equals(
+                        captured, serial, StringComparison.OrdinalIgnoreCase)) StopCore();
+                }
             });
         }
 
@@ -126,16 +139,16 @@ namespace DexManager.Services
             }
         }
 
-        public Task<bool> ApplyRuntimeSettingsAsync()
+        public Task<bool> ApplyRuntimeSettingsAsync(DeviceRunSettingsProfile launchSettings = null, bool experimentalFpsConfirmed = false)
         {
             return Task.Run(delegate
             {
                 lock (_operationGate)
-                    return ApplyRuntimeSettingsCore();
+                    return ApplyRuntimeSettingsCore(launchSettings, experimentalFpsConfirmed);
             });
         }
 
-        private void StartCore(string requestedSerial)
+        private void StartCore(string requestedSerial, DeviceRunSettingsProfile launchSettings = null, bool experimentalFpsConfirmed = false)
         {
             if (IsShutdownRequested) return;
             if (_scrcpyService.IsRunning)
@@ -145,6 +158,8 @@ namespace DexManager.Services
                 return;
             }
 
+            var runSettings = launchSettings ?? GetDeviceRunSettings();
+            FrameRateRules.RequireConsent(runSettings.Scrcpy.MaxFps, experimentalFpsConfirmed);
             var serial = requestedSerial;
             if (string.IsNullOrWhiteSpace(serial) ||
                 !_adbService.IsAuthorizedDeviceConnected(serial))
@@ -160,8 +175,6 @@ namespace DexManager.Services
                         "Error.Dex.DisplayResetFailed"));
             }
             CleanupStaleSession(serial);
-            var runSettings = GetDeviceRunSettings();
-
             VirtualDisplayLease lease = null;
             var scrcpyStarted = false;
             try
@@ -178,7 +191,7 @@ namespace DexManager.Services
                     _scrcpyService.Start(
                         runSettings.Scrcpy,
                         lease.DisplayId,
-                        serial);
+                        serial, experimentalFpsConfirmed);
                     scrcpyStarted = true;
                 });
 
@@ -190,14 +203,14 @@ namespace DexManager.Services
                         LocalizationService.Get(
                             "Error.Scrcpy.ExitedBeforeWindow"));
 
-                TrackSession("DeX", serial, lease);
+                TrackSession("DeX", serial, lease, runSettings.Scrcpy.StartAppPackage);
                 if (!_scrcpyService.IsRunning)
                     throw new InvalidOperationException(
                         LocalizationService.Get(
                             "Error.Scrcpy.ExitedBeforeWindow"));
                 try
                 {
-                    SaveLastSuccess(serial, lease.DisplayId);
+                    SaveLastSuccess(serial, lease.DisplayId, runSettings);
                 }
                 catch (Exception saveException)
                 {
@@ -263,9 +276,11 @@ namespace DexManager.Services
             if (stopException != null) throw stopException;
         }
 
-        private bool ApplyRuntimeSettingsCore()
+        private bool ApplyRuntimeSettingsCore(DeviceRunSettingsProfile launchSettings, bool experimentalFpsConfirmed)
         {
-            if (IsShutdownRequested) return false;
+            if (IsShutdownRequested || !_scrcpyService.IsRunning) return false;
+            launchSettings = launchSettings ?? GetDeviceRunSettings();
+            FrameRateRules.RequireConsent(launchSettings.Scrcpy.MaxFps, experimentalFpsConfirmed);
             try
             {
                 var serial = _currentSession == null
@@ -294,7 +309,7 @@ namespace DexManager.Services
                 ClearSession(session);
 
                 if (_shutdownSignal.WaitOne(1000)) return false;
-                StartCore(serial);
+                StartCore(serial, launchSettings, experimentalFpsConfirmed);
                 if (!_scrcpyService.IsRunning) return false;
                 _logService.Info(LocalizationService.Get(
                     "Log.Dex.ApplyCompleted"));
@@ -541,24 +556,24 @@ namespace DexManager.Services
                 throw new OperationCanceledException();
         }
 
-        private void SaveLastSuccess(string serial, int displayId)
+        private void SaveLastSuccess(string serial, int displayId, DeviceRunSettingsProfile launched)
         {
             _settingsService.UpdateAndSave(_settings, delegate(
                 AppSettings settings)
             {
                 var runSettings = GetDeviceRunSettings(settings);
                 runSettings.LastSuccess.Width =
-                    runSettings.VirtualDisplay.Width;
+                    launched.VirtualDisplay.Width;
                 runSettings.LastSuccess.Height =
-                    runSettings.VirtualDisplay.Height;
+                    launched.VirtualDisplay.Height;
                 runSettings.LastSuccess.Dpi =
-                    runSettings.VirtualDisplay.Dpi;
+                    launched.VirtualDisplay.Dpi;
                 runSettings.LastSuccess.AdbPath = _adbService.AdbPath;
                 runSettings.LastSuccess.ScrcpyPath =
                     _scrcpyService.ScrcpyPath;
                 runSettings.LastSuccess.ScrcpyArguments =
                     _scrcpyService.BuildArguments(
-                        runSettings.Scrcpy,
+                        launched.Scrcpy,
                         displayId,
                         serial);
                 runSettings.LastSuccess.DisplayId = displayId;
@@ -570,13 +585,14 @@ namespace DexManager.Services
         private void TrackSession(
             string mode,
             string serial,
-            VirtualDisplayLease lease)
+            VirtualDisplayLease lease,
+            string launchedPackage = null)
         {
             _currentSession = new ManagedDisplaySession
             {
                 Mode = mode,
                 Serial = serial,
-                AppPackage = GetDeviceRunSettings()
+                AppPackage = launchedPackage ?? GetDeviceRunSettings()
                     .Scrcpy.StartAppPackage,
                 DisplayId = lease.DisplayId,
                 ScrcpyProcessId = _scrcpyService.CurrentProcessId,

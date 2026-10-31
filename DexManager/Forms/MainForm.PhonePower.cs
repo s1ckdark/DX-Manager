@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Threading.Tasks;
@@ -87,6 +87,7 @@ namespace DexManager.Forms
             var serials = new List<string>();
             foreach (var context in GetAllDeviceContexts())
             {
+                if (context.Runtime.Scrcpy.RequiresPhoneScreenOn || context.Runtime.SingleWindows.RequiresPhoneScreenOn) continue;
                 var dexSession = context.Runtime.Scrcpy
                     .GetSessionSnapshot();
                 if (dexSession.ScreenOffRequested)

@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Drawing;
@@ -14,10 +14,11 @@ namespace DexManager.Forms
 {
     public sealed partial class SettingsForm : Form, IMessageFilter
     {
+        internal Action<Form> UpdateCheckRequested { get; set; }
         private const int CardContentTop = 44;
         private const int CardContentBottom = 18;
-        private const int CardWidth = 662;
-        private const int CardContentWidth = 622;
+        private static int CardWidth { get { return _desktopCardWidth; } }
+        private static int CardContentWidth { get { return CardWidth - 40; } }
         private const int WmMouseWheel = 0x020A;
         private const string ProjectUrl =
             "https://github.com/maze-mei/DX-Manager";
@@ -125,8 +126,10 @@ namespace DexManager.Forms
         private int _activePageIndex;
         private Label _deviceDiagnosticsStatusLabel;
         private Button _deviceDiagnosticsRefreshButton;
+        private FlowLayoutPanel _deviceDiagnosticsCardsPanel;
         private Button _diagnosticReportButton;
-        private DeviceVersionDiagnostic _lastDeviceDiagnostic;
+        private List<DeviceVersionDiagnostic> _lastDeviceDiagnostics =
+            new List<DeviceVersionDiagnostic>();
         private int _deviceDiagnosticsGeneration;
 
         public SettingsForm(
@@ -144,18 +147,22 @@ namespace DexManager.Forms
             Action<AppTheme> applyTheme,
             Action<bool> settingsChanged,
             Func<string, Task> detachPhoneTransfer,
-            Action<string> companionInstalled)
+            Action<string> companionInstalled,
+            Action<bool> hotkeyEditing = null,
+            Func<IList<EnvironmentCheckItem>> runEnvironmentCheck = null)
         {
+            _hotkeyEditing = hotkeyEditing;
+            _runStoreEnvironment = runEnvironmentCheck;
+            _mainSelectedSerial = getSelectedDeviceSerial;
+            _mainSelectedIdentity = getSelectedDeviceIdentity;
             _settingsService = settingsService;
             _settings = settings;
             _adbService = adbService;
             _displayCleanupPermissionService =
                 new DisplayCleanupPermissionService(adbService);
             _wirelessAdbService = wirelessAdbService;
-            _getSelectedDeviceSerial = getSelectedDeviceSerial ??
-                delegate { return wirelessAdbService.SelectedSerial; };
-            _getSelectedDeviceIdentity = getSelectedDeviceIdentity ??
-                delegate { return string.Empty; };
+            _getSelectedDeviceSerial = ResolveStoreTargetSerial;
+            _getSelectedDeviceIdentity = ResolveStoreTargetIdentity;
             _getDeviceSnapshot = getDeviceSnapshot ??
                 delegate { return new DeviceRegistrySnapshot(); };
             _getRuntimeSnapshot = getRuntimeSnapshot ??
@@ -172,23 +179,29 @@ namespace DexManager.Forms
             _companionInstalled = companionInstalled;
             _theme = ThemeColors.Current;
 
-            Text = LocalizationService.Get("Settings.Title");
+            Text = "DX Manager · " + StoreUiText.Get("SettingsTitle.Text", LocalizationService.Get("Main.Settings"));
             Icon = AppIconProvider.Current;
             StartPosition = FormStartPosition.CenterParent;
-            Font = UiFonts.Create(9.5F);
+            Font = UiFonts.Pixels(14F);
             BackColor = _theme.WindowBackground;
-            UiWindowStyle.ApplyFixedStandardSize(this);
+            DoubleBuffered = true;
+            AutoScaleMode = AutoScaleMode.Dpi;
+            AutoScaleDimensions = new SizeF(96F, 96F);
+            UiWindowStyle.ApplyStoreSize(this, 1040, 760);
+            FormBorderStyle = FormBorderStyle.Sizable;
+            MinimumSize = new Size(820, 600);
+            _desktopCardWidth = Math.Max(520, Math.Min(716, (int)(ClientSize.Width / Math.Max(1F, CurrentAutoScaleDimensions.Width / 96F)) - 296));
 
-            _titleLabel = new Label
+            _titleLabel = new UiLabel
             {
                 AutoSize = false,
-                Font = UiFonts.Create(20F, FontStyle.Bold),
+                Font = UiFonts.Pixels(28F, true),
                 ForeColor = _theme.TextPrimary,
                 Location = new Point(224, 22),
                 Size = new Size(670, 40),
                 Text = LocalizationService.Get("Main.Settings")
             };
-            _descriptionLabel = new Label
+            _descriptionLabel = new UiLabel
             {
                 AutoEllipsis = true,
                 ForeColor = _theme.TextTertiary,
@@ -197,7 +210,7 @@ namespace DexManager.Forms
                 Text = LocalizationService.Get("Settings.Description")
             };
 
-            _contentHost = new Panel
+            _contentHost = new BufferedPanel
             {
                 Location = new Point(220, 104),
                 Size = new Size(684, 510),
@@ -205,12 +218,7 @@ namespace DexManager.Forms
                     AnchorStyles.Left | AnchorStyles.Right,
                 BackColor = _theme.WindowBackground
             };
-            _pages.Add(BuildGeneralPage());
-            _pages.Add(BuildConnectionPage());
-            _pages.Add(BuildPathPage());
-            _pages.Add(BuildKeyboardPage());
-            _pages.Add(BuildDiagnosticsPage());
-            _pages.Add(BuildAboutPage());
+            _pages.AddRange(BuildStoreSettingsPages());
             foreach (var page in _pages)
             {
                 page.Dock = DockStyle.Fill;
@@ -226,7 +234,7 @@ namespace DexManager.Forms
                     AnchorStyles.Bottom,
                 BackColor = _theme.WindowBackground
             };
-            _saveStatusLabel = new Label
+            _saveStatusLabel = new UiLabel
             {
                 ForeColor = _theme.TextTertiary,
                 Location = new Point(0, 14),
@@ -243,6 +251,9 @@ namespace DexManager.Forms
                 Size = new Size(100, 36),
                 Anchor = AnchorStyles.Top | AnchorStyles.Right
             };
+            saveButton.Visible = false;
+            saveButton.Primary = false;
+            _desktopSaveButton = saveButton;
             saveButton.Click += SaveButton_Click;
             var closeButton = new ThemedButton
             {
@@ -251,6 +262,8 @@ namespace DexManager.Forms
                 Size = new Size(100, 36),
                 Anchor = AnchorStyles.Top | AnchorStyles.Right
             };
+            closeButton.Primary = true;
+            _desktopCloseButton = closeButton;
             closeButton.Click += delegate { Close(); };
             _bottomPanel.Controls.Add(_saveStatusLabel);
             _bottomPanel.Controls.Add(saveButton);
@@ -272,7 +285,14 @@ namespace DexManager.Forms
             Controls.Add(_titleLabel);
             Controls.Add(_descriptionLabel);
             Controls.Add(_bottomPanel);
+            LayoutDesktopSettings();
+            Resize += delegate { LayoutDesktopSettings(); };
+            ApplyCurrentTheme();
             LoadValues();
+            _storeUiReady = true;
+            RestoreStoreExpansion();
+            AttachStoreBindings();
+            UpdateStoreCardSizes();
             ShowPage(0);
             Application.AddMessageFilter(this);
         }

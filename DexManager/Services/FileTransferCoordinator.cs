@@ -26,8 +26,10 @@ namespace DexManager.Services
         private const int FinalCommitRecoveryAttempts = 6;
         private const int StaleCleanupCooldownMilliseconds = 5000;
         private const int ProcessPollMilliseconds = 100;
+        private const int OutputDrainTimeoutMs = 2000;
         private const int MaximumVisibleQueueItems = 5;
         private readonly object _syncRoot = new object();
+        private readonly object _processStartSync = new object();
         private readonly object _targetPreparationRoot = new object();
         private readonly string _realAdbPath;
         private readonly string _proxyPath;
@@ -303,6 +305,30 @@ namespace DexManager.Services
             }
         }
 
+        public bool TryGetScrcpyWindowTarget(
+            string sessionId,
+            out int processId,
+            out IntPtr windowHandle)
+        {
+            processId = 0;
+            windowHandle = IntPtr.Zero;
+            if (string.IsNullOrWhiteSpace(sessionId)) return false;
+            lock (_syncRoot)
+            {
+                TransferSession session;
+                if (!_sessions.TryGetValue(sessionId, out session) ||
+                    !session.Active ||
+                    session.ProcessId <= 0)
+                {
+                    return false;
+                }
+
+                processId = session.ProcessId;
+                windowHandle = session.WindowHandle;
+                return true;
+            }
+        }
+
         public void EndSession(string sessionId)
         {
             if (string.IsNullOrWhiteSpace(sessionId)) return;
@@ -390,7 +416,11 @@ namespace DexManager.Services
 
         public void RequestShutdown()
         {
-            if (Interlocked.Exchange(ref _shutdownRequested, 1) != 0) return;
+            lock (_processStartSync)
+            {
+                if (Interlocked.Exchange(ref _shutdownRequested, 1) != 0)
+                    return;
+            }
 
             NamedPipeServerStream waiting;
             NamedPipeServerStream[] connected;

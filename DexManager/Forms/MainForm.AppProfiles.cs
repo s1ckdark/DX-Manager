@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Windows.Forms;
 using DexManager.Models;
@@ -8,6 +8,8 @@ namespace DexManager.Forms
 {
     public sealed partial class MainForm : Form
     {
+        private bool _appProfileApplying;
+
         private void SetAppProfileControlsVisible(bool visible)
         {
             _appProfileButton.Visible = visible;
@@ -16,6 +18,7 @@ namespace DexManager.Forms
 
         private void UpdateAppProfileControls()
         {
+            UpdateStartAppAvailability();
             if (_appProfileButton == null || _selectedMode == 0)
                 return;
 
@@ -27,11 +30,7 @@ namespace DexManager.Forms
                     packageName)
                 : null;
 
-            _appProfileButton.Text = !hasApp
-                ? LocalizationService.Get("Main.AppProfile.SelectApp")
-                : profile == null
-                    ? LocalizationService.Get("Main.AppProfile.NotSaved")
-                    : LocalizationService.Get("Main.AppProfile.Saved");
+            _appProfileButton.Text = StoreUiText.Get("MainSaveProfile.Text", "Save profile");
             _appProfileButton.Enabled = hasApp;
             _saveAppProfileMenuItem.Enabled = hasApp;
             _deleteAppProfileMenuItem.Enabled = profile != null;
@@ -47,6 +46,9 @@ namespace DexManager.Forms
 
         private bool ApplySelectedAppProfileIfAvailable()
         {
+            if (_appProfileApplying || _selectedMode <= 0)
+                return false;
+
             var packageName = GetSelectedAppPackage();
             if (string.IsNullOrWhiteSpace(packageName)) return false;
 
@@ -56,7 +58,28 @@ namespace DexManager.Forms
             if (profile == null) return false;
 
             var appName = GetSelectedAppName(packageName);
+            if (string.Equals(
+                    appName,
+                    packageName,
+                    StringComparison.OrdinalIgnoreCase) &&
+                !string.IsNullOrWhiteSpace(profile.AppName))
+            {
+                appName = profile.AppName;
+            }
             var selectedMode = _selectedMode;
+            var currentSlot = GetSingleWindowSettings(
+                GetSelectedDeviceRunSettings(),
+                selectedMode);
+            if (AppSettings.SingleWindowAppProfileMatchesSlot(
+                profile,
+                currentSlot,
+                packageName,
+                appName))
+            {
+                return true;
+            }
+
+            _appProfileApplying = true;
             try
             {
                 _settingsService.UpdateAndSave(_settings, delegate(
@@ -68,7 +91,7 @@ namespace DexManager.Forms
                     var slot = GetSingleWindowSettings(
                         runSettings,
                         selectedMode);
-                    CopyProfileToSlot(
+                    AppSettings.ApplySingleWindowAppProfile(
                         profile,
                         slot,
                         packageName,
@@ -87,7 +110,7 @@ namespace DexManager.Forms
                     LocalizationService.Get(
                         "Log.Main.AppProfileApplyFailed"),
                     ex);
-                MessageBox.Show(
+                DesktopDialogs.Show(
                     this,
                     LocalizationService.Format(
                         "Main.AppProfile.ApplyFailed",
@@ -97,6 +120,10 @@ namespace DexManager.Forms
                     MessageBoxButtons.OK,
                     MessageBoxIcon.Warning);
                 return false;
+            }
+            finally
+            {
+                _appProfileApplying = false;
             }
         }
 
@@ -114,7 +141,7 @@ namespace DexManager.Forms
                 packageName);
             if (existing != null)
             {
-                var result = MessageBox.Show(
+                var result = DesktopDialogs.Show(
                     this,
                     LocalizationService.Format(
                         "Main.AppProfile.OverwriteConfirm",
@@ -168,6 +195,7 @@ namespace DexManager.Forms
                     runSettings.SingleWindowAppProfiles.Add(profile);
                 });
                 UpdateAppProfileControls();
+                ShowDesktopNotice(LocalizationService.IsKorean ? appName + " 프로필을 저장했습니다." : "Saved profile for " + appName + ".", DesktopNoticeKind.Success);
                 _logService.Info(LocalizationService.Format(
                     "Log.Main.AppProfileSaved",
                     appName));
@@ -178,7 +206,7 @@ namespace DexManager.Forms
                     LocalizationService.Get(
                         "Log.Main.AppProfileSaveFailed"),
                     ex);
-                MessageBox.Show(
+                DesktopDialogs.Show(
                     this,
                     LocalizationService.Format(
                         "Main.AppProfile.SaveFailed",
@@ -203,7 +231,7 @@ namespace DexManager.Forms
             if (profile == null) return;
 
             var appName = GetSelectedAppName(packageName);
-            var result = MessageBox.Show(
+            var result = DesktopDialogs.Show(
                 this,
                 LocalizationService.Format(
                     "Main.AppProfile.DeleteConfirm",
@@ -241,6 +269,7 @@ namespace DexManager.Forms
                     }
                 });
                 UpdateAppProfileControls();
+                ShowDesktopNotice(LocalizationService.IsKorean ? appName + " 프로필을 삭제했습니다." : "Deleted profile for " + appName + ".", DesktopNoticeKind.Success);
                 _logService.Info(LocalizationService.Format(
                     "Log.Main.AppProfileDeleted",
                     appName));
@@ -251,7 +280,7 @@ namespace DexManager.Forms
                     LocalizationService.Get(
                         "Log.Main.AppProfileDeleteFailed"),
                     ex);
-                MessageBox.Show(
+                DesktopDialogs.Show(
                     this,
                     LocalizationService.Format(
                         "Main.AppProfile.DeleteFailed",
@@ -303,6 +332,7 @@ namespace DexManager.Forms
                 BitRate = source.BitRate,
                 MaxFps = source.MaxFps,
                 TurnScreenOff = source.TurnScreenOff,
+                TurnScreenOffBeforeHighFps = source.TurnScreenOffBeforeHighFps,
                 StayAwake = source.StayAwake,
                 UseHidKeyboard = source.UseHidKeyboard,
                 UseHidMouse = source.UseHidMouse,
@@ -314,30 +344,5 @@ namespace DexManager.Forms
             };
         }
 
-        private static void CopyProfileToSlot(
-            SingleWindowAppProfile source,
-            SingleWindowSlotSettings target,
-            string packageName,
-            string appName)
-        {
-            target.Width = source.Width;
-            target.Height = source.Height;
-            target.Dpi = source.Dpi;
-            target.BitRate = source.BitRate;
-            target.MaxFps = source.MaxFps;
-            target.TurnScreenOff = source.TurnScreenOff;
-            target.StayAwake = source.StayAwake;
-            target.UseHidKeyboard = source.UseHidKeyboard;
-            target.UseHidMouse = source.UseHidMouse;
-            target.ForceStopStartApp = source.ForceStopStartApp;
-            target.StartAppPackage = packageName;
-            target.StartAppName = string.IsNullOrWhiteSpace(appName)
-                ? source.AppName
-                : appName;
-            target.AdditionalArguments = source.AdditionalArguments;
-            target.CustomWidth = source.CustomWidth;
-            target.CustomHeight = source.CustomHeight;
-            target.FlexDisplay = source.FlexDisplay;
-        }
     }
 }

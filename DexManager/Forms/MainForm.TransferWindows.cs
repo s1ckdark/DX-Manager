@@ -1,4 +1,5 @@
 using System;
+using System.Diagnostics;
 using System.Drawing;
 using System.Windows.Forms;
 using DexManager.Models;
@@ -11,24 +12,107 @@ namespace DexManager.Forms
     {
         private const int TransferWindowGap = 8;
         private const int TransferWindowMargin = 16;
+        private bool _transferPositionFailureLogged;
 
         private IntPtr PositionTransferStatusWindow(
             Form window,
             Form otherWindow,
             IntPtr preferredTarget)
         {
+            return PositionTransferStatusWindow(
+                window,
+                otherWindow,
+                preferredTarget,
+                true);
+        }
+
+        private IntPtr PositionTransferStatusWindow(
+            Form window,
+            Form otherWindow,
+            FileTransferCoordinator coordinator,
+            string sessionId)
+        {
+            if (string.IsNullOrWhiteSpace(sessionId) || coordinator == null)
+            {
+                return PositionTransferStatusWindow(
+                    window,
+                    otherWindow,
+                    IntPtr.Zero,
+                    true);
+            }
+
+            int processId;
+            IntPtr boundHandle;
+            var hasTarget = coordinator.TryGetScrcpyWindowTarget(
+                sessionId,
+                out processId,
+                out boundHandle);
+            var statusWindow = window as FileTransferStatusForm;
+            if (!hasTarget)
+            {
+                // Late progress after a session ended must not be rebound to
+                // another phone or mode that happens to own a live window.
+                if (statusWindow != null &&
+                    statusWindow.HasResolvedTargetWindow)
+                {
+                    return IntPtr.Zero;
+                }
+                return PositionTransferStatusWindow(
+                    window,
+                    otherWindow,
+                    IntPtr.Zero,
+                    false);
+            }
+
+            if (statusWindow != null)
+                statusWindow.SetScrcpyTarget(processId, IntPtr.Zero);
+            var targetHandle = ResolveWindowForProcess(
+                processId,
+                boundHandle);
+            if (statusWindow != null)
+            {
+                statusWindow.SetScrcpyTarget(processId, targetHandle);
+                if (targetHandle == IntPtr.Zero &&
+                    statusWindow.HasResolvedTargetWindow)
+                {
+                    // Keep the last placement while the same Scrcpy window
+                    // is temporarily unavailable; do not jump to a corner.
+                    return IntPtr.Zero;
+                }
+            }
+
+            return PositionTransferStatusWindow(
+                window,
+                otherWindow,
+                targetHandle,
+                false);
+        }
+
+        private IntPtr PositionTransferStatusWindow(
+            Form window,
+            Form otherWindow,
+            IntPtr preferredTarget,
+            bool allowFallback)
+        {
             if (window == null || window.IsDisposed) return IntPtr.Zero;
 
-            var targetHandle = ResolveTransferTarget(preferredTarget);
-            Rectangle barBounds;
+            var targetHandle = preferredTarget;
+            if (targetHandle == IntPtr.Zero && allowFallback)
+                targetHandle = ResolveTransferTarget(IntPtr.Zero);
+            var barBounds = Rectangle.Empty;
             Rectangle workArea;
             var x = 0;
             var y = 0;
-            if (_miniControlBarManager.TryGetBarBounds(
+            var hasBar = targetHandle != IntPtr.Zero &&
+                _miniControlBarManager.TryGetBarBounds(
                     targetHandle,
-                    out barBounds) ||
-                _miniControlBarManager.TryGetActiveBarBounds(
-                    out barBounds))
+                    out barBounds);
+            if (!hasBar && allowFallback)
+            {
+                hasBar = _miniControlBarManager.TryGetActiveBarBounds(
+                    out barBounds);
+            }
+            if (hasBar)
             {
                 workArea = Screen.FromRectangle(barBounds).WorkingArea;
                 x = _settings.Features.MiniControlBarSide ==
@@ -86,6 +170,87 @@ namespace DexManager.Forms
 
             window.Location = new Point(x, y);
             return targetHandle;
+        }
+
+        private static IntPtr ResolveWindowForProcess(
+            int expectedProcessId,
+            IntPtr preferredHandle)
+        {
+            if (WindowBelongsToProcess(preferredHandle, expectedProcessId))
+                return preferredHandle;
+            if (expectedProcessId <= 0) return IntPtr.Zero;
+
+            try
+            {
+                using (var process = Process.GetProcessById(expectedProcessId))
+                {
+                    process.Refresh();
+                    var handle = process.MainWindowHandle;
+                    return WindowBelongsToProcess(handle, expectedProcessId)
+                        ? handle
+                        : IntPtr.Zero;
+                }
+            }
+            catch (ArgumentException)
+            {
+                return IntPtr.Zero;
+            }
+            catch (InvalidOperationException)
+            {
+                return IntPtr.Zero;
+            }
+            catch (System.ComponentModel.Win32Exception)
+            {
+                return IntPtr.Zero;
+            }
+        }
+
+        private static bool WindowBelongsToProcess(
+            IntPtr windowHandle,
+            int expectedProcessId)
+        {
+            if (windowHandle == IntPtr.Zero ||
+                expectedProcessId <= 0 ||
+                !NativeMethods.IsWindow(windowHandle))
+            {
+                return false;
+            }
+
+            uint processId;
+            NativeMethods.GetWindowThreadProcessId(
+                windowHandle,
+                out processId);
+            return processId == (uint)expectedProcessId;
+        }
+
+        private void FileTransferStatusForm_PositionUpdateRequested(
+            object sender,
+            EventArgs e)
+        {
+            var window = sender as FileTransferStatusForm;
+            if (window == null || window.IsDisposed ||
+                _exitInProgress || IsDisposed)
+            {
+                return;
+            }
+
+            try
+            {
+                PositionTransferStatusWindow(
+                    window,
+                    _phoneTransferStatusForm,
+                    _fileTransferStatusSource,
+                    window.SessionId);
+                _transferPositionFailureLogged = false;
+            }
+            catch (Exception ex)
+            {
+                if (_transferPositionFailureLogged) return;
+                _transferPositionFailureLogged = true;
+                _logService.Warning(
+                    "Could not follow the active Scrcpy transfer window: " +
+                    ex.Message);
+            }
         }
 
         private static void ShowTransferStatusWindow(

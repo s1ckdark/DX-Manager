@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Net;
@@ -117,16 +117,13 @@ namespace DexManager.Services
                 () => _companionVerifier.Inspect(serial))
                 .ConfigureAwait(false);
             if (_shutdown.IsCancellationRequested) return;
-            if ((verification.State != DisplayCleanupPermissionState.Ready &&
-                 verification.State != DisplayCleanupPermissionState.Granted) ||
-                verification.VersionCode < 3 ||
-                !string.Equals(
-                    verification.Serial,
-                    serial,
-                    StringComparison.OrdinalIgnoreCase))
+            if (!CanConfigureTransfer(verification, serial))
             {
                 _logService.Info(
-                    "Phone-to-PC transfer is unavailable because the verified DX Companion is not installed on the selected device.");
+                    "Phone-to-PC transfer setup was skipped for device " + serial +
+                    " (verification=" + verification.State +
+                    ", versionCode=" + verification.VersionCode +
+                    ", required=" + DisplayCleanupPermissionService.BundledVersionCode + ").");
                 return;
             }
 
@@ -199,6 +196,17 @@ namespace DexManager.Services
             _logService.Info(
                 "Phone-to-PC transfer receiver is ready for device " +
                 serial + ".");
+        }
+
+        internal static bool CanConfigureTransfer(
+            DisplayCleanupPermissionStatus verification, string serial)
+        {
+            return verification != null &&
+                (verification.State == DisplayCleanupPermissionState.Ready ||
+                 verification.State == DisplayCleanupPermissionState.Granted) &&
+                verification.VersionCode >= DisplayCleanupPermissionService.BundledVersionCode &&
+                !string.IsNullOrWhiteSpace(serial) &&
+                string.Equals(verification.Serial, serial, StringComparison.OrdinalIgnoreCase);
         }
 
         public async Task DetachAsync(string serial)
@@ -459,6 +467,8 @@ namespace DexManager.Services
             var rootNames = new Dictionary<int, string>();
             var reservedRootPaths = new HashSet<string>(
                 StringComparer.OrdinalIgnoreCase);
+            var resolvedPaths = new Dictionary<string, string>(
+                StringComparer.Ordinal);
             var completedItems = 0;
             long receivedBytes = 0;
             var lastByteProgressUtc = DateTime.MinValue;
@@ -489,7 +499,8 @@ namespace DexManager.Services
                     rootId,
                     relativePath,
                     rootNames,
-                    reservedRootPaths);
+                    reservedRootPaths,
+                    resolvedPaths);
 
                 Publish(
                     batchId,
@@ -510,8 +521,9 @@ namespace DexManager.Services
                 {
                     Directory.CreateDirectory(
                         Path.GetDirectoryName(safePath));
-                    var partial = safePath + ".dxpartial-" +
-                        Guid.NewGuid().ToString("N");
+                    var partial = CreatePartialPath(
+                        safePath,
+                        Guid.NewGuid());
                     try
                     {
                         using (var output = new FileStream(
@@ -712,12 +724,13 @@ namespace DexManager.Services
             int rootId,
             string relativePath,
             IDictionary<int, string> rootNames,
-            ISet<string> reservedRootPaths)
+            ISet<string> reservedPaths,
+            IDictionary<string, string> resolvedPaths)
         {
             if (string.IsNullOrWhiteSpace(relativePath))
                 throw new InvalidDataException("Empty relative path.");
             var rawParts = relativePath.Replace('\\', '/').Split('/');
-            var parts = new List<string>();
+            var originalParts = new List<string>();
             foreach (var rawPart in rawParts)
             {
                 if (string.IsNullOrWhiteSpace(rawPart) ||
@@ -728,24 +741,44 @@ namespace DexManager.Services
                 if (rawPart == "..")
                     throw new InvalidDataException(
                         "Parent path segments are not allowed.");
-                parts.Add(SanitizeFileName(rawPart));
+                originalParts.Add(rawPart);
             }
-            if (parts.Count == 0)
+            if (originalParts.Count == 0)
                 throw new InvalidDataException("Empty normalized path.");
+
+            var parts = new List<string>(originalParts.Count);
+            foreach (var originalPart in originalParts)
+                parts.Add(SanitizeFileName(originalPart));
 
             string rootName;
             if (!rootNames.TryGetValue(rootId, out rootName))
             {
-                rootName = FindAvailableRootName(
+                rootName = Path.GetFileName(FindAvailablePath(
                     destination,
                     parts[0],
-                    reservedRootPaths);
+                    reservedPaths));
                 rootNames[rootId] = rootName;
             }
-            parts[0] = rootName;
 
-            var path = destination;
-            foreach (var part in parts) path = Path.Combine(path, part);
+            var path = Path.Combine(destination, rootName);
+            var logicalPath = originalParts[0];
+            resolvedPaths[rootId + ":0:" + logicalPath] = path;
+            for (var index = 1; index < parts.Count; index++)
+            {
+                logicalPath += "/" + originalParts[index];
+                var logicalKey = rootId + ":" + index + ":" + logicalPath;
+                string resolvedPath;
+                if (!resolvedPaths.TryGetValue(logicalKey, out resolvedPath))
+                {
+                    resolvedPath = FindAvailablePath(
+                        path,
+                        parts[index],
+                        reservedPaths);
+                    resolvedPaths[logicalKey] = resolvedPath;
+                }
+                path = resolvedPath;
+            }
+
             var fullDestination = Path.GetFullPath(destination)
                 .TrimEnd(Path.DirectorySeparatorChar) +
                 Path.DirectorySeparatorChar;
@@ -760,8 +793,8 @@ namespace DexManager.Services
             return fullPath;
         }
 
-        private static string FindAvailableRootName(
-            string destination,
+        private static string FindAvailablePath(
+            string parent,
             string requested,
             ISet<string> reserved)
         {
@@ -771,15 +804,31 @@ namespace DexManager.Services
                 : requested.Substring(0, requested.Length - extension.Length);
             var candidate = requested;
             var index = 1;
-            while (File.Exists(Path.Combine(destination, candidate)) ||
-                   Directory.Exists(Path.Combine(destination, candidate)) ||
-                   reserved.Contains(candidate))
+            var fullPath = Path.GetFullPath(Path.Combine(parent, candidate));
+            while (File.Exists(fullPath) ||
+                   Directory.Exists(fullPath) ||
+                   reserved.Contains(fullPath))
             {
                 candidate = stem + " (" + index + ")" + extension;
                 index++;
+                fullPath = Path.GetFullPath(Path.Combine(parent, candidate));
             }
-            reserved.Add(candidate);
-            return candidate;
+            reserved.Add(fullPath);
+            return fullPath;
+        }
+
+        private static string CreatePartialPath(
+            string safePath,
+            Guid identifier)
+        {
+            var directory = Path.GetDirectoryName(safePath);
+            if (string.IsNullOrWhiteSpace(directory))
+                throw new ArgumentException(
+                    "The destination file has no parent folder.",
+                    "safePath");
+            return Path.Combine(
+                directory,
+                ".dxpartial-" + identifier.ToString("N"));
         }
 
         private static string SanitizeFileName(string value)

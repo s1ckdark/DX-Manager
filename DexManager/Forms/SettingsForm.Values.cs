@@ -16,6 +16,8 @@ namespace DexManager.Forms
     {
         private void LoadValues()
         {
+            _loadingStoreValues = true;
+            try {
             foreach (var item in _languageBox.Items)
             {
                 var option = item as LanguageOption;
@@ -108,6 +110,7 @@ namespace DexManager.Forms
             _lowLevelHotkeyBox.Checked = _settings.KeyMappings.UseLowLevelHotkeys;
             _keyboardDiagnosticsBox.Checked = _settings.KeyMappings.LogKeyboardDiagnostics;
             _keyInputModeBox.SelectedItem = _settings.KeyMappings.KoreanEnglishInputMode;
+            if (_enterInputModeBox != null) _enterInputModeBox.SelectedItem = _settings.KeyMappings.EnterInputMode;
             _convertHangulBox.Checked = _settings.KeyMappings.ConvertKoreanEnglishKey;
             _rightWindowsBox.Checked = _settings.KeyMappings.HandleRightWindowsKey;
             _convertEnterBox.Checked = _settings.KeyMappings.ConvertEnterToShiftEnter;
@@ -115,6 +118,8 @@ namespace DexManager.Forms
             PopulateWirelessDevices();
             UpdateManualAdbControls();
             UpdateWirelessControls();
+            } finally { _loadingStoreValues = false; }
+            if (_storeUiReady) RestoreStoreExpansion();
         }
 
         private void SaveButton_Click(object sender, EventArgs e)
@@ -163,7 +168,7 @@ namespace DexManager.Forms
             object sender,
             EventArgs e)
         {
-            var result = MessageBox.Show(
+            var result = DesktopDialogs.Show(
                 this,
                 LocalizationService.Get(
                     "Settings.ResetDefaultsConfirm"),
@@ -343,9 +348,9 @@ namespace DexManager.Forms
             }
             settings.KeyMappings.UseLowLevelHotkeys = _lowLevelHotkeyBox.Checked;
             settings.KeyMappings.LogKeyboardDiagnostics = _keyboardDiagnosticsBox.Checked;
-            var keyInputMode = (KeyInputMode)_keyInputModeBox.SelectedItem;
+            var keyInputMode = ReadStoreInputMode(_keyInputModeBox);
             settings.KeyMappings.KoreanEnglishInputMode = keyInputMode;
-            settings.KeyMappings.EnterInputMode = keyInputMode;
+            settings.KeyMappings.EnterInputMode = _enterInputModeBox == null ? keyInputMode : ReadStoreInputMode(_enterInputModeBox);
             settings.KeyMappings.ConvertKoreanEnglishKey = _convertHangulBox.Checked;
             settings.KeyMappings.HandleRightWindowsKey = _rightWindowsBox.Checked;
             settings.KeyMappings.ConvertEnterToShiftEnter = _convertEnterBox.Checked;

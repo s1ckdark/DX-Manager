@@ -5,11 +5,13 @@ namespace DexManager.Models
         Unknown = 0,
         RecommendedBaseline = 1,
         OlderUnverified = 2,
-        NewerUnverified = 3
+        NewerUnverified = 3,
+        UserVerifiedEnvironment = 4
     }
 
     public sealed class DeviceVersionDiagnostic
     {
+        public string DeviceIdentity { get; set; }
         public string Serial { get; set; }
         public string DisplayName { get; set; }
         public DeviceTransportKind TransportKind { get; set; }

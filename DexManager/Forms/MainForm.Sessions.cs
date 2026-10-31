@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Threading.Tasks;
@@ -128,7 +128,14 @@ namespace DexManager.Forms
                 LocalizationService.Get("Main.DexPreparing"));
             try
             {
-                var serial = GetSelectedDeviceSerial();
+                var serial = GetSelectedLaunchSerial();
+                var appDeviceIdentity = _selectedDeviceIdentity;
+                var launchContext = _selectedDeviceContext;
+                var orchestrator = _orchestrator;
+                var launchDirtyState = _modeSettingsDirty;
+                var launchSettings = CaptureSelectedRunSettings();
+                var scrcpySettings = launchSettings.Scrcpy;
+                if (!await ConfirmExperimentalFrameRateAsync(scrcpySettings.MaxFps)) return;
                 if (string.IsNullOrWhiteSpace(serial))
                 {
                     throw new InvalidOperationException(
@@ -136,16 +143,23 @@ namespace DexManager.Forms
                             "Error.Dex.NoAuthorizedDevice"));
                 }
                 if (!await WaitForDeviceStartDelayAsync(serial)) return;
-                var scrcpySettings =
-                    GetSelectedDeviceRunSettings().Scrcpy;
+
                 if (scrcpySettings.TurnScreenOff)
                     RememberManagedSerial(serial);
-                await _orchestrator.StartAsync(serial);
-                if (_exitInProgress || !_orchestrator.IsRunning) return;
+                if (launchContext != null)
+                {
+                    launchContext.RequireManualStartAfterTransportLoss = false;
+                    launchContext.AutoStartBlockedSerial = string.Empty;
+                    launchContext.PendingSessionStarts++;
+                }
+                try { await orchestrator.StartAsync(serial, launchSettings, true); }
+                finally { if (launchContext != null) launchContext.PendingSessionStarts--; }
+                if (_exitInProgress || !orchestrator.IsRunning) return;
                 RememberStartedApp(
+                    appDeviceIdentity,
                     scrcpySettings.StartAppPackage,
                     scrcpySettings.StartAppName);
-                _modeSettingsDirty[0] = false;
+                launchDirtyState[0] = false;
             }
             catch (Exception ex)
             {
@@ -189,6 +203,12 @@ namespace DexManager.Forms
         private async Task StartSingleWindowAsync(int slot)
         {
             if (_exitInProgress) return;
+            if (IsSingleWindowAppMissing(slot))
+            {
+                ShowMissingStartAppNotice(slot);
+                UpdateStartAppAvailability();
+                return;
+            }
             try { ApplyRunSettings(false); }
             catch (Exception ex)
             {
@@ -211,8 +231,13 @@ namespace DexManager.Forms
                 LocalizationService.Get("Main.SinglePreparing"));
             try
             {
-                var settings = GetSingleWindowSettings(slot);
-                var serial = GetSelectedDeviceSerial();
+                var settings = AppSettings.CloneSingleWindowSlot(GetSingleWindowSettings(slot));
+                var serial = GetSelectedLaunchSerial();
+                var appDeviceIdentity = _selectedDeviceIdentity;
+                var launchContext = _selectedDeviceContext;
+                var service = _singleWindowService;
+                var launchDirtyState = _modeSettingsDirty;
+                if (!await ConfirmExperimentalFrameRateAsync(settings.MaxFps)) return;
                 if (string.IsNullOrWhiteSpace(serial))
                 {
                     throw new InvalidOperationException(
@@ -222,16 +247,21 @@ namespace DexManager.Forms
                 if (!await WaitForDeviceStartDelayAsync(serial)) return;
                 if (settings.TurnScreenOff)
                     RememberManagedSerial(serial);
-                await Task.Run(delegate
+                if (launchContext != null)
                 {
-                    _singleWindowService.Start(slot, settings, serial);
-                });
+                    launchContext.RequireManualStartAfterTransportLoss = false;
+                    launchContext.AutoStartBlockedSerial = string.Empty;
+                    launchContext.PendingSessionStarts++;
+                }
+                try { await Task.Run(delegate { service.Start(slot, settings, serial, true); }); }
+                finally { if (launchContext != null) launchContext.PendingSessionStarts--; }
                 if (_exitInProgress ||
-                    !_singleWindowService.IsRunning(slot)) return;
+                    !service.IsRunning(slot)) return;
                 RememberStartedApp(
+                    appDeviceIdentity,
                     settings.StartAppPackage,
                     settings.StartAppName);
-                _modeSettingsDirty[slot] = false;
+                launchDirtyState[slot] = false;
             }
             catch (Exception ex)
             {
@@ -301,13 +331,13 @@ namespace DexManager.Forms
                     ? (string.IsNullOrWhiteSpace(e.Current.DisplayName)
                         ? LocalizationService.Format(
                             "Main.ConnectedDeviceFallback",
-                            AdbService.IsTcpIpSerial(e.Current.Serial)
+                            AdbService.IsWirelessSerial(e.Current.Serial)
                                 ? "Wi-Fi"
                                 : "USB")
                         : LocalizationService.Format(
                             "Main.ConnectedDevice",
                             e.Current.DisplayName,
-                            AdbService.IsTcpIpSerial(e.Current.Serial)
+                            AdbService.IsWirelessSerial(e.Current.Serial)
                                 ? "Wi-Fi"
                                 : "USB"))
                     : LocalizationService.Get("Main.WaitingPhone");

@@ -55,6 +55,7 @@ namespace DexManager.Forms
             ReshowDelay = 100,
             AutoPopDelay = 6000
         };
+        private readonly MiniTransportView _connectionView;
         private readonly MiniControlButton _collapseButton;
         private ThemePalette _theme;
         private bool _collapsed;
@@ -71,6 +72,8 @@ namespace DexManager.Forms
             StartPosition = FormStartPosition.Manual;
             TopMost = false;
             Size = new Size(BarWidth, BarWidth);
+            _connectionView = new MiniTransportView { Size = new Size(ButtonSize, 26) };
+            Controls.Add(_connectionView);
 
             AddCommandButton(
                 MiniControlBarCommand.ScreenOff,
@@ -118,6 +121,13 @@ namespace DexManager.Forms
         internal event EventHandler<MiniControlBarCommandEventArgs>
             CommandRequested;
 
+        internal void SetConnectionState(bool usb, bool wifi)
+        {
+            _connectionView.SetState(usb, wifi);
+            _toolTip.SetToolTip(_connectionView, usb && wifi ? "USB + Wi-Fi" :
+                usb ? "USB" : wifi ? "Wi-Fi" : LocalizationService.Get("Device.Disconnected"));
+        }
+
         internal IntPtr TargetHandle
         {
             get { return _targetHandle; }
@@ -142,6 +152,7 @@ namespace DexManager.Forms
         {
             _theme = ThemeColors.Resolve(theme);
             BackColor = _theme.CardBackground;
+            if (_connectionView != null) _connectionView.ForeColor = _theme.TextSecondary;
             foreach (var button in _commandButtons)
                 button.ApplyTheme(_theme);
             if (_collapseButton != null)
@@ -251,6 +262,7 @@ namespace DexManager.Forms
         private void SetCollapsed(bool collapsed)
         {
             _collapsed = collapsed;
+            _connectionView.Visible = !collapsed;
             foreach (var button in _commandButtons)
                 button.Visible = !collapsed;
             _collapseButton.Icon = collapsed
@@ -268,6 +280,8 @@ namespace DexManager.Forms
         private void LayoutButtons()
         {
             var top = BarPadding;
+            _connectionView.Location = new Point(BarPadding, top);
+            if (!_collapsed) top += _connectionView.Height + 4;
             if (!_collapsed)
             {
                 foreach (var button in _commandButtons)
@@ -303,6 +317,34 @@ namespace DexManager.Forms
             path.AddArc(arc, 90, 90);
             path.CloseFigure();
             return path;
+        }
+    }
+
+    internal sealed class MiniTransportView : Control
+    {
+        private bool _usb, _wifi;
+        internal MiniTransportView()
+        {
+            SetStyle(ControlStyles.UserPaint | ControlStyles.SupportsTransparentBackColor |
+                ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer, true);
+            BackColor = Color.Transparent;
+            TabStop = false;
+        }
+        internal void SetState(bool usb, bool wifi)
+        {
+            if (_usb == usb && _wifi == wifi) return;
+            _usb = usb; _wifi = wifi; Invalidate();
+        }
+        protected override void OnPaint(PaintEventArgs e)
+        {
+            base.OnPaint(e);
+            if (_usb && _wifi)
+            {
+                DesktopSurface.DrawIcon(e.Graphics, UiSymbol.Usb, new Rectangle(1, (Height - 16) / 2, 16, 16), ForeColor);
+                DesktopSurface.DrawIcon(e.Graphics, UiSymbol.Wifi, new Rectangle(19, (Height - 16) / 2, 16, 16), ForeColor);
+            }
+            else DesktopSurface.DrawIcon(e.Graphics, _usb ? UiSymbol.Usb : _wifi ? UiSymbol.Wifi : UiSymbol.Link,
+                new Rectangle((Width - 20) / 2, (Height - 20) / 2, 20, 20), ForeColor);
         }
     }
 
@@ -411,6 +453,22 @@ namespace DexManager.Forms
 
         private void DrawIcon(Graphics graphics, Pen pen, Color color)
         {
+            UiSymbol fluent;
+            switch (_icon)
+            {
+                case MiniControlIcon.ScreenOff: fluent = UiSymbol.ScreenOff; break;
+                case MiniControlIcon.ScreenOn: fluent = UiSymbol.ScreenOn; break;
+                case MiniControlIcon.Power: fluent = UiSymbol.Power; break;
+                case MiniControlIcon.Fullscreen: fluent = UiSymbol.Fullscreen; break;
+                case MiniControlIcon.ResetSize: fluent = UiSymbol.ResetSize; break;
+                case MiniControlIcon.Capture: fluent = UiSymbol.Capture; break;
+                case MiniControlIcon.Manager: fluent = UiSymbol.Manager; break;
+                case MiniControlIcon.Collapse: fluent = UiSymbol.ChevronUp; break;
+                case MiniControlIcon.Expand: fluent = UiSymbol.Chevron; break;
+                default: fluent = UiSymbol.None; break;
+            }
+            if (FluentIconRenderer.TryDraw(graphics, fluent, new Rectangle(
+                (Width - 24) / 2, (Height - 24) / 2, 24, 24), color)) return;
             var cx = ClientSize.Width / 2F;
             var cy = ClientSize.Height / 2F;
             switch (_icon)
@@ -456,6 +514,7 @@ namespace DexManager.Forms
                     using (var brush = new SolidBrush(color))
                     {
                         var text = "DX";
+                        UiText.Configure(graphics);
                         var size = graphics.MeasureString(text, font);
                         graphics.DrawString(
                             text,

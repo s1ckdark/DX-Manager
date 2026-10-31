@@ -7,6 +7,7 @@ using DexManager.Utils;
 
 namespace DexManager.Forms
 {
+    internal interface IDropDownGroupItem { bool StartsGroup { get; } bool IsSelectable { get; } }
     internal sealed class ThemedDropDownForm : Form
     {
         public ThemedDropDownForm(
@@ -28,8 +29,10 @@ namespace DexManager.Forms
             {
                 SelectedIndex = index;
                 var handler = ItemSelected;
-                if (handler != null) handler(index);
+                TopMost = false;
+                Hide();
                 Close();
+                if (handler != null) handler(index);
             };
             Controls.Add(list);
             ClientSize = new Size(
@@ -70,19 +73,25 @@ namespace DexManager.Forms
         }
 
         public event Action<int> ItemCommitted;
+        private bool IsSelectable(int index) {if(index<0 || index>=_items.Count)return false;var group=_items[index] as IDropDownGroupItem;return group==null || group.IsSelectable;}
+        private void MoveHover(int direction) {
+            int next=_hoverIndex+direction;
+            while(next>=0 && next<_items.Count && !IsSelectable(next))next+=direction;
+            if(IsSelectable(next))_hoverIndex=next;
+        }
 
         protected override void OnKeyDown(KeyEventArgs e)
         {
             if (e.KeyCode == Keys.Down)
             {
-                _hoverIndex = Math.Min(_items.Count - 1, _hoverIndex + 1);
+                MoveHover(1);
                 EnsureHoverVisible();
                 Invalidate();
                 e.Handled = true;
             }
             else if (e.KeyCode == Keys.Up)
             {
-                _hoverIndex = Math.Max(0, _hoverIndex - 1);
+                MoveHover(-1);
                 EnsureHoverVisible();
                 Invalidate();
                 e.Handled = true;
@@ -114,6 +123,7 @@ namespace DexManager.Forms
                     VisibleRowCount - 1,
                     Math.Max(e.Y - 1, 0) / ItemHeight));
             var index = Math.Min(_items.Count - 1, _topIndex + row);
+            if(!IsSelectable(index))index=-1;
             if (_hoverIndex != index)
             {
                 _hoverIndex = index;
@@ -124,10 +134,10 @@ namespace DexManager.Forms
 
         protected override void OnMouseDown(MouseEventArgs e)
         {
-            if (e.Button == MouseButtons.Left &&
-                _hoverIndex >= 0 &&
-                _hoverIndex < _items.Count)
+            int clicked=_topIndex+Math.Max(0,e.Y-1)/ItemHeight;
+            if (e.Button == MouseButtons.Left && IsSelectable(clicked))
             {
+                _hoverIndex=clicked;
                 CommitHoveredItem();
             }
             base.OnMouseDown(e);
@@ -161,7 +171,7 @@ namespace DexManager.Forms
 
         private void CommitHoveredItem()
         {
-            if (_hoverIndex < 0 || _hoverIndex >= _items.Count) return;
+            if (!IsSelectable(_hoverIndex)) return;
             var handler = ItemCommitted;
             if (handler != null) handler(_hoverIndex);
         }
@@ -202,19 +212,22 @@ namespace DexManager.Forms
                     1 + row * ItemHeight,
                     Width - 2,
                     ItemHeight);
-                if (index == _hoverIndex)
+                var groupItem=_items[index] as IDropDownGroupItem;
+                if (index == _hoverIndex && IsSelectable(index))
                 {
                     using (var brush = new SolidBrush(colors.AccentSoft))
                         e.Graphics.FillRectangle(brush, bounds);
                 }
-                TextRenderer.DrawText(
+                UiText.DrawText(
                     e.Graphics,
                     _items[index] == null ? string.Empty : _items[index].ToString(),
                     Font,
                     new Rectangle(10, bounds.Top, bounds.Width - 20, bounds.Height),
-                    colors.TextPrimary,
+                    groupItem!=null && !groupItem.IsSelectable ? colors.TextSecondary : colors.TextPrimary,
                     TextFormatFlags.Left | TextFormatFlags.VerticalCenter |
                     TextFormatFlags.EndEllipsis | TextFormatFlags.NoPadding);
+                if(groupItem!=null && groupItem.StartsGroup)
+                    using(var separator=new Pen(colors.ControlBorder))e.Graphics.DrawLine(separator,10,bounds.Top,Width-10,bounds.Top);
             }
             if (_items.Count > VisibleRowCount)
             {
@@ -226,14 +239,10 @@ namespace DexManager.Forms
                 var thumbTop = 4 + (MaxTopIndex == 0
                     ? 0
                     : travel * _topIndex / MaxTopIndex);
-                using (var brush = new SolidBrush(colors.ControlBorder))
+                using (var brush = new SolidBrush(colors.TextTertiary))
+                using (var path = DesktopSurface.RoundedPath(new Rectangle(Width-7,thumbTop,4,thumbHeight),2))
                 {
-                    e.Graphics.FillRectangle(
-                        brush,
-                        Width - 5,
-                        thumbTop,
-                        2,
-                        thumbHeight);
+                    e.Graphics.FillPath(brush,path);
                 }
             }
             using (var pen = new Pen(colors.ControlBorder))
