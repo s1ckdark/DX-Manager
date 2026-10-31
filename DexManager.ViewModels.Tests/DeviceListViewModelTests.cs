@@ -78,11 +78,17 @@ public class DeviceListViewModelTests
         using var list = new DeviceListViewModel(registry, new DeviceRuntimeSessionRegistry(), new ImmediateUiDispatcher(), new FakeDeviceCommands());
         registry.Reconcile(new[] { Device("phone-a", "Galaxy A", "USB-A", DeviceTransportKind.Usb) });
         var row = list.SelectedDevice;
+        foreach (var slot in row.Slots) slot.AppPackage = "com.example.app";
+        Assert.True(row.StartDexCommand.CanExecute(null));
+        Assert.All(row.Slots, slot => Assert.True(slot.StartCommand.CanExecute(null)));
+        var slotChanged = 0;
+        row.Slots[0].StartCommand.CanExecuteChanged += (_, _) => slotChanged++;
         var raised = new List<string>();
         list.PropertyChanged += (_, e) => raised.Add(e.PropertyName);
 
         registry.Reconcile(Array.Empty<DiscoveredDeviceTransport>());
 
+        Assert.True(slotChanged > 0);
         Assert.Single(list.Devices);
         Assert.Same(row, list.Devices[0]);
         Assert.Same(row, list.SelectedDevice);
@@ -103,6 +109,7 @@ public class DeviceListViewModelTests
         using var list = new DeviceListViewModel(registry, new DeviceRuntimeSessionRegistry(), new ImmediateUiDispatcher(), new FakeDeviceCommands());
         registry.Reconcile(new[] { Device("phone-a", "Galaxy A", "USB-A", DeviceTransportKind.Usb) });
         var row = list.SelectedDevice;
+        foreach (var slot in row.Slots) slot.AppPackage = "com.example.app";
         registry.Reconcile(Array.Empty<DiscoveredDeviceTransport>());
         var raised = new List<string>();
         list.PropertyChanged += (_, e) => raised.Add(e.PropertyName);
@@ -115,6 +122,8 @@ public class DeviceListViewModelTests
         Assert.True(row.IsConnected);
         Assert.Contains("USB-A2", row.TransportSummary);
         Assert.Equal("USB-A2", row.PrimarySerial);
+        Assert.True(row.StartDexCommand.CanExecute(null));
+        Assert.All(row.Slots, slot => Assert.True(slot.StartCommand.CanExecute(null)));
         Assert.DoesNotContain(nameof(IDeviceSelectionSource.SelectedIdentity), raised);
     }
 
@@ -184,6 +193,84 @@ public class DeviceListViewModelTests
         Assert.Single(list.Devices);
         Assert.True(a.IsDisposed);
         Assert.Same(b, list.SelectedDevice);
+    }
+
+    private sealed class FakeClock
+    {
+        public DateTime Now = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+    }
+
+    private static DeviceListViewModel TwoPhonesAWithClock(
+        PhysicalDeviceRegistry registry, FakeClock clock)
+    {
+        registry.Reconcile(new[]
+        {
+            Device("phone-a", "Galaxy A", "USB-A", DeviceTransportKind.Usb),
+            Device("phone-b", "Galaxy B", "USB-B", DeviceTransportKind.Usb)
+        });
+        var list = new DeviceListViewModel(
+            registry, new DeviceRuntimeSessionRegistry(), new ImmediateUiDispatcher(),
+            new FakeDeviceCommands(), () => clock.Now);
+        list.SelectedDevice = list.Devices.First(d => d.Identity == "phone-a");
+        return list;
+    }
+
+    [Fact]
+    public void SelectedMissing_WithinGrace_KeepsPlaceholderEvenIfAnotherPhoneIsConnected()
+    {
+        var registry = new PhysicalDeviceRegistry();
+        var clock = new FakeClock();
+        using var list = TwoPhonesAWithClock(registry, clock);
+        var a = list.SelectedDevice;
+
+        clock.Now += TimeSpan.FromSeconds(1);
+        registry.Reconcile(new[] { Device("phone-b", "Galaxy B", "USB-B", DeviceTransportKind.Usb) });
+        clock.Now += TimeSpan.FromSeconds(2);
+        registry.Reconcile(new[] { Device("phone-b", "Galaxy B", "USB-B2", DeviceTransportKind.Usb) });
+
+        Assert.Equal(2, list.Devices.Count);
+        Assert.Same(a, list.SelectedDevice);
+        Assert.False(a.IsConnected);
+    }
+
+    [Fact]
+    public void SelectedMissing_AfterGrace_WithAnotherConnectedPhone_ExpiresAndSelectsIt()
+    {
+        var registry = new PhysicalDeviceRegistry();
+        var clock = new FakeClock();
+        using var list = TwoPhonesAWithClock(registry, clock);
+        var a = list.SelectedDevice;
+
+        registry.Reconcile(new[] { Device("phone-b", "Galaxy B", "USB-B", DeviceTransportKind.Usb) });
+        clock.Now += TimeSpan.FromSeconds(11);
+        var raised = new List<string>();
+        list.PropertyChanged += (_, e) => raised.Add(e.PropertyName);
+        registry.Reconcile(new[] { Device("phone-b", "Galaxy B", "USB-B2", DeviceTransportKind.Usb) });
+
+        Assert.Single(list.Devices);
+        Assert.True(a.IsDisposed);
+        Assert.Equal("phone-b", list.SelectedIdentity);
+        Assert.Equal(1, raised.Count(n => n == nameof(IDeviceSelectionSource.SelectedIdentity)));
+    }
+
+    [Fact]
+    public void SelectedMissing_ForAMinute_WithNoOtherDevice_KeepsPlaceholderSelected()
+    {
+        var registry = new PhysicalDeviceRegistry();
+        var clock = new FakeClock();
+        registry.Reconcile(new[] { Device("phone-a", "Galaxy A", "USB-A", DeviceTransportKind.Usb) });
+        using var list = new DeviceListViewModel(
+            registry, new DeviceRuntimeSessionRegistry(), new ImmediateUiDispatcher(),
+            new FakeDeviceCommands(), () => clock.Now);
+        var a = list.SelectedDevice;
+
+        registry.Reconcile(Array.Empty<DiscoveredDeviceTransport>());
+        clock.Now += TimeSpan.FromSeconds(60);
+        registry.Reconcile(new[] { Device("phone-x", "Galaxy X", "USB-X", DeviceTransportKind.Usb, AdbDeviceStatus.Unauthorized) });
+
+        Assert.Same(a, list.SelectedDevice);
+        Assert.Contains(a, list.Devices);
+        Assert.False(a.IsDisposed);
     }
 
     [Fact]
