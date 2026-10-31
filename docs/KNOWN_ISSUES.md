@@ -433,6 +433,7 @@ Core 155 — + 다중기기 39개)로만 뒷받침된다.
 - Disconnect 뒤 저장 모드가 USB로 돌아가는가
 - IP를 잘못 입력하면 실패 메시지가 뜨고 버튼이 복귀하는가
 - 동작 중 Save 버튼이 비활성이고 끝나면 다시 활성화되는가
+- [ ] 포트 입력란을 비웠을 때 Port 값과 연결 버튼 상태(NumericUpDown null 바인딩 미확인)
 
 알려진 한계:
 
@@ -443,6 +444,9 @@ Core 155 — + 다중기기 39개)로만 뒷받침된다.
   `_saveSync`)로 저장하고, 설정 페이지는 `ApplicationHost.UpdateSettings`(잠금
   `_settingsLock`)로 저장한다. 같은 살아 있는 `AppSettings`에 대해 잠금이 둘이라 서로를
   배제하지 못하므로 `SettingsViewModel.IsWirelessIdle`이 false인 동안 Save를 비활성화한다.
+  다만 이 게이트는 창을 좁힐 뿐 닫지는 못한다(페이지 교체나 설정 창을 닫았다 다시 열면
+  Core 호출이 아직 도는 중에도 게이트가 풀린다). 근본 해결은 `TODO.md`에 기록한 설정 저장
+  잠금 통합이다.
 - TUI [5]-[1]의 `EnableFromUsb(device.Identity, 5555)` 호출(`InteractiveHost.cs:537`)은
   identity를 호스트 자리에 넘긴다. 이 브랜치에서는 고치지 않았다(`TODO.md` 참조).
 
