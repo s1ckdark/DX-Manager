@@ -343,6 +343,25 @@ Phase 2(DeX 시작/중지 + 단일창 슬롯) 종료 시점에는 실기 검증 
    없거나 신뢰 에이전트로 이미 풀린" 가장 흔한 경우를 위한 것이고, 자격증명이 실제로
    필요하면 폰에서 직접 해제해야 한다.
 
+   **시작 버튼은 한 번만 누르면 된다 — 2단계 잠금 대기.** dismiss 직후 잠금 게이트는
+   먼저 짧은 폴(예산 2000ms, 간격 150ms)로 해제 반영을 기다린다. 그래도 `Locked`면
+   바로 실패시키지 않고 "잠금 해제를 기다린다"는 로그(`Log.Dex.WaitingForUserUnlock`)를
+   남긴 뒤 두 번째 폴(예산 15000ms, 간격 500ms,
+   `DexOrchestrator.UserUnlockWaitBudgetMs`)로 사용자가 폰에서 PIN·지문·얼굴 인증을
+   마치기를 기다린다. 이전에는 짧은 폴만 있어서 사람이 2초 안에 인증을 끝내지 못하면
+   첫 시작이 `Error.Dex.DeviceLocked`로 실패했고, 잠금을 푼 뒤 한 번 더 눌러야 연결됐다.
+   두 단계 모두 `Unlocked`나 `Unknown`이 나오면 즉시 진행한다(fail-open 유지). 두 번째
+   단계까지 `Locked`일 때만 기존 오류를 낸다. 두 번째 단계의 대기는 `_shutdownSignal`로
+   하므로, 대기 중 종료가 요청되면 남은 확인을 돌리지 않고 시작을 조용히 포기한다(첫머리의
+   종료 검사와 같은 `return false`). 진행 표시나 UI 문구는 바꾸지 않았다 — 확인이
+   정상 응답하면 최대 약 17초 동안 시작 버튼이 진행 중 상태로 머문다. 다만 이미 나간
+   adb 확인 하나(`IsDeviceLocked`)는 종료 신호로 끊기지 않고 자체 타임아웃
+   (`AppSettings.Timing.ProcessTimeoutMs`, 기본 15000ms)까지 기다릴 수 있다. 같은 2단계
+   대기는 시작 버튼뿐 아니라 실행 중 설정 적용(`ApplyRuntimeSettingsCore`가 `StartCore`를
+   다시 부른다)에도 적용된다. 실제 PIN/생체 인증 기기에서 한 번 누름으로
+   연결되는지는 아직 실기로 확인하지 않았다(테스트는 가짜 adb의 `dumpsys trust` 전환으로만
+   고정했다).
+
 2. **UI-2의 잠금 감지는 `dumpsys trust`를 1순위로 쓴다 — `dumpsys window`의 secure
    필드 접근은 One UI에서 실기 확인 결과 발동하지 않는다.** 원래 구현
    (`AdbService.ParseLockState`)은 `dumpsys window` 출력에서 `mShowingLockscreen` →

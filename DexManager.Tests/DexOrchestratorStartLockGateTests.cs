@@ -38,6 +38,11 @@ public class DexOrchestratorStartLockGateTests
         try
         {
             var runtime = host.RuntimeCoordinator.GetOrCreate(Identity, Serial);
+            // 사용자 잠금 해제 대기(기본 15초)는
+            // DexOrchestratorDismissKeyguardPollTests가 고정한다. 여기서는
+            // "확신하면 막는다"만 보므로 짧게 줄여 스위트를 느리게 만들지
+            // 않는다.
+            runtime.Dex.UserUnlockWaitBudget = TimeSpan.FromMilliseconds(300);
 
             var ex = await Assert.ThrowsAsync<InvalidOperationException>(
                 () => runtime.Dex.StartAsync(Serial, Identity, CancellationToken.None));
