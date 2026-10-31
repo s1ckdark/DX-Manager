@@ -46,9 +46,14 @@
   - [x] 자동 테스트: ViewModels.Tests 152(게이트웨이 4 + ConnectionSettingsViewModel 13 +
         SettingsViewModel 통합 6 포함), Desktop.Tests 26, Tests 281.
         `dotnet build DexManager.Mac.sln -c Release --warnaserror` 경고 0
-  - [ ] 실기 미확인(이 환경은 Avalonia를 띄우지 못한다 — RenderTimer -6661):
+  - [ ] 실기 확인 현황(2026-10-31 SM-F971N; 이 환경에서도 `DOTNET_ROOT`를 주면 GUI가 뜬다 —
+        `docs/KNOWN_ISSUES.md` "macOS GUI Connection 탭 실기 검증 범위" 참조):
+    - [x] 기기 선택 뒤 탭이 USB serial·저장 방식·포트·자동 재연결을 표시하고 Prepare만 활성
+    - [x] 호스트명 `z-fold8`로 Connect wirelessly → 무선 연결 성공, 프로필 Wireless로 저장
     - [ ] USB 연결 상태에서 Prepare → 기기의 `Transports`에 Wireless 항목이 추가로 표시되는가
-    - [ ] 케이블 분리 후 기기 행이 유지되고 DeX를 시작할 수 있는가
+          (adbd 재시작으로 페이지가 사라지는 결함 때문에 결과를 보지 못함 — 아래 항목)
+    - [x] 케이블 분리 후 기기 행이 유지되고 DeX를 시작할 수 있는가 — 무선 transport로 DeX
+          시작·Stop DeX, overlay `null` 회수 확인
     - [ ] Disconnect 뒤 저장 모드가 USB로 돌아가는가
     - [ ] IP를 잘못 입력하면 실패 메시지가 뜨고 버튼이 복귀하는가
     - [ ] 동작 중 Save가 비활성이고 끝나면 다시 활성화되는가

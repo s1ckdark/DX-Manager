@@ -449,11 +449,22 @@ Connection 탭은 `Usb: R5KL808ZQTP`, 저장된 방식 USB, 포트 5555, 자동 
 Mac과 휴대폰 사이의 네트워크 경로 문제이지 앱 논리 문제가 아니다. 다만 "전환 도중 기기
 재열거로 페이지가 사라져 결과를 잃는" 동작은 실제로 재현된 결함이며 `docs/TODO.md`에
 수정 항목으로 올렸다. 포트 입력란(NumericUpDown)은 폭이 좁아 "5555"의 마지막 자리가 잘려
-보인다. 아래 나머지 항목은 여전히 **미확인**이다.
+보인다.
+
+같은 날 네트워크가 정상인 상태(Mac 192.168.1.19, 휴대폰 192.168.1.86, 5555 포트 도달)에서
+사용자가 GUI를 직접 조작해 확인한 결과: IP 입력란에 호스트명 `z-fold8`을 넣고 "Connect
+wirelessly"를 누르자 무선 연결이 성공했고, 프로필이 `Mode=Wireless`, `WirelessHost=z-fold8`,
+`WirelessPort=5555`, `AutoReconnect=true`로 저장됐다. 이후 USB를 분리한 상태에서 `adb devices`에는
+`z-fold8:5555`만 남았고, 그 transport로 DeX 시작과 **Stop DeX**가 정상 동작했다고 사용자가
+보고했다. Stop DeX 뒤 `overlay_display_devices`는 `null`, `stay_on_while_plugged_in`은 `0`,
+디스플레이는 내장 0·1만 남아 overlay 회수가 확인됐다(2026-10-31, SM-F971N). 호스트명 입력이
+동작한 것은 `NormalizeHost`가 IP 외 호스트명도 허용하기 때문이며, 로컬 DNS/mDNS 해석에 의존한다.
+아래 나머지 항목은 여전히 **미확인**이다.
 
 - USB 연결 상태에서 Prepare → 기기의 `Transports`에 Wireless 항목이 추가 표시되는가
   (2026-10-31: 네트워크 미도달로 연결 단계가 실패해 확인하지 못함)
-- 케이블 분리 후 기기 행이 유지되고 DeX를 시작할 수 있는가
+- 케이블 분리 후 기기 행이 유지되고 DeX를 시작할 수 있는가 — **확인됨**(2026-10-31, 호스트명
+  `z-fold8:5555` 무선 transport로 DeX 시작·Stop DeX·overlay 회수)
 - Disconnect 뒤 저장 모드가 USB로 돌아가는가
 - IP를 잘못 입력하면 실패 메시지가 뜨고 버튼이 복귀하는가
 - 동작 중 Save 버튼이 비활성이고 끝나면 다시 활성화되는가
