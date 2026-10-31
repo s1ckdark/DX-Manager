@@ -72,25 +72,118 @@ public class DeviceListViewModelTests
     }
 
     [Fact]
-    public void RemovesDisappearedDeviceAndMovesSelection()
+    public void SelectedDeviceMissingFromSnapshot_IsKeptAsDisconnectedPlaceholderAndStaysSelected()
     {
         var registry = new PhysicalDeviceRegistry();
         using var list = new DeviceListViewModel(registry, new DeviceRuntimeSessionRegistry(), new ImmediateUiDispatcher(), new FakeDeviceCommands());
+        registry.Reconcile(new[] { Device("phone-a", "Galaxy A", "USB-A", DeviceTransportKind.Usb) });
+        var row = list.SelectedDevice;
+        var raised = new List<string>();
+        list.PropertyChanged += (_, e) => raised.Add(e.PropertyName);
 
+        registry.Reconcile(Array.Empty<DiscoveredDeviceTransport>());
+
+        Assert.Single(list.Devices);
+        Assert.Same(row, list.Devices[0]);
+        Assert.Same(row, list.SelectedDevice);
+        Assert.Equal("phone-a", list.SelectedIdentity);
+        Assert.False(row.IsConnected);
+        Assert.False(row.IsDisposed);
+        Assert.Equal("Galaxy A", row.DisplayName);
+        Assert.Equal(string.Empty, row.TransportSummary);
+        Assert.DoesNotContain(nameof(IDeviceSelectionSource.SelectedIdentity), raised);
+        Assert.False(row.StartDexCommand.CanExecute(null));
+        Assert.All(row.Slots, slot => Assert.False(slot.StartCommand.CanExecute(null)));
+    }
+
+    [Fact]
+    public void MissingSelectedDevice_ReturningWithANewTransport_UpdatesTheSameRow()
+    {
+        var registry = new PhysicalDeviceRegistry();
+        using var list = new DeviceListViewModel(registry, new DeviceRuntimeSessionRegistry(), new ImmediateUiDispatcher(), new FakeDeviceCommands());
+        registry.Reconcile(new[] { Device("phone-a", "Galaxy A", "USB-A", DeviceTransportKind.Usb) });
+        var row = list.SelectedDevice;
+        registry.Reconcile(Array.Empty<DiscoveredDeviceTransport>());
+        var raised = new List<string>();
+        list.PropertyChanged += (_, e) => raised.Add(e.PropertyName);
+
+        registry.Reconcile(new[] { Device("phone-a", "Galaxy A", "USB-A2", DeviceTransportKind.Usb) });
+
+        Assert.Single(list.Devices);
+        Assert.Same(row, list.Devices[0]);
+        Assert.Same(row, list.SelectedDevice);
+        Assert.True(row.IsConnected);
+        Assert.Contains("USB-A2", row.TransportSummary);
+        Assert.Equal("USB-A2", row.PrimarySerial);
+        Assert.DoesNotContain(nameof(IDeviceSelectionSource.SelectedIdentity), raised);
+    }
+
+    [Fact]
+    public void UnselectedMissingDevice_IsStillRemoved()
+    {
+        var registry = new PhysicalDeviceRegistry();
+        using var list = new DeviceListViewModel(registry, new DeviceRuntimeSessionRegistry(), new ImmediateUiDispatcher(), new FakeDeviceCommands());
         registry.Reconcile(new[]
         {
             Device("phone-a", "Galaxy A", "USB-A", DeviceTransportKind.Usb),
             Device("phone-b", "Galaxy B", "USB-B", DeviceTransportKind.Usb)
         });
-        list.SelectedDevice = list.Devices.First(d => d.Identity == "phone-b");
+        var a = list.Devices.First(d => d.Identity == "phone-a");
+        var b = list.Devices.First(d => d.Identity == "phone-b");
+        list.SelectedDevice = a;
 
-        registry.Reconcile(new[]
-        {
-            Device("phone-a", "Galaxy A", "USB-A", DeviceTransportKind.Usb)
-        });
+        registry.Reconcile(new[] { Device("phone-a", "Galaxy A", "USB-A", DeviceTransportKind.Usb) });
 
         Assert.Single(list.Devices);
-        Assert.Equal("phone-a", list.SelectedDevice.Identity);
+        Assert.True(b.IsDisposed);
+        Assert.Same(a, list.SelectedDevice);
+    }
+
+    [Fact]
+    public void DisappearedSelectedDevice_IsKeptDisconnectedAndSelectionDoesNotSlide()
+    {
+        var registry = new PhysicalDeviceRegistry();
+        using var list = new DeviceListViewModel(registry, new DeviceRuntimeSessionRegistry(), new ImmediateUiDispatcher(), new FakeDeviceCommands());
+        registry.Reconcile(new[]
+        {
+            Device("phone-a", "Galaxy A", "USB-A", DeviceTransportKind.Usb),
+            Device("phone-b", "Galaxy B", "USB-B", DeviceTransportKind.Usb)
+        });
+        var b = list.Devices.First(d => d.Identity == "phone-b");
+        list.SelectedDevice = b;
+
+        registry.Reconcile(new[] { Device("phone-a", "Galaxy A", "USB-A", DeviceTransportKind.Usb) });
+
+        Assert.Equal(2, list.Devices.Count);
+        Assert.Same(b, list.SelectedDevice);
+        Assert.False(b.IsConnected);
+        Assert.True(list.Devices.First(d => d.Identity == "phone-a").IsConnected);
+    }
+
+    [Fact]
+    public void DisconnectedPlaceholder_IsRemovedOnceAnotherDeviceIsSelected()
+    {
+        var registry = new PhysicalDeviceRegistry();
+        using var list = new DeviceListViewModel(registry, new DeviceRuntimeSessionRegistry(), new ImmediateUiDispatcher(), new FakeDeviceCommands());
+        registry.Reconcile(new[]
+        {
+            Device("phone-a", "Galaxy A", "USB-A", DeviceTransportKind.Usb),
+            Device("phone-b", "Galaxy B", "USB-B", DeviceTransportKind.Usb)
+        });
+        var a = list.Devices.First(d => d.Identity == "phone-a");
+        var b = list.Devices.First(d => d.Identity == "phone-b");
+        list.SelectedDevice = a;
+        registry.Reconcile(new[] { Device("phone-b", "Galaxy B", "USB-B", DeviceTransportKind.Usb) });
+        Assert.Equal(2, list.Devices.Count);
+        Assert.False(a.IsConnected);
+
+        list.SelectedDevice = b;
+        // 스냅샷이 실제로 달라져야 Apply 가 돈다.
+        registry.Reconcile(new[] { Device("phone-b", "Galaxy B", "USB-B2", DeviceTransportKind.Usb) });
+
+        Assert.Single(list.Devices);
+        Assert.True(a.IsDisposed);
+        Assert.Same(b, list.SelectedDevice);
     }
 
     [Fact]
@@ -225,8 +318,17 @@ public class DeviceListViewModelTests
         });
         Assert.False(list.IsEmpty);
 
+        // 선택된 유일한 기기가 사라져도 연결 끊김 자리표시자로 남는다.
         registry.Reconcile(Array.Empty<DiscoveredDeviceTransport>());
-        Assert.True(list.IsEmpty);
+        Assert.False(list.IsEmpty);
+
+        // 선택이 풀린 자리표시자는 다음 Apply 에서 제거된다.
+        list.SelectedDevice = null;
+        registry.Reconcile(new[]
+        {
+            Device("phone-b", "Galaxy B", "USB-B", DeviceTransportKind.Usb)
+        });
+        Assert.Equal(new[] { "phone-b" }, list.Devices.Select(d => d.Identity));
     }
 
     [Fact]
@@ -362,8 +464,10 @@ public class DeviceListViewModelTests
         // 생성자의 첫 Apply는 디스패처를 거치지 않고 동기로 실행된다.
         Assert.Single(vm.Devices);
 
-        // phone-a 를 목록에서 뺀다. 목록 레벨 SnapshotChanged는 디스패처
-        // 큐를 거치므로 Drain해야 실제로 반영되고 행이 Dispose된다.
+        // 선택된 행은 자리표시자로 남으므로, 선택을 푼 뒤 phone-a 를 뺀다.
+        // 목록 레벨 SnapshotChanged는 디스패처 큐를 거치므로 Drain해야
+        // 실제로 반영되고 행이 Dispose된다.
+        vm.SelectedDevice = null;
         registry.Reconcile(Array.Empty<DiscoveredDeviceTransport>());
         dispatcher.Drain();
         Assert.True(vm.IsEmpty);

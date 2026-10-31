@@ -94,6 +94,21 @@ public sealed partial class DeviceListViewModel : ObservableObject, IDisposable,
                 d.Identity, identity, StringComparison.OrdinalIgnoreCase));
             if (!stillPresent)
             {
+                // 선택된 행은 transport 가 잠깐 사라져도(adb tcpip 의 adbd
+                // 재시작 등) 연결 끊김 자리표시자로 남긴다. 행과 선택이
+                // 유지돼야 기기별 설정 페이지와 진행 중인 작업이 살아남고,
+                // 선택이 다른 휴대폰으로 미끄러지지 않는다.
+                if (ReferenceEquals(Devices[i], SelectedDevice))
+                {
+                    Devices[i].Update(new PhysicalDeviceInfo
+                    {
+                        Identity = Devices[i].Identity,
+                        DisplayName = Devices[i].DisplayName,
+                        Transports = new List<DeviceTransportInfo>()
+                    });
+                    continue;
+                }
+
                 // 행이 건 구독을 끊고 뽑는다. 순서를 바꾸면 뽑힌 행이
                 // 계속 이벤트를 받는다.
                 Devices[i].Dispose();

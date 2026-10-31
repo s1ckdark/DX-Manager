@@ -80,8 +80,13 @@ public sealed partial class SingleWindowSlotViewModel : ObservableObject, IDispo
         IsRunning = slot?.IsRunning == true;
     }
 
+    /// <summary>부모 기기가 연결돼 있는지 여부. 끊긴 동안은 시작할 수 없다.</summary>
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(StartCommand))]
+    private bool _isDeviceConnected = true;
+
     private bool CanStart()
-        => !_disposed && !IsBusy && !string.IsNullOrWhiteSpace(AppPackage);
+        => !_disposed && !IsBusy && IsDeviceConnected && !string.IsNullOrWhiteSpace(AppPackage);
 
     [RelayCommand(CanExecute = nameof(CanStart))]
     private async Task StartAsync()
