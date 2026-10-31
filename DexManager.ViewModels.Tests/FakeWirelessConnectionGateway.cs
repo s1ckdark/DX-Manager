@@ -77,9 +77,10 @@ public sealed class FakeWirelessConnectionGateway : IWirelessConnectionGateway, 
         {
             return Gate.Task.ContinueWith(t =>
             {
-                applySideEffects(t.Result);
-                return t.Result;
-            }, TaskContinuationOptions.OnlyOnRanToCompletion);
+                var result = t.GetAwaiter().GetResult();
+                applySideEffects(result);
+                return result;
+            }, TaskContinuationOptions.ExecuteSynchronously);
         }
 
         var result = NextResult;
