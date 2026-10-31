@@ -435,9 +435,24 @@ RenderTimer -6661은 재현되지 않았다). apphost `DXManager.Desktop`을 직
 미선택 placeholder를 보이는 것, Cancel과 `Cmd+Q` 종료가 정상인 것까지 확인했다. 첫
 시도에서 Connection 탭을 클릭하자 설정 창이 사라진 일이 한 번 있었으나 다시 열어
 클릭했을 때는 재현되지 않았고 프로세스는 살아 있었으며 stderr에 아무것도 없었다.
-원인은 모른다. 실제 휴대폰이 연결된 상태의 동작은 아래와 같이 **미확인**이다.
+원인은 모른다.
+
+2026-10-31 SM-F971N(R5KL808ZQTP)을 USB로 연결해 같은 방식으로 실기 확인했다. 기기 선택 뒤
+Connection 탭은 `Usb: R5KL808ZQTP`, 저장된 방식 USB, 포트 5555, 자동 재연결 켬을 표시했고
+"Prepare over USB"만 활성, 나머지 둘은 비활성이었다. Prepare를 누르자 휴대폰에는
+`service.adb.tcp.port=5555`가 적용됐으나(USB transport_id 36→37로 재열거), 약 1초 뒤
+설정 창의 Connection 탭이 "Select a device…" placeholder로 바뀌었다. `adb tcpip`가 adbd를
+재시작하면서 USB transport가 잠시 사라지고, 기기 목록이 선택을 비우면서
+`LoadDevicePages("")`가 진행 중인 Connection 페이지를 폐기한 것이다. 그래서 결과 메시지를
+볼 수 없었고 Save 게이트도 그 순간 풀렸다. 프로필은 저장되지 않았다. 셸에서 직접
+`adb connect 192.168.1.86:5555`를 실행하니 `No route to host`였으므로 연결 실패 자체는 이
+Mac과 휴대폰 사이의 네트워크 경로 문제이지 앱 논리 문제가 아니다. 다만 "전환 도중 기기
+재열거로 페이지가 사라져 결과를 잃는" 동작은 실제로 재현된 결함이며 `docs/TODO.md`에
+수정 항목으로 올렸다. 포트 입력란(NumericUpDown)은 폭이 좁아 "5555"의 마지막 자리가 잘려
+보인다. 아래 나머지 항목은 여전히 **미확인**이다.
 
 - USB 연결 상태에서 Prepare → 기기의 `Transports`에 Wireless 항목이 추가 표시되는가
+  (2026-10-31: 네트워크 미도달로 연결 단계가 실패해 확인하지 못함)
 - 케이블 분리 후 기기 행이 유지되고 DeX를 시작할 수 있는가
 - Disconnect 뒤 저장 모드가 USB로 돌아가는가
 - IP를 잘못 입력하면 실패 메시지가 뜨고 버튼이 복귀하는가

@@ -55,6 +55,16 @@
   - [ ] 이연된 리뷰 minor: 연결 호출 중 Cancel/기기 선택 변경 시 호출이 끝나기 전에 idle로
         보고됨, 비운 NumericUpDown이 int `Port`로 바인딩되지 못함, placeholder 문구가 다른 탭처럼
         영어로 하드코딩됨, `OperationCanceledException` 경로 테스트 없음
+- [ ] **[실기 재현]** Connection 탭 "Prepare over USB" 도중 USB 재열거로 페이지가 사라진다 —
+      `adb tcpip 5555`가 adbd를 재시작해 USB transport가 잠시 빠지면 기기 목록이 선택을 비우고
+      `SettingsViewModel.LoadDevicePages("")`가 진행 중인 `ConnectionSettingsViewModel`을 폐기한다.
+      결과 메시지가 사라지고 `IsWirelessIdle` Save 게이트도 그 순간 풀린다(2026-10-31 SM-F971N,
+      `docs/KNOWN_ISSUES.md` 참조). 후보: (a) 기기 목록이 짧은 transport 공백 동안 선택 identity를
+      유지(재열거 후 같은 identity 행을 다시 선택), (b) 설정 창이 identity별 페이지를 기기 행이 아니라
+      마지막 선택 identity에 묶어 빈 선택에서도 유지, (c) 진행 중 명령이 끝날 때까지 페이지 교체를
+      미룸. 어느 쪽이든 복수 기기 불변 조건(명시적 identity)을 지켜야 한다.
+- [ ] Connection 탭 포트 NumericUpDown 폭이 좁아 "5555" 마지막 자리가 잘려 보인다(실기 확인) —
+      `MinWidth`를 늘린다.
 - [ ] 설정 저장 잠금 통합 — `ApplicationHost.UpdateSettings`(`_settingsLock`, live 객체 변경 후 Save)와 `SettingsService.UpdateAndSave`(`_saveSync`, CloneCore→mutate→SaveCore→CopySettings)가 같은 `AppSettings`를 서로 다른 잠금으로 쓴다. `UpdateAndSave`의 CloneCore와 CopySettings 사이에 들어온 UI 저장은 메모리와 디스크에서 조용히 덮어써진다. 수 ms 창이라 드물지만, `UpdateSettings`가 `_saveSync` 아래에서 변경+저장을 한 번에 하도록 바꾸면 이 부류가 사라지고 Connection 탭의 `IsWirelessIdle` Save 게이트는 UX 용도만 남는다. Core 동시성 변경이라 별도 PR로 진행한다.
 - [ ] TUI [5]-[1]이 `EnableFromUsb(device.Identity, 5555)`로 identity를 호스트 자리에 넘긴다
       (`DexManager.Mac/Hosting/InteractiveHost.cs:537`) — 메서드는 호스트 IP를 기대한다.
