@@ -79,7 +79,12 @@
   - [x] `scripts/Build-Mac-App.sh` → `dist/DXManager.app`(osx-arm64, ad-hoc 서명, 개인용)
   - [x] 번들: Desktop 앱 + `tools/{adb-proxy,scrcpy,adb}` + `PORTABLE_PACKAGE.txt` + icns;
         재빌드 시 `Contents/MacOS/{config,logs,screenshot}` 보존
-  - [ ] 번들 GUI 실제 실행(Finder/Dock) 확인은 사용자 몫
+  - [x] 번들 GUI 실제 실행 확인(2026-10-31, `open dist/DXManager.app`): 창·Dock·메뉴 막대
+        "DX Manager" 표시, 저장된 무선 프로필로 `z-fold8:5555` 자동 표시, 번들 안의
+        `tools/adb-proxy/DXMAdbProxy`·`tools/scrcpy/adb`로 scrcpy 서버 실행(DeX display 12),
+        DeX 세션이 열린 채 SIGTERM 종료 시 overlay `null`·잔여 프로세스 없음, 재빌드 뒤 `config/` 보존
+  - [ ] Gatekeeper 첫 실행 경고(우클릭 → 열기)는 `open` 명령 실행에서는 나오지 않았다. Finder
+        더블클릭 경로는 미확인
 - [ ] 설정 저장 잠금 통합 — `ApplicationHost.UpdateSettings`(`_settingsLock`, live 객체 변경 후 Save)와 `SettingsService.UpdateAndSave`(`_saveSync`, CloneCore→mutate→SaveCore→CopySettings)가 같은 `AppSettings`를 서로 다른 잠금으로 쓴다. `UpdateAndSave`의 CloneCore와 CopySettings 사이에 들어온 UI 저장은 메모리와 디스크에서 조용히 덮어써진다. 수 ms 창이라 드물지만, `UpdateSettings`가 `_saveSync` 아래에서 변경+저장을 한 번에 하도록 바꾸면 이 부류가 사라지고 Connection 탭의 `IsWirelessIdle` Save 게이트는 UX 용도만 남는다. Core 동시성 변경이라 별도 PR로 진행한다.
 - [ ] TUI [5]-[1]이 `EnableFromUsb(device.Identity, 5555)`로 identity를 호스트 자리에 넘긴다
       (`DexManager.Mac/Hosting/InteractiveHost.cs:537`) — 메서드는 호스트 IP를 기대한다.
