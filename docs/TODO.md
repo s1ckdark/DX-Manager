@@ -17,6 +17,14 @@
         `companion/integration/CompanionRelease.cs`를 연결하거나 상수를 갱신해야 한다.
   - [ ] macOS 워크플로와 `Package-Mac-Release.sh`에 `DexManager.Desktop.Tests`(26개) 실행 단계와
         `paths:` 필터 추가 — 현재는 sln 빌드로 컴파일만 되고 실행되지 않는다.
+  - [ ] CI 러너에서 `DexOrchestratorDismissKeyguardPollTests.StartAsync_DeviceUnlocksPartwayThroughTheBudget_StopsPollingEarlyAndProceeds`
+        실패 — PR #15의 두 번째 CI 실행(41164781227)에서 arm64·x64 러너 모두 "expected at least one
+        re-check before the device unlocked, but saw 1"로 실패했고(280/281 통과) 로컬 Apple Silicon에서는
+        통과한다. 테스트는 700ms 뒤 잠금 해제를 흉내 내는 벽시계 기반이라, 러너에서 fake adb 프로세스
+        기동이 느리면 첫 `dumpsys trust` 확인 전에 이미 풀린다. `KNOWN_ISSUES.md`의 "fake-adb 프로브의
+        CPU 경합 flake"와 같은 부류다. main의 CI가 PR #9 이후 빌드 단계에서 멈춰 있어 이 테스트가 CI에서
+        실행된 것은 이번이 처음이다. 재현 조건을 더 확인한 뒤 해제 지연을 늘리거나 fake adb를 결정적으로
+        바꿀지 판단한다. 이 머지에서는 손대지 않았다.
   - [x] 포크 macOS CI 실패 원인 제거 — `ApplicationHostTests.Dispose_AfterShutdownAsync_DoesNotThrow`의
         `GetAwaiter().GetResult()`가 `--warnaserror`에서 `xUnit1031` 오류가 되어 PR #9 이후 main의
         모든 워크플로 실행이 실패했다. 테스트를 `async`/`await`로 바꿨다(아래 Phase 2 이연 항목의
