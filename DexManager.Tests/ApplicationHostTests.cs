@@ -403,13 +403,13 @@ public class ApplicationHostTests : IDisposable
     }
 
     [Fact]
-    public void Dispose_AfterShutdownAsync_DoesNotThrow()
+    public async Task Dispose_AfterShutdownAsync_DoesNotThrow()
     {
         using var root = new TempHostRoot();
         var host = root.CreateHost();
         host.RuntimeFactory.Create();
 
-        host.ShutdownAsync(null, null).GetAwaiter().GetResult();
+        await host.ShutdownAsync(null, null);
 
         // 종료 훅이 ShutdownAsync를 부른 뒤 using이 Dispose를 또 부른다.
         host.Dispose();
