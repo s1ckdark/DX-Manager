@@ -2,7 +2,8 @@
      시작 시 저장된 테마(ThemeApplier.Apply)로 이 값을 설정한다. -->
 <Application xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             x:Class="DexManager.Desktop.App">
+             x:Class="DexManager.Desktop.App"
+             Name="DX Manager">
   <Application.Styles>
     <FluentTheme />
   </Application.Styles>
